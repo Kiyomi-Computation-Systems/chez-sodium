@@ -1,0 +1,40 @@
+#!r6rs
+;; Detail for p06's "fused" design (wipe in the critical after thunk), and the
+;; same with the whole extent held in one critical-section: what a resumed
+;; remainder answers.
+;; Usage: scheme --script p06c-fused-resume.sps [section]
+(import (chezscheme))
+(define events '())
+(define (note! e) (set! events (cons e events)))
+(define (some-work) (let loop ((i 0)) (when (< i 20) (loop (+ i 1)))))
+(define (call-with-block who size fill! proc)
+  (let ((block #f) (freed #f))
+    (dynamic-wind
+      (lambda () (when freed (assertion-violation who "re-entered after its block was freed")))
+      (lambda ()
+        (dynamic-wind #t
+          (lambda () (set! block 'B) (note! 'made))
+          (lambda () (fill! block) (proc block))
+          (lambda () (set! freed #t) (when block (note! 'wiped) (note! 'freed) (set! block #f)))))
+      (lambda () #f))))
+(define (fused)
+  (call-with-block 'v 16 (lambda (b) #f) (lambda (b) (some-work) (note! 'used) 'answer)))
+(define (fused-in-section)
+  (critical-section (fused)))
+(define inner (if (member "section" (command-line)) fused-in-section fused))
+(define tally '())
+(let loop ((fuel 1))
+  (set! events '())
+  (let* ((first ((make-engine inner) fuel (lambda (left . v) (list 'completed)) (lambda (rest) rest)))
+         (second (if (procedure? first)
+                     (guard (e (#t (list 'resume-raised (condition-message e))))
+                       (first 1000000 (lambda (left . v) 'resumed-completed) (lambda (r) 'expired-again)))
+                     'none)))
+    (set! tally (cons (list (reverse events) (if (procedure? first) 'expired 'completed) second) tally))
+    (unless (and (pair? first) (eq? (car first) 'completed)) (loop (+ fuel 1)))))
+(let count ((rest tally) (seen '()))
+  (if (null? rest)
+      (for-each (lambda (p) (printf "~s x~s\n" (car p) (cdr p))) seen)
+      (let ((p (assoc (car rest) seen)))
+        (if p (begin (set-cdr! p (+ (cdr p) 1)) (count (cdr rest) seen))
+            (count (cdr rest) (cons (cons (car rest) 1) seen))))))

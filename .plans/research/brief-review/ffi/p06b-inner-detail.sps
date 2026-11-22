@@ -1,0 +1,33 @@
+#!r6rs
+;; Detail for p06's "inner" design: each fuel's events and run outcomes.
+;; Usage: scheme --script p06b-inner-detail.sps
+(import (chezscheme))
+(define events '())
+(define (note! e) (set! events (cons e events)))
+(define (some-work) (let loop ((i 0)) (when (< i 20) (loop (+ i 1)))))
+(define (call-with-block who size fill! proc)
+  (let ((block #f) (freed #f))
+    (dynamic-wind
+      (lambda () (when freed (assertion-violation who "re-entered after its block was freed")))
+      (lambda ()
+        (dynamic-wind #t
+          (lambda () (set! block 'B) (note! 'made))
+          (lambda () (fill! block) (proc block))
+          (lambda () (set! freed #t) (when block (note! 'freed) (set! block #f)))))
+      (lambda () #f))))
+(define (inner)
+  (call-with-block 'v 16 (lambda (b) #f)
+    (lambda (b)
+      (dynamic-wind (lambda () #f)
+        (lambda () (some-work) (note! 'used) 'answer)
+        (lambda () (note! 'wipe-start) (some-work) (note! 'wiped))))))
+(let loop ((fuel 1))
+  (set! events '())
+  (let* ((first ((make-engine inner) fuel (lambda (left . v) (list 'completed)) (lambda (rest) rest)))
+         (second (if (procedure? first)
+                     (guard (e (#t (list 'resume-raised (condition-message e))))
+                       (first 1000000 (lambda (left . v) 'resumed-completed) (lambda (r) 'expired-again)))
+                     'none)))
+    (printf "fuel ~s: ~s ~s\n" fuel (reverse events) (if (procedure? first) 'expired first) )
+    (printf "        resume: ~s\n" second)
+    (unless (and (pair? first) (eq? (car first) 'completed)) (loop (+ fuel 1)))))

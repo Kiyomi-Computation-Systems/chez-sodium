@@ -1,0 +1,30 @@
+==208425== Memcheck, a memory error detector
+==208425== Copyright (C) 2002-2026, and GNU GPL'd, by Julian Seward et al.
+==208425== Using Valgrind-3.27.0 and LibVEX; rerun with -h for copyright info
+==208425== Command: /gnu/store/8bp0ndirsjcwh0mjqcv6z4b9syrpi97i-chez-scheme-10.4.0/lib/csv10.4.0/ta6le/scheme --script chez-sodium-probe.ss /lib/x86_64-linux-gnu/libsodium.so.23
+==208425== 
+sodium_init 0 then 1
+hash 59 ms: $argon2id$v=19$m=8,t=1,p=1$zx2SrCG1bmCIjsz8Y1Jb7A$d4NBiC5HrzTqTIwuAhWNEl8feReCcGUf7zsaAVKu9RI
+verify right 0, wrong -1, NUL-password -1
+needs_rehash same 0, higher 1
+random #vu8(25 167 150 179 122 44 212 132 216 141 152 215 37 42 110 241 249 52 221 153 1 151 221 75 0 242 120 42 147 157 107 40)
+generichash rc 0: #vu8(186 128 165 63 152 28 77 13 106 39 151 182 159 18 246 233 76 33 47 20 104 90 196 183 75 18 187 111 219 255 162 209 125 135 197 57 42 171 121 45 194 82 213 222 69 51 204 149 24 211 138 168 219 241 146 90 185 35 134 237 212 0 153 35)
+memcmp equal 0 unequal -1 len0 0
+foreign-alloc 0: (raised ~s is not a positive fixnum (0))
+==208425== 
+==208425== HEAP SUMMARY:
+==208425==     in use at exit: 1,626 bytes in 5 blocks
+==208425==   total heap usage: 445 allocs, 440 frees, 107,830 bytes allocated
+==208425== 
+==208425== LEAK SUMMARY:
+==208425==    definitely lost: 0 bytes in 0 blocks
+==208425==    indirectly lost: 0 bytes in 0 blocks
+==208425==      possibly lost: 0 bytes in 0 blocks
+==208425==    still reachable: 1,626 bytes in 5 blocks
+==208425==         suppressed: 0 bytes in 0 blocks
+==208425== Reachable blocks (those to which a pointer was found) are not shown.
+==208425== To see them, rerun with: --leak-check=full --show-leak-kinds=all
+==208425== 
+==208425== For lists of detected and suppressed errors, rerun with: -s
+==208425== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+wall 3.15 s maxrss 106708 KB
