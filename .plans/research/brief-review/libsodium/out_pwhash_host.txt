@@ -1,0 +1,61 @@
+version 1.0.18 (10.3)
+randombytes_buf before sodium_init and with (NULL,0): no crash
+sodium_init() first                                                    -> 0
+sodium_init() second                                                   -> 1
+strbytes=128 passwd_min=0 passwd_max=4294967295
+opslimit min=1 max=4294967295 int=2 mod=3 sens=4
+memlimit min=8192 max=4398046510080 int=67108864 mod=268435456 sens=1073741824
+argon2i opslimit_min=3 (argon2id 1)
+crypto_pwhash_str(pw, min limits)                                      -> 0
+  hash = $argon2id$v=19$m=8,t=1,p=1$AIv3FGfFiKN5tPokyw7DqA$YKXDMDKq4Dt2Rk5/5WZxZwPp4YZOCPjQqfxZuOk6veQ (strlen 93)
+str_verify(h, pw)                                                      -> 0
+str_verify(h, pX)                                                      -> -1
+str_verify("garbage", pw)                                              -> -1
+str_verify("", pw)                                                     -> -1
+str_verify(h "\0junk", pw)  [C sees h only]                            -> 0
+str_verify(h "junk", pw)  [trailing non-NUL data]                      -> -1
+str_verify(h "\n", pw)                                                 -> -1
+str_verify(" " h, pw)                                                  -> -1
+str_verify(hash("a\0b"), "a\0b",3)                                     -> 0
+str_verify(hash("a\0b"), "a",1)                                        -> -1
+crypto_pwhash_str("",0)                                                -> 0
+str_verify(hash(""), "",0)                                             -> 0
+str_verify(hash(""), "x",1)                                            -> -1
+needs_rehash(h, same)                                                  -> 0
+needs_rehash(h, ops+1)                                                 -> 1
+needs_rehash(h, mem*2)                                                 -> 1
+needs_rehash(h(ops=3), ops=1)  [limits LOWERED]                        -> 0
+  -> needs_rehash(h3, 1, MEM)                                          -> 1
+needs_rehash(h, OPS, MEM+1023)  [memlimit compared in KiB]             -> 0
+needs_rehash("garbage")                                                -> -1
+needs_rehash(h "\0junk", same)                                         -> 0
+  str with memlimit=9192: $argon2id$v=19$m=8,t=1,p=1$d9lIAFqe5WVO7...
+crypto_pwhash_str_alg(argon2i, ops=3)                                  -> 0
+  argon2i hash = $argon2i$v=19$m=8,t=3,p=1$ySAAPauyYVJaAxgQY7bUqQ$8/nF2u2mNg0CpOoPxlNn/FKPGHdlnuufsspRYLhO9zQ
+str_verify(argon2i hash, pw)  [generic verify]                         -> 0
+needs_rehash(argon2i hash, 3, MEM)  [default alg is argon2id]          -> 0
+argon2id_str_needs_rehash(argon2i hash, 3, MEM)                        -> -1
+  no-version string = $argon2id$m=8,t=1,p=1$AIv3FGfFiKN5tPokyw7DqA$YKXDMDKq4Dt2Rk5/5WZxZwPp4YZOCPjQqfxZuOk6veQ
+str_verify(no-$v= string)                                              -> -1
+needs_rehash(no-$v= string)                                            -> -1
+str_verify($v=16 string)                                               -> -1
+str_verify($argon2d$ string)                                           -> -1
+  long hash (strlen 136, STRBYTES 128) = $argon2id$v=19$m=8,t=1,p=1$1E+sFZg61XtpAvMXYevFJg$vAN+H20gXtPkAy6j4hdvt4dWB+3g6MXn3qbZe2Or6PuVG/OnZr4QiNXKDHTEqI5udcsfkDfHVx8P4CYHnQh88A
+str_verify(long valid hash, pw)                                        -> 0
+str_verify(long valid hash, pX)                                        -> -1
+needs_rehash(long valid hash, same)                                    -> -1
+  p=4 string (tag is for p=1, so verify must be -1): $argon2id$v=19$m=64,t=1,p=4$W8wV+/mJaC6/yDZGgwHeAQ$Xc4YSnohlnrHJcU6nhdkmpNNAjGn3Y2hHylI9nqO/uU
+str_verify(p=4 string)  [decoded, recomputed, mismatched]              -> -1
+needs_rehash(p=4 string, same t,m)  [p not compared?]                  -> 0
+str_verify(m=4294967295 KiB i.e. 4 TiB)                                -> -1 (errno 22 Invalid argument) in 0.000s
+str_verify(m=262144 KiB i.e. 256 MiB, t=1)                             -> -1 in 0.147s  [attacker-chosen cost]
+needs_rehash(saved h, ops=2^32)                                        -> -1
+needs_rehash(saved h, ops=0)  [below min, not checked by C]            -> 1
+needs_rehash(saved h, mem=0)  [below min, not checked by C]            -> 1
+crypto_pwhash_str(ops=0)                                               -> -1
+  errno=22
+crypto_pwhash_str(mem=MEM-1)                                           -> -1
+  errno=22
+crypto_pwhash_str(ops=2^32)                                            -> -1
+  errno=27
+  after failed crypto_pwhash_str, out buffer strlen = 0 (zeroed)

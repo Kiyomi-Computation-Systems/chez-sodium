@@ -1,0 +1,10 @@
+;; Can a Chez string be wiped? Can string->utf8 fail? Does a surrogate code point exist as a char?
+(define s (string-copy "hunter2"))
+(string-fill! s #\nul)
+(printf "after string-fill!: ~s (mutable string wiped in place)\n" s)
+(printf "literal is immutable: ~s\n" (guard (e (#t (condition-message e))) (string-fill! "abc" #\x) 'filled))
+(printf "integer->char #xD800: ~s\n" (guard (e (#t (condition-message e))) (integer->char #xD800)))
+(printf "string->utf8 of U+0000 and U+10FFFF: ~s\n" (string->utf8 (string #\nul #\x10FFFF)))
+(define bv (string->utf8 "hunter2"))
+(bytevector-fill! bv 0)
+(printf "bytevector wiped: ~s\n" bv)

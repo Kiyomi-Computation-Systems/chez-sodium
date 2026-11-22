@@ -1,0 +1,40 @@
+* chez-sodium
+
+Password hashing, random bytes and fast hashing for Chez Scheme, through
+[[https://doc.libsodium.org/][libsodium]]'s C library.
+
+#+begin_quote
+✨ *AI Disclosure:* LLMs are used extensively in the planning and development of this project.
+#+end_quote
+
+chez-sodium will bind a small part of =libsodium= through Chez's foreign
+interface, and load it when your program runs: there will be nothing to
+compile. It covers four jobs:
+
+- hash a password with argon2id, check it, and tell when a hash needs
+  redoing because its limits were raised;
+- make random bytes from the system, for keys and tokens;
+- hash bytes fast with BLAKE2b, for storing a long random key without storing
+  the key;
+- compare two secrets in constant time.
+
+SHA-256 and HMAC-SHA256 come later. Encryption and signatures are not
+planned.
+
+** Status
+
+*Nothing is built yet.* The project is at its plan:
+[[file:.plans/2026-11-22-chez-sodium-project-brief.md][the brief]] sets out what will be bound, and why. Its names may change before
+the first release, and the API may change in any release before 1.0.
+
+** Requirements
+
+These are planned, and not yet tested:
+
+- Chez Scheme 10.4.0 or later, built with threads
+- libsodium 1.0.18 or later
+
+** License
+
+© [[https://kiyomicomputation.systems/][Kiyomi Computation Systems LLC]]. Licensed under BSD-3-Clause — see
+[[file:LICENSE][LICENSE]].

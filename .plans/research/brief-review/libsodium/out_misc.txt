@@ -1,0 +1,28 @@
+generichash bytes=32 min=16 max=64 keybytes=32 min=16 max=64
+generichash(outlen=1)  [< BYTES_MIN 16]                            -> 0
+generichash(outlen=15)                                             -> 0
+generichash(outlen=0)                                              -> -1
+generichash(outlen=65)                                             -> -1
+generichash(keylen=1)  [< KEYBYTES_MIN 16]                         -> 0
+generichash(keylen=65)                                             -> 0
+generichash(keylen=65 real)                                        -> -1
+generichash(abc, key=non-NULL len 0) == unkeyed                    -> 1
+generichash("" ptr) == generichash(NULL,0)                         -> 1
+b2b-512(abc)              = ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d17d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab92386edd4009923
+b2b-256(abc)              = bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+b2b-128(abc)              = cf4ab791c62b8d2b2109c90275287816
+b2b-256(abc, key=00..1f)  = d63a32d3e44738d7907f964316c241adaba0abfeabc32349677578a15a203f7f
+b2b-512("", key=00..3f)   = 10ebb67700b1868efb4417987acf4690ae9d972fb7a590c2f02871799aaa4786b5e996e8f0f4eb981fc214b005f42d2ff4233499391653df7aefcbc13fc51568
+sodium_memcmp(len 0)                                               -> 0
+sodium_memcmp(equal)                                               -> 0
+sodium_memcmp(differ in last byte)                                 -> -1
+sodium_memcmp(differ in first byte)                                -> -1
+randombytes_buf(out, 0): ok; implementation = sysrandom
+crypto_hash_sha256_statebytes=104 sizeof=104 alignof=8
+crypto_auth_hmacsha256_statebytes=208 sizeof=208 alignof=8 keybytes=32
+crypto_generichash_statebytes=384 alignof=64  (not in scope; shown for contrast)
+HMAC state is all zero after init+update                           -> 0
+HMAC state is all zero after final                                 -> 1
+SigV4 kSecret length = 44 bytes
+SigV4 kSigning = f4780e2d9f65fa895f9c67b32ce1baf0b0d8a43505a000a1a9e090d414db404d
+expected       = f4780e2d9f65fa895f9c67b32ce1baf0b0d8a43505a000a1a9e090d414db404d
