@@ -6,7 +6,8 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
 
 ## Now
 
-- **M0 is built, on the branch `m0-harness`, and not yet merged** ([the M0 plan](2026-11-22-m0-plan.md)).
+- **M0 is done and merged** (PR #2; [the M0 plan](2026-11-22-m0-plan.md); its close-out is
+  below).
   - **The records:** ADR-0001 to ADR-0011, `global-constraints.md` and `traps.md`. Each is
     Accepted: the owner settled it in brief §11, or approved it with the brief.
   - **The container,** pinned to Guix `b532aa7`. It has Chez 10.4.0, threaded, and libsodium
@@ -16,10 +17,7 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   - **The memory gate.** Valgrind ran the container's Chez loading libsodium clean, with
     `default.supp` alone ([research/m0-memory-gate/](research/m0-memory-gate/README.md)).
   - **CI:** `main`, `memory` and `nothreads`.
-- **M0's closing review is done** ([research/m0-review/](research/m0-review/README.md)). It found
-  no blocker, 2 majors and 11 minors, and each is fixed.
-- **M0 is done once CI's three jobs pass on its PR** (the M0 plan §6).
-- **Then M1's plan:** `conditions`, discovery, the load and the floor, `sodium-version`, and
+- **Next: M1's plan:** `conditions`, discovery, the load and the floor, `sodium-version`, and
   the block helper.
 
 ## Owed to M1
@@ -54,4 +52,28 @@ Questions the records leave to M1, each needing an answer in M1's plan:
 
 ## Close-outs
 
-None yet.
+### 2026-11-22 — M0: the records and the harness (PR #2)
+
+- **Built** on `m0-harness`, from `527170d` ([the plan](2026-11-22-m0-plan.md)). Five agents
+  did the work, and each hand-back was rerun before it was built on:
+  - the records (Opus): ADR-0001 to ADR-0011, `global-constraints.md` and `traps.md`;
+  - the container and harness (Sonnet): seven suites, and `check-test-fails` with 12 plants
+    ([the mutation log](m0-harness-mutation-log.md));
+  - the memory gate (Sonnet): 59 cases ([the mutation log](m0-memory-gate-mutation-log.md));
+  - CI (Sonnet): `main`, `memory` and `nothreads`, held by `check-ci`
+    ([the mutation log](m0-ci-mutation-log.md)).
+- **Added after the hand-backs:** the `floors-script` plant, which v0.1.1 has. Watched to fail
+  alone when `check-floors` reads a clean directory in place of `scripts/ci`.
+- **Reviewed:** one Opus review, read-only, found no blocker, 2 majors and 11 minors, and each
+  is fixed ([research/m0-review/](research/m0-review/README.md)).
+  - The majors were in the records: ADR-0006 lacked the hash-string exception to the cap, and
+    no record said the cap counts UTF-8 bytes.
+  - One check could not fail: `counters` without its critical section passed every row. The
+    mutant left the mutex held under an abandoned engine at fuel 5. A row now kills it.
+  - The brief's §4.3 ranges and the decoy's pointer rule are owed to M2's and M1's plans
+    (above).
+- **CI's first run** passed all three jobs, from a cold cache, in about 11 minutes:
+  - `main`: the runner's libsodium is `1.0.18-1ubuntu0.24.04.1`, the package ADR-0003 names;
+    `make test` 7 of 7, and `check-test-fails` all 12 cases;
+  - `memory`: the gate's 59 cases, then 7 of 7 suites under it, none slow;
+  - `nothreads`: every library under `src/` refused by name.
