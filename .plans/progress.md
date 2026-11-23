@@ -29,7 +29,10 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
     a blocker, six majors and thirteen minors, each fixed. The owner chose the wipe fused with
     the free (ADR-0008, amended) and native's load in one section (ADR-0007, amended); ADR-0001
     is amended for the allow-lists.
-- **Next: slice 1,** the pure core, built beside slice 0 on disjoint files.
+- **Slice 1 is on `m1-slice-1`,** stacked on slice 0: `conditions`, `load-state`, `discovery`
+  and `verify`, built from chez-sqlite3 v0.1.1 by trim tables checked before any code, and the
+  exit checks removed ([its mutation log](m1-slice-1-mutation-log.md)).
+- **Next: slice 2,** the load and the checks of the FFI.
 
 ## Answered for M1
 

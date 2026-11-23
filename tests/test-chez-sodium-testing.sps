@@ -1,6 +1,6 @@
 #!r6rs
-;;; The suite for (chez-sodium-testing): suite-exit-form, suite-exit-status
-;;; with the exit checks it runs, capture-command, the temporary directories
+;;; The suite for (chez-sodium-testing): suite-exit-form, suite-exit-status,
+;;; capture-command, the temporary directories
 ;;; (call-with-temp-directory, make-process-temp-directory,
 ;;; remove-temp-directory), run-until, gated-command and describe.
 ;;;
@@ -704,103 +704,6 @@
   '(0 under-tmpdir ("kept") removed)
   (process-outcome
    (string-append "(warning 'probe \"just a warning\")\n" kept-line)))
-
-;; --- the exit checks (ADR-0011) --------------------------------------------
-;; suite-exit-status runs every check registered with the counters, in the
-;; order registered, and names each outcome on the error port: a pass, a
-;; failure, which exits 1, or unavailable. A check is registered for good, so
-;; each row runs in a child: a fresh Chez running a suite of one passing test
-;; under a null runner, which prints nothing, then the forms given, then the
-;; shared exit form. This suite's own process registers nothing: its verdict
-;; rows above see no check.
-;;
-;; The rows register checks of their own, and load no libsodium.
-
-;; child-suite : String String -> (List Integer String String)
-;; The exit status, stdout and stderr of a child suite whose imports end with
-;; IMPORTS and whose forms after its one test are BODY.
-(define (child-suite imports body)
-  (run-child-suite capture-command imports body))
-
-(define (run-child-suite run imports body)
-  (call-with-temp-directory
-   (lambda (base)
-     (let ((program (string-append base "/child.sps")))
-       (write-file program
-                   (string-append
-                    "#!r6rs\n"
-                    "(import (rnrs) (srfi :64) (chez-sodium private counters) (chez-sodium-testing)\n"
-                    "        " imports ")\n"
-                    "(define runner (test-runner-null))\n"
-                    "(test-runner-current runner)\n"
-                    "(test-begin \"child\")\n"
-                    "(test-assert \"passes\" #t)\n"
-                    body "\n"
-                    "(test-end \"child\")\n"
-                    "(exit (suite-exit-status runner))\n"))
-       (run (list chez "--libdirs" "src:tests:build/scheme-libs" "--program" program))))))
-
-(test-equal "two checks that pass and are unavailable: exit 0, each named on its own line, in the order registered"
-  (list 0 ""
-        (string-append
-         "suite-exit-status: the zeta check passed: all is well\n"
-         "suite-exit-status: the alpha check is unavailable: nothing to count here\n"))
-  (child-suite ""
-               (string-append "(register-exit-check! 'zeta (lambda () '(pass \"all is well\")))\n"
-                              "(register-exit-check! 'alpha (lambda () '(unavailable \"nothing to count here\")))")))
-
-(test-equal "a check that fails: exit 1, its line naming it"
-  (list 1 "" "suite-exit-status: exit 1 (the fake check failed): it did not hold\n")
-  (child-suite "" "(register-exit-check! 'fake (lambda () '(fail \"it did not hold\")))"))
-
-(test-equal "a check that raises: exit 1, its line naming what it raised"
-  (list 1 "" "suite-exit-status: exit 1 (the fake check failed): it raised: Exception in fake-check: it broke with irritant 42\n")
-  (child-suite "" "(register-exit-check! 'fake (lambda () (error 'fake-check \"it broke\" 42)))"))
-
-;; The answers a check may give are (pass TEXT), (fail TEXT) and
-;; (unavailable TEXT); these are their neighbours. None may pass.
-(test-equal "a check that answers anything but (pass TEXT), (fail TEXT) or (unavailable TEXT): exit 1, each named with what it answered"
-  (list 1 ""
-        (apply string-append
-               (map (lambda (shown)
-                      (string-append "suite-exit-status: exit 1 (the odd check failed): it answered "
-                                     shown ", not (pass TEXT), (fail TEXT) or (unavailable TEXT)\n"))
-                    '("fine" "(pass)" "(pass 5)" "(passed \"x\")" "(pass \"x\" \"y\")"
-                      "(unavailable . \"x\")" "#f"))))
-  (child-suite ""
-               (apply string-append
-                      (map (lambda (answer) (string-append "(register-exit-check! 'odd (lambda () '" answer "))\n"))
-                           '("fine" "(pass)" "(pass 5)" "(passed \"x\")" "(pass \"x\" \"y\")"
-                             "(unavailable . \"x\")" "#f")))))
-
-;; The checks run before the counts are read, so a check that makes a native
-;; object is seen. The child lowers the count again once the verdict is
-;; printed, and exits 0 itself, so the shared exit form never runs the check
-;; a second time.
-(test-equal "a check that counts a block up and answers pass: the exit checks run before the counts are read, so the counts' line names block 1 and then the check's line; once the child lowers the count, it exits clean"
-  (list 0 "(1 ((block . 0)))\n"
-        (string-append "suite-exit-status: exit 1 (native objects left: block 1" counts-tail
-                       "suite-exit-status: the bump check passed: counted\n"))
-  (child-suite ""
-               (string-append "(register-exit-check! 'bump (lambda () (count-up! 'block) '(pass \"counted\")))\n"
-                              "(let ((status (suite-exit-status runner)))\n"
-                              "  (count-down! 'block)\n"
-                              "  (write (list status (native-counts)))\n"
-                              "  (newline)\n"
-                              "  (exit 0))")))
-
-(test-equal "a failure, a native object left and two checks: every line, the runner's first, then the counts', then the checks' in the order registered"
-  (list 1 ""
-        (string-append
-         "suite-exit-status: exit 1 (pass 1, fail 1, xpass 0" runner-tail
-         "suite-exit-status: exit 1 (native objects left: block 1" counts-tail
-         "suite-exit-status: the zeta check passed: all is well\n"
-         "suite-exit-status: exit 1 (the alpha check failed): it did not hold\n"))
-  (child-suite ""
-               (string-append "(test-assert \"fails\" #f)\n"
-                              "(count-up! 'block)\n"
-                              "(register-exit-check! 'zeta (lambda () '(pass \"all is well\")))\n"
-                              "(register-exit-check! 'alpha (lambda () '(fail \"it did not hold\")))")))
 
 ;; --- run-until ------------------------------------------------------------
 
