@@ -25,29 +25,47 @@
 #     and a ${{ }} expression), a quoted scalar left open, and a backslash after
 #     a double quote;
 #   - the shape: the top-level keys, the three blocks `on`, `permissions` and
-#     `concurrency` line for line, the three jobs (main, memory and nothreads)
-#     and each key in them, each step's keys, with: and env: keys, the one if:
-#     and where it may be, the Chez cache's path and keys, one restore and one
-#     save of it in each job, and the checks each job must run, each as one
-#     step's whole run line, in order:
+#     `concurrency` line for line, the five jobs (main, memory, nothreads,
+#     floor and current) and each key in them, each step's keys, with: and
+#     env: keys, the ifs and where they may be, the Chez cache's path and keys,
+#     one restore and one save of it in each job, and the checks each job must
+#     run, each as one step's whole run line, in order:
 #       main        the Chez build, check-chez, the two report steps, the
-#                   install check (make build), the checks, then the
-#                   launcher's tests;
+#                   install check (make build), the discovery check
+#                   (scripts/ci/check-sodium.sh --discovery, which takes no
+#                   argument), the checks, then the launcher's tests;
 #       memory      the Chez build, check-chez, make check-memory-gate, then
 #                   make test-memory, both bare;
 #       nothreads   the --nothreads Chez build, its check-chez, then make
 #                   check-nothreads;
 #     each job's Chez build carries the cache's if and no other step does but
-#     the cache's save, a step that runs make carries the env CHEZ of its job's
-#     Chez, and in job main, between its check-chez step and its make step, the
-#     steps "Report the versions this run uses" (its run block, line for line)
-#     and "Report the runner's libsodium" (its run line), in that order, and
-#     the install check, make build, as one step's whole run line, after
-#     check-chez and before the make step;
+#     the cache's save, a step that runs make or the discovery check carries
+#     the env CHEZ of its job's Chez, and in job main, between its check-chez
+#     step and its make step, the steps "Report the versions this run uses"
+#     (its run block, line for line) and "Report the runner's libsodium" (its
+#     run line), in that order, and the install check, make build, as one
+#     step's whole run line, after check-chez and before the discovery check,
+#     which comes before the make step;
+#   - in jobs floor and current, which build one libsodium and run the suites
+#     against it (ADR-0003), and nowhere else: the checkout with submodules
+#     first; then the Chez build, check-chez, the step that names the compiler
+#     (with id: cc), and the steps that build the libsodium (under its own if),
+#     check it, run make build and run make test, each as one step's whole run
+#     line, in order. The libsodium cache has one restore and one save, its
+#     path and key held whole, the restore's id held (sodium) and the save
+#     keyed by that id's cache-primary-key; its restore comes after the
+#     compiler step and before the build, its save after the build and before
+#     the check; its if stands only on its build and its save, and the Chez
+#     cache's only on the Chez build and its save; and the env keys
+#     CHEZ_SODIUM_LIBRARY and C_INCLUDE_PATH, each with exactly its build's
+#     value (floor's library is libsodium.so.23, current's .so.26), stand on
+#     the steps that run the check, make build and make test, each of which
+#     must carry both and CHEZ, and on no other step;
 #   - a uses: step may only be actions/checkout@, actions/cache/restore@ or
-#     actions/cache/save@; the cache's restore comes before its build, and its
-#     save after the build and before the cache's check; and the checkout of
-#     main and memory is with submodules: recursive;
+#     actions/cache/save@; each cache's restore comes before its build, and its
+#     save after the build and before the cache's check (a cache is told by
+#     its path); and the checkout of main, memory, floor and current is with
+#     submodules: recursive;
 #   - every step whose whole run line begins scripts/ci/NAME: that file exists
 #     and is executable, under CHECK_CI_ROOT (the repository root if unset);
 #     floor.sh is run with sh by the others, so it needs no bit and is not held;
@@ -59,7 +77,10 @@
 #     C_INCLUDE_PATH, CPATH, LIBRARY_PATH, LD_LIBRARY_PATH, LD_PRELOAD), which
 #     could steer the library the suites load or the report, the library's own
 #     (CHEZ_SODIUM_LIBRARY), and CHECK_CI_ROOT, which would point this check's
-#     execute-bit rule at another tree; and
+#     execute-bit rule at another tree. One exception: CHEZ_SODIUM_LIBRARY and
+#     C_INCLUDE_PATH may stand as an env key of floor and current, above, and
+#     in no other job: main, which tests discovery, memory and nothreads
+#     refuse them, the discovery check's step among them; and
 #   - check-memory-gate, test-memory and check-nothreads anywhere but as the
 #     whole run line of a step that runs them: check-memory-gate and
 #     test-memory in job memory, and check-nothreads in job nothreads.
@@ -210,11 +231,30 @@ function gaterun(g, j) {
   return ""
 }
 
+# isl(j): whether j is one of the two libsodium lanes, floor and current.
+function isl(j) { return (j == "floor" || j == "current") }
+
+# issod(p): whether p is the cache path of either lane's libsodium build.
+function issod(p) { return (p == sodp["floor"] || p == sodp["current"]) }
+
 # nreq(j): fills rq[1..n] with the run lines job j must run, in order, and
 # rqk[i] with what each one is: bld (the Chez build, which carries the cache's
-# if) or env (a make line, make build among them, which carries the env CHEZ).
+# if), env (a make line, make build among them, which carries the env CHEZ),
+# and in a lane cc (the compiler step, which has an id), sbld (the libsodium
+# build, which carries its own if and CHEZ), and schk, sbuild and stest (the
+# libsodium check, make build and make test, each of which carries CHEZ and
+# the build's library and header directory).
 function nreq(j,   n) {
   split("", rqk)
+  if (isl(j)) {
+    rq[1] = BLDT; rqk[1] = "bld"; rq[2] = CHKT
+    rq[3] = CCLINE; rqk[3] = "cc"
+    rq[4] = sodbld[j]; rqk[4] = "sbld"
+    rq[5] = sodchk[j]; rqk[5] = "schk"
+    rq[6] = BUILDLINE; rqk[6] = "sbuild"
+    rq[7] = TESTLINE; rqk[7] = "stest"
+    return 7
+  }
   if (j == "nothreads") {
     rq[1] = BLDN; rqk[1] = "bld"; rq[2] = CHKN
     rq[3] = "make check-nothreads"; rqk[3] = "env"
@@ -222,9 +262,9 @@ function nreq(j,   n) {
   }
   rq[1] = BLDT; rqk[1] = "bld"; rq[2] = CHKT
   if (j == "main") {
-    rq[3] = BUILDLINE; rqk[3] = "env"; rq[4] = MAKELINE; rqk[4] = "env"
-    rq[5] = LAUNCHER; rqk[5] = "env"
-    return 5
+    rq[3] = BUILDLINE; rqk[3] = "env"; rq[4] = DISCOVERY; rqk[4] = "env"
+    rq[5] = MAKELINE; rqk[5] = "env"; rq[6] = LAUNCHER; rqk[6] = "env"
+    return 6
   }
   rq[3] = "make check-memory-gate"; rqk[3] = "env"; rq[4] = "make test-memory"; rqk[4] = "env"
   return 4
@@ -271,20 +311,43 @@ function subkey(   want) {
     if (key == "path") { S_path[sn] = val; S_pathln[sn] = ln }
     if (key == "key") { S_key[sn] = val; S_keyln[sn] = ln }
   } else {
-    if (key != "CHEZ") { prob(ln, "env key \"" key "\" is not CHEZ"); return }
+    if (isl(job)) {
+      if (!(key in laneenv)) { prob(ln, "env key \"" key "\" is not one of CHEZ, CHEZ_SODIUM_LIBRARY, C_INCLUDE_PATH"); return }
+    } else if (key != "CHEZ") { prob(ln, "env key \"" key "\" is not CHEZ"); return }
     if (key in eseen) { prob(ln, "env key \"" key "\" is written twice in one step"); return }
     eseen[key] = 1
-    S_ev[sn, key] = 1; S_evln[sn, key] = ln
+    S_ev[sn, key] = 1; S_evln[sn, key] = ln; S_evv[sn, key] = val
+    # CHEZ is held here. The two names are held at the job's end, by the
+    # build of the step that carries them, which a line cannot tell.
     want = chezpath[job]
-    if (val != want) prob(ln, "env " key " in job " job " is not " want)
+    if (key == "CHEZ" && val != want) prob(ln, "env " key " in job " job " is not " want)
   }
 }
 
 # cachestep(): a Chez cache step's path, key and id, for the step just ended.
 function cachestep(   restore, want) {
   restore = (S_uses[sn] ~ /^actions\/cache\/restore@/)
-  if (S_path[sn] != cachepath[job])
+  # A lane's own libsodium cache: its id, its key, its save's key.
+  if (isl(job) && S_path[sn] == sodp[job]) {
+    if (restore) {
+      if (S_id[sn] != "sodium")
+        prob(S_idln[sn] ? S_idln[sn] : S_ln[sn], "the libsodium cache's restore in job " job " is not id: sodium")
+      if (S_key[sn] != sodkey[job])
+        prob(S_keyln[sn] ? S_keyln[sn] : S_ln[sn], "the cache key in job " job " is not exactly " sodkey[job])
+    } else {
+      want = "${{ steps.sodium.outputs.cache-primary-key }}"
+      if (S_key[sn] != want)
+        prob(S_keyln[sn] ? S_keyln[sn] : S_ln[sn], "the cache key of the save in job " job " is not exactly " want)
+    }
+    return
+  }
+  if (S_path[sn] != cachepath[job]) {
+    if (isl(job)) {
+      prob(S_pathln[sn] ? S_pathln[sn] : S_ln[sn], "the cache path in job " job " is not one of " cachepath[job] " or " sodp[job])
+      return
+    }
     prob(S_pathln[sn] ? S_pathln[sn] : S_ln[sn], "the cache path in job " job " is not " cachepath[job])
+  }
   if (restore) {
     if (!keyok(S_key[sn]))
       prob(S_keyln[sn] ? S_keyln[sn] : S_ln[sn], "the cache key in job " job " does not begin with " prefix[job] "${{ hashFiles(" HASHLIST ") }}")
@@ -299,9 +362,39 @@ function cachestep(   restore, want) {
   }
 }
 
+# lanestep(): a lane's if rules, for the step just ended: the Chez cache's if
+# only on the Chez build and on a cache save that is not the libsodium cache's,
+# the libsodium cache's only on the step that builds into this lane's directory
+# and on the save of this lane's path.
+function lanestep(   savep) {
+  savep = (S_uses[sn] ~ /^actions\/cache\/save@/)
+  if (S_if[sn] == "") return
+  if (S_if[sn] != IFLINE && S_if[sn] != IFSOD)
+    prob(S_ifln[sn], "if is not one of \"" IFLINE "\" or \"" IFSOD "\"")
+  else if (S_if[sn] == IFLINE && !(S_run[sn] ~ /^run: scripts\/ci\/build-chez\.sh( |$)/ || (savep && S_path[sn] != sodp[job])))
+    prob(S_ifln[sn], "the Chez cache's if is on a step that is neither the Chez build nor the Chez cache's save")
+  else if (S_if[sn] == IFSOD && !(argof(sn, "build-sodium.sh") || (savep && S_path[sn] == sodp[job])))
+    prob(S_ifln[sn], "the libsodium cache's if is on a step that is neither the libsodium build nor the libsodium cache's save")
+}
+
+# argof(s, script): whether step s runs scripts/ci/SCRIPT on this lane's
+# libsodium directory, "$RUNNER_TEMP/sodium-JOB", with or without more
+# arguments: the step that builds or checks that cache, whatever its flag.
+function argof(s, script,   w, t) {
+  w = "run: scripts/ci/" script " \"$RUNNER_TEMP/sodium-" job "\""
+  if (substr(S_run[s], 1, length(w)) != w) return 0
+  t = substr(S_run[s], length(w) + 1)
+  return (t == "" || substr(t, 1, 1) == " ")
+}
+
 function endstep() {
   if (!instep) return
   instep = 0
+  if (isl(job)) {
+    lanestep()
+    if (S_uses[sn] ~ /^actions\/cache\/(restore|save)@/) cachestep()
+    return
+  }
   if (S_if[sn] != "") {
     if (S_if[sn] != IFLINE) prob(S_ifln[sn], "if is not exactly \"" IFLINE "\"")
     if (!(S_run[sn] ~ /^run: scripts\/ci\/build-chez\.sh( |$)/ || S_uses[sn] ~ /^actions\/cache\/save@/))
@@ -356,6 +449,11 @@ function needenv(at, x, k) {
   if (!((at, k) in S_ev)) prob(S_ln[at], "job " job "'s step that runs \"" x "\" has no env " k)
 }
 
+# envval(at, k, want): env key k of step at, when it has one, holds want.
+function envval(at, k, want) {
+  if (((at, k) in S_ev) && S_evv[at, k] != want) prob(S_evln[at, k], "env " k " in job " job " is not " want)
+}
+
 # runs(s, what, prog): whether step s runs scripts/ci/WHAT-PROG.sh.
 function runs(s, what, prog) {
   return (S_run[s] ~ ("^run: scripts/ci/" what "-" prog "\\.sh( |$)"))
@@ -363,13 +461,22 @@ function runs(s, what, prog) {
 
 # cacheorder(first, last): the Chez cache's restore before its build, and its
 # save after the build and before its check, and one of each.
-function cacheorder(first, last,   s, t, restore, nr, ns) {
-  nr = 0; ns = 0
+function cacheorder(first, last,   s, t, restore, nr, ns, sr, ss) {
+  nr = 0; ns = 0; sr = 0; ss = 0
   for (s = first; s <= last; s++) {
     if (S_uses[s] != "" && !(S_uses[s] ~ /^actions\/(checkout|cache\/restore|cache\/save)@/))
       prob(S_ln[s], "job " job " has a step that uses \"" S_uses[s] "\", which is not actions/checkout@, actions/cache/restore@ or actions/cache/save@")
     if (!(S_uses[s] ~ /^actions\/cache\/(restore|save)@/)) continue
     restore = (S_uses[s] ~ /^actions\/cache\/restore@/)
+    # A lane's libsodium cache is held on its own, by its path. A cache step at
+    # the other lane's libsodium path is neither cache's: its path is a problem
+    # already told.
+    if (isl(job) && S_path[s] == sodp[job]) {
+      if (restore) sr++; else ss++
+      sodorder(s, restore, first, last)
+      continue
+    }
+    if (isl(job) && issod(S_path[s])) continue
     if (restore) nr++; else ns++
     for (t = first; t <= last; t++) {
       if (runs(t, "build", "chez")) {
@@ -382,15 +489,35 @@ function cacheorder(first, last,   s, t, restore, nr, ns) {
   }
   if (nr != 1) prob(jln, "job " job " has " nr " restores of the Chez cache, not one")
   if (ns != 1) prob(jln, "job " job " has " ns " saves of the Chez cache, not one")
+  if (isl(job)) {
+    if (sr != 1) prob(jln, "job " job " has " sr " restores of the libsodium cache, not one")
+    if (ss != 1) prob(jln, "job " job " has " ss " saves of the libsodium cache, not one")
+  }
 }
 
-function endjob(   i, s, c, at, pos, lastp, m, x, lastx, first, last, isb) {
+# sodorder(s, restore, first, last): a lane's libsodium cache step s, a
+# restore or a save: the restore before the build into its directory, after the
+# step that names the compiler; the save after the build and before the check.
+function sodorder(s, restore, first, last,   t) {
+  for (t = first; t <= last; t++) {
+    if (argof(t, "build-sodium.sh")) {
+      if (restore && s > t) prob(S_ln[s], "job " job " restores the libsodium cache after the libsodium build, and must restore it before")
+      if (!restore && s < t) prob(S_ln[s], "job " job " saves the libsodium cache before the libsodium build, and must save it after")
+    }
+    if (!restore && argof(t, "check-sodium.sh") && s > t)
+      prob(S_ln[s], "job " job " saves the libsodium cache after the libsodium check, and must save it before")
+  }
+  if (restore && atrun[CCLINE] && s < atrun[CCLINE])
+    prob(S_ln[s], "job " job " restores the libsodium cache before the step that names the C compiler, and must restore it after")
+}
+
+function endjob(   i, s, c, at, pos, lastp, m, x, lastx, first, last, isb, k, okstep) {
   if (job == "") return
   endstep()
   for (i = 1; i <= 4; i++)
     if (!jbad && !(jk2[i] in jkseen)) prob(jln, "job " job " has no key \"" jk2[i] "\"")
   first = jfirst; last = sn; lastp = 0; lastx = "the start"
-  if (job == "main" || job == "memory") {
+  if (job == "main" || job == "memory" || isl(job)) {
     if (first > last || !(S_uses[first] ~ /^actions\/checkout@/ && S_sub[first] == "recursive" && S_run[first] == "" && S_if[first] == ""))
       prob((first <= last) ? S_ln[first] : jln, "job " job "'s first step is not uses: actions/checkout@ with submodules: recursive")
   }
@@ -401,7 +528,7 @@ function endjob(   i, s, c, at, pos, lastp, m, x, lastx, first, last, isb) {
   }
   m = nreq(job)
   # A required line must be the run line of exactly one step.
-  split("", rqn); split("", hn); split("", hit)
+  split("", rqn); split("", hn); split("", hit); split("", okrun)
   for (i = 1; i <= m; i++) rqn[rq[i]]++
   for (s = first; s <= last; s++) {
     x = substr(S_run[s], 6)
@@ -410,6 +537,8 @@ function endjob(   i, s, c, at, pos, lastp, m, x, lastx, first, last, isb) {
   for (i = 1; i <= m; i++) {
     x = rq[i]
     atrun[x] = 0
+    k = rqk[i]
+    if (k == "schk" || k == "sbuild" || k == "stest") okrun["run: " x] = 1
     c = hn[x] + 0
     if (c != 1) { prob(jln, "job " job " has " c " steps that run \"" x "\", not one"); continue }
     at = hit[x, 1]
@@ -417,13 +546,31 @@ function endjob(   i, s, c, at, pos, lastp, m, x, lastx, first, last, isb) {
     pos = at - first + 1
     if (pos <= lastp) prob(S_runln[at], "job " job " runs \"" x "\" before \"" lastx "\", and must run it after")
     else { lastp = pos; lastx = x }
-    isb = (rqk[i] == "bld")
+    isb = (k == "bld" || k == "sbld")
     if (isb) {
       if (S_if[at] == "") prob(S_ln[at], "job " job "'s step that runs \"" x "\" has no if")
     } else if (S_if[at] != "") prob(S_ifln[at], "job " job "'s step that runs \"" x "\" has an if")
-    if (rqk[i] == "env") needenv(at, x, "CHEZ")
+    if (k == "env") needenv(at, x, "CHEZ")
+    if (isl(job)) {
+      if (k == "cc" && S_id[at] != "cc") prob(S_ln[at], "job " job "'s step that runs \"" x "\" has no id: cc")
+      if (k == "sbld" || k == "schk" || k == "sbuild" || k == "stest") needenv(at, x, "CHEZ")
+      if (k == "schk" || k == "sbuild" || k == "stest") {
+        needenv(at, x, "CHEZ_SODIUM_LIBRARY"); needenv(at, x, "C_INCLUDE_PATH")
+        envval(at, "CHEZ_SODIUM_LIBRARY", sodlib[job]); envval(at, "C_INCLUDE_PATH", sodinc[job])
+      }
+    }
   }
   cacheorder(first, last)
+  # The two names are for the steps that run the libsodium check, make build and
+  # make test, and for no other step of a lane.
+  if (isl(job))
+    for (s = first; s <= last; s++) {
+      if (S_run[s] in okrun) continue
+      if ((s, "CHEZ_SODIUM_LIBRARY") in S_ev)
+        prob(S_evln[s, "CHEZ_SODIUM_LIBRARY"], "env key \"CHEZ_SODIUM_LIBRARY\" is only for the steps that run the libsodium check, make build and make test")
+      if ((s, "C_INCLUDE_PATH") in S_ev)
+        prob(S_evln[s, "C_INCLUDE_PATH"], "env key \"C_INCLUDE_PATH\" is only for the steps that run the libsodium check, make build and make test")
+    }
   if (job == "main") mainsteps(first, last)
   job = ""
 }
@@ -432,7 +579,7 @@ function endsec(   i) {
   endjob()
   if (curblk != "") { closeblock(curblk); curblk = "" }
   if (sec == "jobs")
-    for (i = 1; i <= 3; i++)
+    for (i = 1; i <= 5; i++)
       if (!(jn[i] in jobseen)) prob(jobsln, "job \"" jn[i] "\" is missing")
   sec = ""
 }
@@ -446,9 +593,9 @@ BEGIN {
   split("name on permissions concurrency jobs", tk, " ")
   for (i = 1; i <= 5; i++) topidx[tk[i]] = i
   isblock["on"] = 1; isblock["permissions"] = 1; isblock["concurrency"] = 1
-  JOBS = "main, memory, nothreads"
-  split("main memory nothreads", jn, " ")
-  for (i = 1; i <= 3; i++) wantjob[jn[i]] = 1
+  JOBS = "main, memory, nothreads, floor, current"
+  split("main memory nothreads floor current", jn, " ")
+  for (i = 1; i <= 5; i++) wantjob[jn[i]] = 1
   JOBKEYS = "name, runs-on, timeout-minutes, steps"
   split("name runs-on timeout-minutes steps", jk2, " ")
   for (i = 1; i <= 4; i++) jobkey[jk2[i]] = 1
@@ -465,6 +612,26 @@ BEGIN {
   IFLINE = "if: steps.chez.outputs.cache-hit != 'true'"
   PINRUN = "scripts/ci/check-action-pins.sh .github/workflows"
   BUILDLINE = "make build"
+  TESTLINE = "make test"
+  DISCOVERY = "scripts/ci/check-sodium.sh --discovery"
+  CCLINE = "echo \"id=$(cc --version | head -n 1 | tr -c '[:alnum:].' '-')\" >> \"$GITHUB_OUTPUT\""
+  IFSOD = "if: steps.sodium.outputs.cache-hit != 'true'"
+  # The libsodium builds, one to a lane, each by its job's name.
+  laneenv["CHEZ"] = 1; laneenv["CHEZ_SODIUM_LIBRARY"] = 1; laneenv["C_INCLUDE_PATH"] = 1
+  sodflag["floor"] = ""; sodflag["current"] = " --current"
+  sodso["floor"] = "23"; sodso["current"] = "26"
+  sodhash["floor"] = "'packaging/floors.sexp', 'scripts/ci/floor.sh', 'scripts/ci/build-sodium.sh', 'scripts/ci/check-sodium.sh'"
+  sodhash["current"] = "'scripts/ci/build-sodium.sh', 'scripts/ci/check-sodium.sh'"
+  split("floor current", lj, " ")
+  for (i = 1; i <= 2; i++) {
+    b = lj[i]
+    sodp[b] = "${{ runner.temp }}/sodium-" b
+    sodlib[b] = sodp[b] "/lib/libsodium.so." sodso[b]
+    sodinc[b] = sodp[b] "/include"
+    sodbld[b] = "scripts/ci/build-sodium.sh \"$RUNNER_TEMP/sodium-" b "\"" sodflag[b]
+    sodchk[b] = "scripts/ci/check-sodium.sh \"$RUNNER_TEMP/sodium-" b "\"" sodflag[b]
+    sodkey[b] = "sodium-" b "-${{ hashFiles(" sodhash[b] ") }}-${{ steps.image.outputs.id }}-${{ steps.cc.outputs.id }}"
+  }
   BLDT = "scripts/ci/build-chez.sh \"$RUNNER_TEMP/chez-threads\""
   CHKT = "scripts/ci/check-chez.sh \"$RUNNER_TEMP/chez-threads\""
   BLDN = "scripts/ci/build-chez.sh \"$RUNNER_TEMP/chez-nothreads\" --nothreads"
@@ -482,11 +649,14 @@ BEGIN {
   vl[5] = "          echo \"kernel: $(uname -r)\""
   chezpath["main"] = "${{ runner.temp }}/chez-threads/bin/scheme"
   chezpath["memory"] = chezpath["main"]
+  chezpath["floor"] = chezpath["main"]; chezpath["current"] = chezpath["main"]
   chezpath["nothreads"] = "${{ runner.temp }}/chez-nothreads/bin/scheme"
   cachepath["main"] = "${{ runner.temp }}/chez-threads"
   cachepath["memory"] = cachepath["main"]
+  cachepath["floor"] = cachepath["main"]; cachepath["current"] = cachepath["main"]
   cachepath["nothreads"] = "${{ runner.temp }}/chez-nothreads"
   prefix["main"] = "chez-threads-"; prefix["memory"] = "chez-threads-"
+  prefix["floor"] = "chez-threads-"; prefix["current"] = "chez-threads-"
   prefix["nothreads"] = "chez-nothreads-"
   HASVAL = "this key must hold a block, not a value"
   NOKEY = "is not a key line check-ci reads"
@@ -538,10 +708,19 @@ fileno == 1 {
   # included.
   if (index(raw, "GITHUB_ENV") > 0) prob(ln, "names GITHUB_ENV, which could steer a check or a later step")
   if (index(raw, "GITHUB_PATH") > 0) prob(ln, "names GITHUB_PATH, which could steer a check or a later step")
+  # The one place in the file the two names may stand: as the key of an env
+  # line, at its own indent, in a step of the floor or current job. Its value
+  # is held exactly, and the steps that may carry it are held, at the job's end.
+  ealk = ""
+  if (!content && dashed == 0 && ind == 10 && instep && subk == "env" && isl(job)) {
+    if (substr(rest, 1, 21) == "CHEZ_SODIUM_LIBRARY: ") ealk = "CHEZ_SODIUM_LIBRARY"
+    else if (substr(rest, 1, 16) == "C_INCLUDE_PATH: ") ealk = "C_INCLUDE_PATH"
+  }
   w = raw; gsub(/[^A-Za-z0-9_]+/, " ", w)
   nw = split(w, ws, " "); split("", seen)
   for (k = 1; k <= nw; k++) {
     x = ws[k]
+    if (k == 1 && ealk != "" && x == ealk) continue
     if (!(x in seen) && ((x in banned) || x ~ /^VALGRIND_/ || x ~ /^MEMORY_/)) {
       seen[x] = 1
       prob(ln, "names " x ", which could steer a check or a later step")

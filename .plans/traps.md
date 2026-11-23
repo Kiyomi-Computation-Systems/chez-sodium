@@ -124,6 +124,24 @@ chez-sodium, M1's slice 3 review.
 - **The rule:** a row about an uncaught raise compares its stderr with the same raise left
   unguarded. An exit status and a missing line can't tell one raise from another.
 
+### In the container, `C_INCLUDE_PATH` set alone loses the kernel headers
+
+chez-sodium, M1's slice 5 measurements.
+
+- **What happened.** A probe compiled against a libsodium built from source, with
+  `C_INCLUDE_PATH=PREFIX/include`, failed in the container: `linux/limits.h: No such file or
+  directory`, reached from `sodium/export.h` through glibc's `limits.h`.
+- **Why.** Guix's gcc has glibc's headers built in, but not the kernel's. `gcc -v` lists the
+  profile's `include` first: that is `C_INCLUDE_PATH`, and it alone holds `linux/limits.h`.
+  Setting the variable to the build's headers replaces the profile's directory, and the
+  kernel's headers with it.
+- **Reproduced** at slice 5's measurements, against both builds. The same compile with
+  `C_INCLUDE_PATH=PREFIX/include:$C_INCLUDE_PATH` passes, and the probe reads that build's own
+  version, `1.0.18` and `1.0.22`.
+- **The rule:** in the container, a floor run puts the build's headers first in
+  `C_INCLUDE_PATH`, never in its place. On the Ubuntu runner, `PREFIX/include` alone is right,
+  as CI's lanes set it: gcc's own system directories still apply.
+
 ### Under Valgrind, a suite's `LD_PRELOAD` holds Valgrind's preloads
 
 chez-sodium, M1's plan.
@@ -136,6 +154,24 @@ chez-sodium, M1's plan.
   interposer's verdicts hold there.
 - **The rule:** the wipe row's child sets `LD_PRELOAD` to the interposer alone, never appended
   ([ADR-0011], amended).
+
+### A stacked PR conflicts once the one below is squash-merged
+
+chez-sodium, M1's merges of #3 to #7.
+
+- **What happened.** #3 was squash-merged onto `main`. #4, retargeted to `main`, then read
+  CONFLICTING, though its parent's tree was exactly `main`'s.
+- **Why.** The squash commit is not an ancestor of #4's head, so GitHub merges three ways from
+  M0's commit. Slice 1 edits lines next to slice 0's in the same files, so the two sides' hunks
+  differ, and they conflict. Identical content alone is not enough.
+- **Reproduced:** `git merge-tree --write-tree origin/main <head>` exits 1, as GitHub's check
+  does.
+- **What worked.** Before each merge, `git commit-tree H^{tree} -p H -p M` made a merge commit
+  with the head's own tree, whose parents are the head `H` and `main` `M`. It was pushed as a
+  plain fast-forward, with no force-push and no history rewritten. After CI passed on it, the
+  squash landed exactly `H`'s tree, and a tree check held that after every merge.
+- **The rule:** to merge a stack by squash, bring `main` into each head this way before its merge,
+  and check `origin/main^{tree}` against the tested head's tree after it. Budget one CI run a PR.
 
 ## Editing the records
 

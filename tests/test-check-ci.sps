@@ -105,7 +105,7 @@
 
 ;; The jobs, in the file's order. A job's text runs from its header line to the
 ;; next job's, so a job's text can be told from the other jobs' copies of it.
-(define job-order '("main" "memory" "nothreads"))
+(define job-order '("main" "memory" "nothreads" "floor" "current"))
 
 ;; job-bounds : String String -> (Pair Natural Natural)
 (define (job-bounds text job)
@@ -178,7 +178,7 @@
 (define (block-extra k got)
   (string-append "the \"" k "\" block has a line it must not: \"" got "\""))
 
-(define jobs "main, memory, nothreads")
+(define jobs "main, memory, nothreads, floor, current")
 (define (job-unknown j) (string-append "job \"" j "\" is not one of " jobs))
 (define (job-missing j) (string-append "job \"" j "\" is missing"))
 (define (job-key j k)
@@ -205,7 +205,12 @@
                  "${{ hashFiles(" hash-list ") }}"))
 (define primary "${{ steps.chez.outputs.cache-primary-key }}")
 (define (save-key j) (string-append "the cache key of the save in job " j " is not exactly " primary))
-(define (cache-path j p) (string-append "the cache path in job " j " is not " p))
+;; A lane's cache steps may name two paths, the Chez cache's and its own
+;; libsodium cache's; the other jobs, the Chez cache's alone.
+(define (cache-path j p)
+  (if (or (string=? j "floor") (string=? j "current"))
+      (string-append "the cache path in job " j " is not one of " p " or ${{ runner.temp }}/sodium-" j)
+      (string-append "the cache path in job " j " is not " p)))
 (define (restore-id j) (string-append "the cache's restore in job " j " is not id: chez"))
 (define (restores j n) (string-append "job " j " has " (number->string n) " restores of the Chez cache, not one"))
 (define (saves j n) (string-append "job " j " has " (number->string n) " saves of the Chez cache, not one"))
@@ -219,6 +224,12 @@
   (string-append "job " j " has a step that uses \"" u "\", which is not actions/checkout@, actions/cache/restore@ or actions/cache/save@"))
 (define if-line "if: steps.chez.outputs.cache-hit != 'true'")
 (define if-bad (string-append "if is not exactly \"" if-line "\""))
+(define if-sod-line "if: steps.sodium.outputs.cache-hit != 'true'")
+(define lane-if-bad
+  (string-append "if is not one of \"" if-line "\" or \"" if-sod-line "\""))
+;; if-bad-for : String -> String
+(define (if-bad-for j)
+  (if (or (string=? j "floor") (string=? j "current")) lane-if-bad if-bad))
 (define if-wrong
   "if is on a step that neither runs scripts/ci/build-chez.sh nor uses actions/cache/save")
 
@@ -274,6 +285,9 @@
 (define make-line
   "make check-help check-suites check-pins check-floors check-ci test check-test-fails check-dev check-clean")
 (define build-run "make build")
+(define disc-run "scripts/ci/check-sodium.sh --discovery")
+(define disc-hdr "      - name: The runner's libsodium is the floor")
+(define disc-line (string-append "        run: " disc-run))
 (define install-hdr "      - name: The install check, by discovery")
 (define build-line "        run: make build")
 (define (install-step)
@@ -566,7 +580,7 @@
           (list (list (hdr-in j #f (build-hdr j)) (step-no-if j (bld-run j)))))
      (row (pfx "the Chez build with another if")
           (list (le j build (string-append (build-hdr j) "\n        if: false\n        run: " (bld-run j) "\n")))
-          (list (list "        if: false" if-bad)))
+          (list (list "        if: false" (if-bad-for j))))
      (row (pfx "the Chez restore deleted")
           (list (le j restore ""))
           (list (list (string-append "  " j ":") (restores j 0))))
@@ -662,6 +676,8 @@
       (row (string-append j ": the job has no name")
            (list (le j (string-append "    name: " (cond ((string=? j "main") "main (checks and suites, Chez built from source)")
                                                          ((string=? j "memory") "memory (the Valgrind gate)")
+                                                         ((string=? j "floor") "floor (the suites against libsodium at its floor, built from source)")
+                                                         ((string=? j "current") "current (the suites against libsodium at the current release, built from source)")
                                                          (else "nothreads (every library is refused on a Chez without threads)"))
                                       "\n") ""))
            (list (list jl (job-no-key j "name"))))
@@ -682,6 +698,7 @@
 ;; (job header run chez-value): the five steps that run make or sh with Chez.
 (define make-steps
   (list (list "main" install-hdr build-run chez-t)
+        (list "main" disc-hdr disc-run chez-t)
         (list "main" "      - name: Checks and suites" make-line chez-t)
         (list "main" "      - name: The launcher's host-side tests" launcher chez-t)
         (list "memory" "      - name: The gate must fail on planted defects" gate-run chez-t)
@@ -900,11 +917,14 @@
         (list (list "permissions:" (top-order "permissions"))))
    (row "no jobs key"
         (list (e "jobs:\n" "jobz:\n"))
-        (list (list "jobz:" (top-unknown "jobz"))
-              (list "        run: make check-memory-gate" (gate-msg "check-memory-gate"))
-              (list "        run: make test-memory" (gate-msg "test-memory"))
-              (list "        run: make check-nothreads" (gate-msg "check-nothreads"))
-              (list 'eof (top-missing "jobs"))))
+        (append
+         (list (list "jobz:" (top-unknown "jobz"))
+               (list "        run: make check-memory-gate" (gate-msg "check-memory-gate"))
+               (list "        run: make test-memory" (gate-msg "test-memory"))
+               (list "        run: make check-nothreads" (gate-msg "check-nothreads")))
+         (lane-name-problems "floor")
+         (lane-name-problems "current")
+         (list (list 'eof (top-missing "jobs")))))
 
    ;; --- jobs ---
    (row "the nothreads job deleted"
@@ -964,7 +984,9 @@
    (row "main's install check moved after Checks and suites"
         (list (e (string-append (install-step) "\n") "")
               (e (make-run) (string-append (make-run) "\n" (install-step))))
-        (list (list (string-append "        run: " make-line) (out-of-order "main" make-line build-run))))
+        ;; the discovery step, which must follow the install check, is out of order too
+        (list (list "        run: scripts/ci/check-sodium.sh --discovery" (out-of-order "main" disc-run build-run))
+              (list (string-append "        run: " make-line) (out-of-order "main" make-line build-run))))
    (row "main's install check moved before Check the Chez"
         (list (e (string-append (install-step) "\n") "")
               (le "main" (main-chk-step) (string-append (install-step) "\n" (main-chk-step))))
@@ -1287,6 +1309,594 @@
               (list (list 'file not-regular)
                     (list 'dir (stray-entry "ci.yaml"))))))
 
+;; --- the lanes: floor and current ----------------------------------------------------
+;; Each lane builds one libsodium (scripts/ci/build-sodium.sh), checks it, and
+;; runs make build and make test against it. The steps that run the check,
+;; make build and make test carry that build's library and header directory,
+;; exactly, beside CHEZ; no other step of any job carries either name.
+
+(define (lane-floor? j) (string=? j "floor"))
+(define (lane-where j) (if (lane-floor? j) "at its floor" "at the current release"))
+(define (lane-flag j) (if (lane-floor? j) "" " --current"))
+(define (sod-sq j) (string-append "${{ runner.temp }}/sodium-" j))
+(define (sod-so j) (if (lane-floor? j) "23" "26"))
+(define (sod-lib* j so) (string-append (sod-sq j) "/lib/libsodium.so." so))
+(define (sod-lib j) (sod-lib* j (sod-so j)))
+(define (sod-inc j) (string-append (sod-sq j) "/include"))
+(define (other-lane j) (if (lane-floor? j) "current" "floor"))
+(define (bld* j flag)
+  (string-append "scripts/ci/build-sodium.sh \"$RUNNER_TEMP/sodium-" j "\"" flag))
+(define (chk* j flag)
+  (string-append "scripts/ci/check-sodium.sh \"$RUNNER_TEMP/sodium-" j "\"" flag))
+(define (lane-bld j) (bld* j (lane-flag j)))
+(define (lane-chk j) (chk* j (lane-flag j)))
+(define cc-line
+  "echo \"id=$(cc --version | head -n 1 | tr -c '[:alnum:].' '-')\" >> \"$GITHUB_OUTPUT\"")
+(define (lane-hash j)
+  (if (lane-floor? j)
+      "'packaging/floors.sexp', 'scripts/ci/floor.sh', 'scripts/ci/build-sodium.sh', 'scripts/ci/check-sodium.sh'"
+      "'scripts/ci/build-sodium.sh', 'scripts/ci/check-sodium.sh'"))
+(define (lane-key j)
+  (string-append "sodium-" j "-${{ hashFiles(" (lane-hash j) ") }}-${{ steps.image.outputs.id }}-${{ steps.cc.outputs.id }}"))
+(define (key-line k) (string-append "          key: " k))
+(define (path-line p) (string-append "          path: " p))
+(define (env-line k v) (string-append "          " k ": " v))
+
+(define h-install-pk "Install the packages in packaging/debian-prereqs.txt")
+(define h-image "Identify the runner image")
+(define h-restore-chez "Restore Chez")
+(define h-build-chez "Build Chez")
+(define h-save-chez "Save Chez")
+(define h-chk-chez "Check the Chez this job runs")
+(define h-cc "Name the C compiler for the cache key")
+(define (h-restore j) (string-append "Restore libsodium " (lane-where j)))
+(define (h-build j) (string-append "Build libsodium " (lane-where j)))
+(define (h-save j) (string-append "Save libsodium " (lane-where j)))
+(define h-chk "Check the libsodium this job runs")
+(define (h-load j) (string-append "Load libsodium " (lane-where j)))
+(define (h-suites j) (string-append "The suites against libsodium " (lane-where j)))
+(define (hdr-line h) (string-append "      - name: " h))
+
+;; to-end : String -> String
+;; The real file from the one START to its end.
+(define (to-end start)
+  (unless (= (count-sub real start) 1) (error 'to-end "the start must occur once" start))
+  (substring real (find-sub real start 0) (string-length real)))
+
+;; between : String String -> String
+;; The real file from the one START up to, not including, the one END after it.
+(define (between start end)
+  (let* ((s (find-sub real start 0)) (t (and s (find-sub real end s))))
+    (unless (and s t (= (count-sub real start) 1)) (error 'between "markers" start end))
+    (substring real s t)))
+
+;; lane-step : String String -> String
+;; The text of one step of a job, its header line to its last line.
+(define (lane-step j h)
+  (let* ((rt (job-text real j))
+         (hl (string-append (hdr-line h) "\n"))
+         (s (find-sub rt hl 0)))
+    (unless (and s (= (count-sub rt hl) 1)) (error 'lane-step "no such step, or twice" j h))
+    (let ((end (find-sub rt "\n\n" s)))
+      (substring rt s (if end (+ end 1) (string-length rt))))))
+
+;; se : String String String String -> Edit
+;; In one step of one job, OLD becomes NEW.
+(define (se j h old new)
+  (let ((st (lane-step j h)))
+    (unless (= (count-sub st old) 1) (error 'se "the old text is not once in the step" j h old))
+    (le j st (replace-first st old new))))
+
+;; del-step : String String -> Edit
+;; The step and the blank line after it, or before it for the job's last.
+(define (del-step j h)
+  (let ((st (lane-step j h)))
+    (if (find-sub (job-text real j) (string-append st "\n") 0)
+        (le j (string-append st "\n") "")
+        (le j (string-append "\n" st) ""))))
+
+;; A : String (U String #f) String -> Anchor
+(define (A j h text) (list 'in j h text))
+
+(define if-chez if-line)
+(define if-sod if-sod-line)
+(define chez-if-wrong
+  "the Chez cache's if is on a step that is neither the Chez build nor the Chez cache's save")
+(define sod-if-wrong
+  "the libsodium cache's if is on a step that is neither the libsodium build nor the libsodium cache's save")
+(define (path-msg j) (cache-path j "${{ runner.temp }}/chez-threads"))
+(define (restores-msg j n)
+  (string-append "job " j " has " (number->string n) " restores of the libsodium cache, not one"))
+(define (saves-msg j n)
+  (string-append "job " j " has " (number->string n) " saves of the libsodium cache, not one"))
+(define (sod-restore-id-msg j)
+  (string-append "the libsodium cache's restore in job " j " is not id: sodium"))
+(define (sod-key-msg j) (string-append "the cache key in job " j " is not exactly " (lane-key j)))
+(define (sod-save-key-msg j id)
+  (string-append "the cache key of the save in job " j " is not exactly ${{ steps." id ".outputs.cache-primary-key }}"))
+(define (lane-env-key k)
+  (string-append "env key \"" k "\" is not one of CHEZ, CHEZ_SODIUM_LIBRARY, C_INCLUDE_PATH"))
+(define (env-value j k v) (string-append "env " k " in job " j " is not " v))
+(define (env-wrong-step k)
+  (string-append "env key \"" k "\" is only for the steps that run the libsodium check, make build and make test"))
+(define (env-missing3 j run k)
+  (string-append "job " j "'s step that runs \"" run "\" has no env " k))
+(define (cc-id-msg j) (string-append "job " j "'s step that runs \"" cc-line "\" has no id: cc"))
+(define (sod-restore-late j)
+  (string-append "job " j " restores the libsodium cache after the libsodium build, and must restore it before"))
+(define (sod-save-early j)
+  (string-append "job " j " saves the libsodium cache before the libsodium build, and must save it after"))
+(define (sod-save-late j)
+  (string-append "job " j " saves the libsodium cache after the libsodium check, and must save it before"))
+(define (restore-cc j)
+  (string-append "job " j " restores the libsodium cache before the step that names the C compiler, and must restore it after"))
+
+;; wrong-step-pair : String String -> (Listof Problem)
+;; The problems of a step whose run line is none of the three, but whose env
+;; names the two keys.
+(define (wrong-step-pair j h)
+  (list (list (A j (hdr-line h) (env-line "CHEZ_SODIUM_LIBRARY" (sod-lib j)))
+              (env-wrong-step "CHEZ_SODIUM_LIBRARY"))
+        (list (A j (hdr-line h) (env-line "C_INCLUDE_PATH" (sod-inc j)))
+              (env-wrong-step "C_INCLUDE_PATH"))))
+
+;; lane-name-problems : String -> (Listof Problem)
+;; With no jobs key no job is known, so no lane's env may name the two names:
+;; every line that names one of them is refused.
+(define (lane-name-problems j)
+  (apply append
+         (map (lambda (h)
+                (list (list (A j (hdr-line h) (env-line "CHEZ_SODIUM_LIBRARY" (sod-lib j)))
+                            (names-msg "CHEZ_SODIUM_LIBRARY"))
+                      (list (A j (hdr-line h) (env-line "C_INCLUDE_PATH" (sod-inc j)))
+                            (names-msg "C_INCLUDE_PATH"))))
+              (list h-chk (h-load j) (h-suites j)))))
+
+(define chez-key-line t-restore-key)
+
+(define (lane-rows j)
+  (define (HA h) (A j #f (hdr-line h)))
+  (define (here) (string-append "  " j ":"))
+  (define (step h) (lane-step j h))
+  ;; each required line: the step's name, its run line
+  (define req
+    (list (list h-chk-chez chk-t)
+          (list h-cc cc-line)
+          (list (h-build j) (lane-bld j))
+          (list h-chk (lane-chk j))
+          (list (h-load j) build-run)
+          (list (h-suites j) "make test")))
+  (define (insert-line h line)
+    (le j (string-append (hdr-line h) "\n") (string-append (hdr-line h) "\n" line "\n")))
+  (define (drop-part part) (replace-first (lane-key j) part ""))
+  (define key-parts
+    (if (lane-floor? j)
+        (list "'packaging/floors.sexp', " ", 'scripts/ci/floor.sh'" ", 'scripts/ci/build-sodium.sh'"
+              ", 'scripts/ci/check-sodium.sh'")
+        (list "'scripts/ci/build-sodium.sh', " ", 'scripts/ci/check-sodium.sh'")))
+  (define (pfx s) (string-append j ": " s))
+  (define (restore-key-row name new-key)
+    (row (pfx name)
+         (list (se j (h-restore j) (key-line (lane-key j)) (key-line new-key)))
+         (list (list (A j (hdr-line (h-restore j)) (key-line new-key)) (sod-key-msg j)))))
+  (define (chk-env k v) (env-line k v))
+  (append
+   ;; the first step
+   (list
+    (row (pfx "the checkout without submodules")
+         (list (le j "        with:\n          submodules: recursive\n" ""))
+         (list (list (A j #f checkout-line) (first-step-msg j))))
+    (row (pfx "the checkout with submodules: false")
+         (list (le j "          submodules: recursive\n" "          submodules: false\n"))
+         (list (list (A j #f checkout-line) (first-step-msg j)))))
+
+   ;; each required run line deleted, and written twice
+   (apply append
+          (map (lambda (r)
+                 (let ((h (car r)) (run (cadr r)))
+                   (list
+                    (row (pfx (string-append "the step that runs " run " deleted"))
+                         (list (del-step j h))
+                         (list (list (here) (n-steps j run 0))))
+                    (row (pfx (string-append "the step that runs " run " written twice"))
+                         (list (le j (step h) (string-append (step h) "\n" (step h))))
+                         (list (list (here) (n-steps j run 2)))))))
+               req))
+
+   ;; order, exactness, ifs on the steps
+   (list
+    (row (pfx "the check after make build")
+         (list (le j (string-append (step h-chk) "\n" (step (h-load j)))
+                   (string-append (step (h-load j)) "\n" (step h-chk))))
+         (list (list (A j (hdr-line (h-load j)) "        run: make build")
+                     (out-of-order j build-run (lane-chk j)))))
+    (row (pfx "make test before make build")
+         (list (le j (string-append (step (h-load j)) "\n" (step (h-suites j)))
+                   (string-append (step (h-suites j)) "\n" (step (h-load j)))))
+         (list (list (A j (hdr-line (h-suites j)) "        run: make test")
+                     (out-of-order j "make test" build-run))))
+    (row (pfx "the libsodium build before check-chez")
+         (list (del-step j (h-build j))
+               (le j (step h-chk-chez) (string-append (step (h-build j)) "\n" (step h-chk-chez))))
+         ;; the build now comes before the libsodium restore too
+         (list (list (A j (hdr-line (h-build j)) (string-append "        run: " (lane-bld j)))
+                     (out-of-order j (lane-bld j) cc-line))
+               (list (HA (h-restore j)) (sod-restore-late j))))
+    (row (pfx "the libsodium build without its if")
+         (list (se j (h-build j) (string-append "        " if-sod "\n") ""))
+         (list (list (HA (h-build j)) (step-no-if j (lane-bld j)))))
+    (row (pfx "an if with another value on the libsodium build")
+         (list (se j (h-build j) if-sod "if: false"))
+         (list (list (A j (hdr-line (h-build j)) "        if: false") lane-if-bad)))
+    (row (pfx "an if: always() on the libsodium check")
+         (list (insert-line h-chk "        if: always()"))
+         (list (list (A j (hdr-line h-chk) "        if: always()") lane-if-bad)
+               (list (A j (hdr-line h-chk) "        if: always()") (step-has-if j (lane-chk j)))))
+    (row (pfx "an if: always() on make build")
+         (list (insert-line (h-load j) "        if: always()"))
+         (list (list (A j (hdr-line (h-load j)) "        if: always()") lane-if-bad)
+               (list (A j (hdr-line (h-load j)) "        if: always()") (step-has-if j build-run))))
+    (row (pfx "an if: always() on make test")
+         (list (insert-line (h-suites j) "        if: always()"))
+         (list (list (A j (hdr-line (h-suites j)) "        if: always()") lane-if-bad)
+               (list (A j (hdr-line (h-suites j)) "        if: always()") (step-has-if j "make test"))))
+    (row (pfx "continue-on-error on make test")
+         (list (insert-line (h-suites j) "        continue-on-error: true"))
+         (list (list (A j (hdr-line (h-suites j)) "        continue-on-error: true")
+                     (step-key "continue-on-error"))))
+    (row (pfx "make test X")
+         (list (se j (h-suites j) "        run: make test\n" "        run: make test X\n"))
+         (cons (list (here) (n-steps j "make test" 0)) (wrong-step-pair j (h-suites j))))
+    (row (pfx "make test as a block scalar")
+         (list (se j (h-suites j) "        run: make test\n" "        run: |\n          make test\n"))
+         (cons (list (here) (n-steps j "make test" 0)) (wrong-step-pair j (h-suites j))))
+    (row (pfx "make build with an argument")
+         (list (se j (h-load j) "        run: make build\n" "        run: make build X\n"))
+         (cons (list (here) (n-steps j build-run 0)) (wrong-step-pair j (h-load j))))
+    (row (pfx (if (lane-floor? j) "the check with --current" "the check without --current"))
+         (list (se j h-chk (lane-chk j) (chk* j (if (lane-floor? j) " --current" ""))))
+         (cons (list (here) (n-steps j (lane-chk j) 0)) (wrong-step-pair j h-chk)))
+    (row (pfx "the build with the other lane's flag")
+         (list (se j (h-build j) (lane-bld j) (bld* j (if (lane-floor? j) " --current" ""))))
+         (list (list (here) (n-steps j (lane-bld j) 0))))
+    ;; Its if then guards a build of no cache: a cache's build is the step that
+    ;; names its directory.
+    (row (pfx "the build into another directory")
+         (list (se j (h-build j) (lane-bld j) (string-append "scripts/ci/build-sodium.sh \"$RUNNER_TEMP/sodium-x\"" (lane-flag j))))
+         (list (list (A j (hdr-line (h-build j)) (string-append "        " if-sod)) sod-if-wrong)
+               (list (here) (n-steps j (lane-bld j) 0))))
+    (row (pfx "the compiler step's line changed")
+         (list (se j h-cc "head -n 1" "head -n 2"))
+         (list (list (here) (n-steps j cc-line 0))))
+    (row (pfx "the compiler step without its id")
+         (list (se j h-cc "        id: cc\n" ""))
+         (list (list (HA h-cc) (cc-id-msg j))))
+    (row (pfx "check-chez with --nothreads")
+         (list (se j h-chk-chez chk-t (string-append chk-t " --nothreads")))
+         (list (list (here) (n-steps j chk-t 0)))))
+
+   ;; the ifs, each on the other cache's steps
+   (list
+    (row (pfx "the libsodium if on the Chez build")
+         (list (se j h-build-chez "steps.chez." "steps.sodium."))
+         (list (list (A j (hdr-line h-build-chez) (string-append "        " if-sod)) sod-if-wrong)))
+    (row (pfx "the Chez if on the libsodium build")
+         (list (se j (h-build j) "steps.sodium." "steps.chez."))
+         (list (list (A j (hdr-line (h-build j)) (string-append "        " if-chez)) chez-if-wrong)))
+    (row (pfx "the libsodium if on the Chez save")
+         (list (se j h-save-chez "steps.chez.outputs.cache-hit" "steps.sodium.outputs.cache-hit"))
+         (list (list (A j (hdr-line h-save-chez) (string-append "        " if-sod)) sod-if-wrong)))
+    (row (pfx "the Chez if on the libsodium save")
+         (list (se j (h-save j) "steps.sodium.outputs.cache-hit" "steps.chez.outputs.cache-hit"))
+         (list (list (A j (hdr-line (h-save j)) (string-append "        " if-chez)) chez-if-wrong)))
+    (row (pfx "the libsodium if on make test")
+         (list (insert-line (h-suites j) (string-append "        " if-sod)))
+         (list (list (A j (hdr-line (h-suites j)) (string-append "        " if-sod)) sod-if-wrong)
+               (list (A j (hdr-line (h-suites j)) (string-append "        " if-sod)) (step-has-if j "make test"))))
+    (row (pfx "the Chez if on make test")
+         (list (insert-line (h-suites j) (string-append "        " if-chez)))
+         (list (list (A j (hdr-line (h-suites j)) (string-append "        " if-chez)) chez-if-wrong)
+               (list (A j (hdr-line (h-suites j)) (string-append "        " if-chez)) (step-has-if j "make test")))))
+
+   ;; the cache keys
+   (map (lambda (part)
+          (restore-key-row (string-append "the libsodium key drops " part) (drop-part part)))
+        key-parts)
+   (list
+    (restore-key-row "the libsodium key hashes one file more"
+                     (replace-first (lane-key j) "check-sodium.sh')" "check-sodium.sh', 'README.org')"))
+    (restore-key-row "the libsodium key drops the compiler"
+                     (replace-first (lane-key j) "-${{ steps.cc.outputs.id }}" ""))
+    (restore-key-row "the libsodium key drops the image"
+                     (replace-first (lane-key j) "-${{ steps.image.outputs.id }}" ""))
+    (restore-key-row "the libsodium key takes the other lane's prefix"
+                     (replace-first (lane-key j) (string-append "sodium-" j "-") (string-append "sodium-" (other-lane j) "-")))
+    (restore-key-row "the libsodium key takes the other lane's whole key"
+                     (lane-key (other-lane j)))
+    (restore-key-row "the libsodium key has a tail"
+                     (string-append (lane-key j) "-x"))
+    (row (pfx "the libsodium restore's path is the other lane's")
+         (list (se j (h-restore j) (path-line (sod-sq j)) (path-line (sod-sq (other-lane j)))))
+         (list (list (A j (hdr-line (h-restore j)) (path-line (sod-sq (other-lane j)))) (path-msg j))
+               (list (here) (restores-msg j 0))))
+    (row (pfx "the libsodium save's path is the other lane's")
+         (list (se j (h-save j) (path-line (sod-sq j)) (path-line (sod-sq (other-lane j)))))
+         ;; a save at the other lane's path is no save of this lane's cache, so
+         ;; its if is held as well
+         (list (list (A j (hdr-line (h-save j)) (string-append "        " if-sod)) sod-if-wrong)
+               (list (A j (hdr-line (h-save j)) (path-line (sod-sq (other-lane j)))) (path-msg j))
+               (list (here) (saves-msg j 0))))
+    (row (pfx "the libsodium save is keyed by the Chez cache")
+         (list (se j (h-save j) "steps.sodium.outputs.cache-primary-key" "steps.chez.outputs.cache-primary-key"))
+         (list (list (A j (hdr-line (h-save j)) (key-line "${{ steps.chez.outputs.cache-primary-key }}"))
+                     (sod-save-key-msg j "sodium"))))
+    (row (pfx "the Chez save is keyed by the libsodium cache")
+         (list (se j h-save-chez "steps.chez.outputs.cache-primary-key" "steps.sodium.outputs.cache-primary-key"))
+         (list (list (A j (hdr-line h-save-chez) (key-line "${{ steps.sodium.outputs.cache-primary-key }}"))
+                     (save-key j))))
+    (row (pfx "the libsodium save is keyed as a restore is")
+         (list (se j (h-save j) "${{ steps.sodium.outputs.cache-primary-key }}" (lane-key j)))
+         (list (list (A j (hdr-line (h-save j)) (key-line (lane-key j))) (sod-save-key-msg j "sodium"))))
+    (row (pfx "the libsodium restore deleted")
+         (list (del-step j (h-restore j)))
+         (list (list (here) (restores-msg j 0))))
+    (row (pfx "the libsodium restore written twice")
+         (list (le j (step (h-restore j)) (string-append (step (h-restore j)) "\n" (step (h-restore j)))))
+         (list (list (here) (restores-msg j 2))))
+    (row (pfx "the libsodium save deleted")
+         (list (del-step j (h-save j)))
+         (list (list (here) (saves-msg j 0))))
+    (row (pfx "the libsodium restore without its id")
+         (list (se j (h-restore j) "        id: sodium\n" ""))
+         (list (list (HA (h-restore j)) (sod-restore-id-msg j))))
+    (row (pfx "the libsodium restore's id is another")
+         (list (se j (h-restore j) "        id: sodium\n" "        id: sodium-x\n"))
+         (list (list (A j (hdr-line (h-restore j)) "        id: sodium-x") (sod-restore-id-msg j))))
+    (row (pfx "the Chez key drops a file")
+         (list (se j h-restore-chez ", 'scripts/ci/check-chez.sh'" ""))
+         (list (list (A j (hdr-line h-restore-chez)
+                        "          key: chez-threads-${{ hashFiles('packaging/floors.sexp', 'scripts/ci/floor.sh', 'scripts/ci/build-chez.sh') }}-${{ steps.image.outputs.id }}")
+                     (cache-key j "chez-threads-"))))
+    (row (pfx "the Chez cache's path is the libsodium cache's")
+         (list (se j h-restore-chez "/chez-threads\n" (string-append "/sodium-" j "\n")))
+         ;; a second restore of the libsodium path, before the compiler step,
+         ;; with the Chez restore's id and key; and none of the Chez cache's
+         (list (list (A j (hdr-line h-restore-chez) "        id: chez") (sod-restore-id-msg j))
+               (list (A j (hdr-line h-restore-chez) chez-key-line) (sod-key-msg j))
+               (list (HA h-restore-chez) (restore-cc j))
+               (list (here) (restores j 0))
+               (list (here) (restores-msg j 2)))))
+
+   ;; the env keys
+   (list
+    (row (pfx "the check's library is the other lane's")
+         (list (se j h-chk (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib j)) (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib (other-lane j)))))
+         (list (list (A j (hdr-line h-chk) (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib (other-lane j))))
+                     (env-value j "CHEZ_SODIUM_LIBRARY" (sod-lib j)))))
+    ;; The lanes differ in the soname as well as the directory.
+    (row (pfx "the check's library is this lane's directory with the other release's soname")
+         (list (se j h-chk (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib j))
+                   (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib* j (sod-so (other-lane j))))))
+         (list (list (A j (hdr-line h-chk) (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib* j (sod-so (other-lane j)))))
+                     (env-value j "CHEZ_SODIUM_LIBRARY" (sod-lib j)))))
+    (row (pfx "the suites' header directory has a second directory")
+         (list (se j (h-suites j) (chk-env "C_INCLUDE_PATH" (sod-inc j)) (chk-env "C_INCLUDE_PATH" (string-append (sod-inc j) ":/usr/include"))))
+         (list (list (A j (hdr-line (h-suites j)) (chk-env "C_INCLUDE_PATH" (string-append (sod-inc j) ":/usr/include")))
+                     (env-value j "C_INCLUDE_PATH" (sod-inc j)))))
+    (row (pfx "the library's value is relative")
+         (list (se j (h-load j) (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib j)) (chk-env "CHEZ_SODIUM_LIBRARY" "lib/libsodium.so.23")))
+         (list (list (A j (hdr-line (h-load j)) (chk-env "CHEZ_SODIUM_LIBRARY" "lib/libsodium.so.23"))
+                     (env-value j "CHEZ_SODIUM_LIBRARY" (sod-lib j)))))
+    (row (pfx "the check's CHEZ is the nothreads Chez")
+         (list (se j h-chk (chk-env "CHEZ" chez-t) (chk-env "CHEZ" chez-n)))
+         (list (list (A j (hdr-line h-chk) (chk-env "CHEZ" chez-n)) (env-chez j chez-t))))
+    (row (pfx "make test without C_INCLUDE_PATH")
+         (list (se j (h-suites j) (string-append (chk-env "C_INCLUDE_PATH" (sod-inc j)) "\n") ""))
+         (list (list (HA (h-suites j)) (env-missing3 j "make test" "C_INCLUDE_PATH"))))
+    (row (pfx "make build without CHEZ_SODIUM_LIBRARY")
+         (list (se j (h-load j) (string-append (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib j)) "\n") ""))
+         (list (list (HA (h-load j)) (env-missing3 j build-run "CHEZ_SODIUM_LIBRARY"))))
+    (row (pfx "the check without CHEZ")
+         (list (se j h-chk (string-append (chk-env "CHEZ" chez-t) "\n") ""))
+         (list (list (HA h-chk) (env-missing3 j (lane-chk j) "CHEZ"))))
+    (row (pfx "the check without any env")
+         (list (se j h-chk (string-append "        env:\n" (chk-env "CHEZ" chez-t) "\n" (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib j)) "\n" (chk-env "C_INCLUDE_PATH" (sod-inc j)) "\n") ""))
+         (list (list (HA h-chk) (env-missing3 j (lane-chk j) "CHEZ"))
+               (list (HA h-chk) (env-missing3 j (lane-chk j) "CHEZ_SODIUM_LIBRARY"))
+               (list (HA h-chk) (env-missing3 j (lane-chk j) "C_INCLUDE_PATH"))))
+    (row (pfx "the libsodium build without CHEZ")
+         (list (se j (h-build j) (string-append "        env:\n" (chk-env "CHEZ" chez-t) "\n") ""))
+         (list (list (HA (h-build j)) (env-missing3 j (lane-bld j) "CHEZ"))))
+    (row (pfx "the libsodium build with the override")
+         (list (se j (h-build j) (string-append (chk-env "CHEZ" chez-t) "\n")
+                   (string-append (chk-env "CHEZ" chez-t) "\n" (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib j)) "\n")))
+         (list (list (A j (hdr-line (h-build j)) (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib j)))
+                     (env-wrong-step "CHEZ_SODIUM_LIBRARY"))))
+    (row (pfx "the libsodium restore with the header directory")
+         (list (se j (h-restore j) "        with:\n"
+                   (string-append "        env:\n" (chk-env "C_INCLUDE_PATH" (sod-inc j)) "\n        with:\n")))
+         (list (list (A j (hdr-line (h-restore j)) (chk-env "C_INCLUDE_PATH" (sod-inc j)))
+                     (env-wrong-step "C_INCLUDE_PATH"))))
+    (row (pfx "the Chez build with the override")
+         (list (se j h-build-chez "        run:" (string-append "        env:\n" (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib j)) "\n        run:")))
+         (list (list (A j (hdr-line h-build-chez) (chk-env "CHEZ_SODIUM_LIBRARY" (sod-lib j)))
+                     (env-wrong-step "CHEZ_SODIUM_LIBRARY"))))
+    ;; The exemption is for the key alone: a banned word in the value is named.
+    (row (pfx "the header directory's value names CPATH")
+         (list (se j (h-suites j) (chk-env "C_INCLUDE_PATH" (sod-inc j)) (chk-env "C_INCLUDE_PATH" (string-append (sod-inc j) "/CPATH"))))
+         (list (list (A j (hdr-line (h-suites j)) (chk-env "C_INCLUDE_PATH" (string-append (sod-inc j) "/CPATH")))
+                     (names-msg "CPATH"))
+               (list (A j (hdr-line (h-suites j)) (chk-env "C_INCLUDE_PATH" (string-append (sod-inc j) "/CPATH")))
+                     (env-value j "C_INCLUDE_PATH" (sod-inc j)))))
+    ;; The exemption is for an env key: a with key of the name is named, and
+    ;; refused as a with key.
+    (row (pfx "a with key of the restore is C_INCLUDE_PATH")
+         (list (se j (h-restore j) "        with:\n" (string-append "        with:\n" (env-line "C_INCLUDE_PATH" "x") "\n")))
+         (list (list (A j (hdr-line (h-restore j)) (env-line "C_INCLUDE_PATH" "x")) (names-msg "C_INCLUDE_PATH"))
+               (list (A j (hdr-line (h-restore j)) (env-line "C_INCLUDE_PATH" "x")) (with-key "C_INCLUDE_PATH"))))
+    ;; The exemption is for the name as it stands: a quoted key, and an
+    ;; explicit one, are refused by their spelling and name the word.
+    (row (pfx "a quoted key, \"C_INCLUDE_PATH\", in the suites' env")
+         (list (se j (h-suites j) (chk-env "C_INCLUDE_PATH" (sod-inc j))
+                   (string-append (chk-env "C_INCLUDE_PATH" (sod-inc j)) "\n          \"C_INCLUDE_PATH\": " (sod-inc j))))
+         (list (list (A j (hdr-line (h-suites j)) (string-append "          \"C_INCLUDE_PATH\": " (sod-inc j)))
+                     (names-msg "C_INCLUDE_PATH"))
+               (list (A j (hdr-line (h-suites j)) (string-append "          \"C_INCLUDE_PATH\": " (sod-inc j)))
+                     quoted-msg)))
+    (row (pfx "an explicit key, ? C_INCLUDE_PATH: x, in the suites' env")
+         (list (se j (h-suites j) (chk-env "C_INCLUDE_PATH" (sod-inc j))
+                   (string-append (chk-env "C_INCLUDE_PATH" (sod-inc j)) "\n          ? C_INCLUDE_PATH: x")))
+         (list (list (A j (hdr-line (h-suites j)) "          ? C_INCLUDE_PATH: x") (names-msg "C_INCLUDE_PATH"))
+               (list (A j (hdr-line (h-suites j)) "          ? C_INCLUDE_PATH: x") explicit-msg))))
+   ;; the names that stay refused
+   (map (lambda (k)
+          (row (pfx (string-append "the suites' env gains " k))
+               (list (se j (h-suites j) (string-append "          CHEZ: " chez-t "\n")
+                         (string-append "          CHEZ: " chez-t "\n          " k ": x\n")))
+               (list (list (A j (hdr-line (h-suites j)) (string-append "          " k ": x")) (names-msg k))
+                     (list (A j (hdr-line (h-suites j)) (string-append "          " k ": x")) (lane-env-key k)))))
+        '("CPATH" "LD_LIBRARY_PATH" "CC" "MAKEFLAGS" "CHEZ_SODIUM_GATE_CHILD"))
+
+   ;; the names on every other line
+   (list
+    (row (pfx "a run block exports CHEZ_SODIUM_LIBRARY")
+         (list (se j h-image id-line (string-append id-line "          export CHEZ_SODIUM_LIBRARY=x\n")))
+         (list (list (A j (hdr-line h-image) "          export CHEZ_SODIUM_LIBRARY=x") (names-msg "CHEZ_SODIUM_LIBRARY"))))
+    (row (pfx "C_INCLUDE_PATH is written to GITHUB_ENV")
+         (list (se j h-image id-line (string-append id-line "          echo C_INCLUDE_PATH=/x >> \"$GITHUB_ENV\"\n")))
+         (list (list (A j (hdr-line h-image) "          echo C_INCLUDE_PATH=/x >> \"$GITHUB_ENV\"") (names-msg "GITHUB_ENV"))
+               (list (A j (hdr-line h-image) "          echo C_INCLUDE_PATH=/x >> \"$GITHUB_ENV\"") (names-msg "C_INCLUDE_PATH"))))
+    (row (pfx "a step's name names C_INCLUDE_PATH")
+         (list (le j (hdr-line (h-load j)) "      - name: Load C_INCLUDE_PATH"))
+         (list (list (A j #f "      - name: Load C_INCLUDE_PATH") (names-msg "C_INCLUDE_PATH"))))
+    (row (pfx "a with value names CHEZ_SODIUM_LIBRARY")
+         (list (se j (h-restore j) (path-line (sod-sq j)) (path-line "CHEZ_SODIUM_LIBRARY")))
+         (list (list (A j (hdr-line (h-restore j)) (path-line "CHEZ_SODIUM_LIBRARY")) (names-msg "CHEZ_SODIUM_LIBRARY"))
+               (list (A j (hdr-line (h-restore j)) (path-line "CHEZ_SODIUM_LIBRARY")) (path-msg j))
+               ;; at no libsodium path, it is a Chez restore, after the Chez build
+               (list (HA (h-restore j)) (restore-late j))
+               (list (here) (restores j 2))
+               (list (here) (restores-msg j 0))))
+    (row (pfx "a run line names C_INCLUDE_PATH")
+         (list (se j (h-load j) "        run: make build\n" "        run: make build C_INCLUDE_PATH=x\n"))
+         (list (list (A j (hdr-line (h-load j)) "        run: make build C_INCLUDE_PATH=x") (names-msg "C_INCLUDE_PATH"))
+               (list (here) (n-steps j build-run 0))
+               (car (wrong-step-pair j (h-load j)))
+               (cadr (wrong-step-pair j (h-load j))))))
+
+   ;; the spellings, over a lane's steps: the exemption for the two names is
+   ;; for a plain key, so each of these is refused by its spelling
+   (list
+    (row (pfx "a quoted key, \"if\": false")
+         (list (insert-line (h-load j) "        \"if\": false"))
+         (list (list (A j (hdr-line (h-load j)) "        \"if\": false") quoted-msg)))
+    (row (pfx "an explicit key, ? if")
+         (list (insert-line (h-load j) "        ? if\n        : false"))
+         (list (list (A j (hdr-line (h-load j)) "        ? if") explicit-msg)
+               (list (A j (hdr-line (h-load j)) "        : false") (step-key "")))))
+
+   ;; the actions a job uses, and the order of each cache's steps
+   (list
+    (row (pfx "the libsodium restore uses actions/cache, not actions/cache/restore")
+         (list (le j (step (h-restore j))
+                   (replace-first
+                    (replace-first (step (h-restore j))
+                                   "uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0"
+                                   "uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0")
+                    (key-line (lane-key j)) (key-line (string-append "sodium-" j "-anything")))))
+         (list (list (HA (h-restore j))
+                     (uses-msg j "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"))
+               (list (here) (restores-msg j 0))))
+    (row (pfx "the libsodium restore moved below the check")
+         (list (le j (string-append (step (h-restore j)) "\n" (step (h-build j)) "\n" (step (h-save j)) "\n" (step h-chk))
+                   (string-append (step (h-build j)) "\n" (step (h-save j)) "\n" (step h-chk) "\n" (step (h-restore j)))))
+         (list (list (HA (h-restore j)) (sod-restore-late j))))
+    (row (pfx "the compiler step moved below the libsodium restore")
+         (list (le j (string-append (step h-cc) "\n" (step (h-restore j)))
+                   (string-append (step (h-restore j)) "\n" (step h-cc))))
+         (list (list (HA (h-restore j)) (restore-cc j))))
+    (row (pfx "the libsodium save moved below the check")
+         (list (le j (string-append (step (h-save j)) "\n" (step h-chk))
+                   (string-append (step h-chk) "\n" (step (h-save j)))))
+         (list (list (HA (h-save j)) (sod-save-late j))))
+    (row (pfx "the libsodium save moved above the build")
+         (list (le j (string-append (step (h-build j)) "\n" (step (h-save j)))
+                   (string-append (step (h-save j)) "\n" (step (h-build j)))))
+         (list (list (HA (h-save j)) (sod-save-early j)))))))
+
+;; The rows that are not a lane's: the job list, and the two names in the jobs
+;; that must stay refused them.
+(define (env-ln k v) (string-append "          " k ": " v))
+
+(define (disc-step)
+  (span "      # The library the install check found" (string-append disc-line "\n")))
+(define gate-hdr "      - name: The gate must fail on planted defects")
+(define mem-hdr "      - name: Every suite under Valgrind")
+(define nt-hdr "      - name: Every library must be refused, by name")
+
+(define lane-global-rows
+  (append
+   (list
+    (row "the floor job deleted"
+         (list (e (between "\n  # libsodium at its floor," "\n  # libsodium at the current release,") ""))
+         (list (list "jobs:" (job-missing "floor"))))
+    (row "the current job deleted"
+         (list (e (to-end "\n  # libsodium at the current release,") ""))
+         (list (list "jobs:" (job-missing "current"))))
+    (row "a job beside the five"
+         (list (le "current" (lane-step "current" (h-suites "current"))
+                   (string-append (lane-step "current" (h-suites "current")) "\n"
+                                  (lines "  extra:" "    name: x" "    runs-on: ubuntu-24.04"
+                                         "    timeout-minutes: 5" "    steps:" "      - run: echo hi"))))
+         (list (list "  extra:" (job-unknown "extra")))))
+   ;; The two names, with floor's exact values, in every job that must refuse
+   ;; them, the discovery step among them.
+   (map (lambda (spec)
+          (let ((name (car spec)) (hdr (cadr spec)) (job (caddr spec)) (chez (cadddr spec)) (k (car (cddddr spec))))
+            (row (string-append name " gains " k ", with floor's exact value")
+                 (list (le job (string-append hdr "\n        env:\n          CHEZ: " chez "\n")
+                           (string-append hdr "\n        env:\n          CHEZ: " chez "\n"
+                                          (env-ln k (if (string=? k "C_INCLUDE_PATH") (sod-inc "floor") (sod-lib "floor"))) "\n")))
+                 (let ((at (A job hdr (env-ln k (if (string=? k "C_INCLUDE_PATH") (sod-inc "floor") (sod-lib "floor"))))))
+                   (list (list at (names-msg k)) (list at (env-key k)))))))
+        (apply append
+               (map (lambda (k)
+                      (list (list "main's install check" install-hdr "main" chez-t k)
+                            (list "main's discovery step" disc-hdr "main" chez-t k)
+                            (list "memory's gate step" gate-hdr "memory" chez-t k)
+                            (list "memory's test-memory step" mem-hdr "memory" chez-t k)
+                            (list "nothreads's step" nt-hdr "nothreads" chez-n k)))
+                    '("CHEZ_SODIUM_LIBRARY" "C_INCLUDE_PATH"))))))
+
+;; --- main's discovery step: the runner's libsodium is the floor -----------------------------
+
+(define discovery-rows
+  (list
+   (row "main's discovery step deleted"
+        (list (e (string-append (disc-step) "\n") ""))
+        (list (list "  main:" (n-steps "main" disc-run 0))))
+   (row "main's discovery step written twice"
+        (list (e (string-append (disc-step) "\n") (string-append (disc-step) "\n" (disc-step) "\n")))
+        (list (list "  main:" (n-steps "main" disc-run 2))))
+   (row "main's discovery step moved before the install check"
+        (list (e (string-append (disc-step) "\n") "")
+              (e (string-append (install-step) "\n") (string-append (disc-step) "\n" (install-step) "\n")))
+        (list (list disc-line (out-of-order "main" disc-run build-run))))
+   (row "main's discovery step moved after Checks and suites"
+        (list (e (string-append (disc-step) "\n") "")
+              (e (make-run) (string-append (make-run) "\n" (disc-step))))
+        (list (list (string-append "        run: " make-line) (out-of-order "main" make-line disc-run))))
+   (row "main's discovery step with an argument, --discovery X"
+        (list (e disc-line (string-append disc-line " X")))
+        (list (list "  main:" (n-steps "main" disc-run 0))))
+   (row "main's discovery step with a prefix, as a lane's check has it"
+        (list (e disc-line (string-append "        run: " (chk* "floor" ""))))
+        (list (list "  main:" (n-steps "main" disc-run 0))))
+   (row "main's discovery step as a block scalar"
+        (list (e disc-line (string-append "        run: |\n          " disc-run)))
+        (list (list "  main:" (n-steps "main" disc-run 0))
+              (list (string-append "          " disc-run) stray-msg)))))
+
 (define rows
   (append
    stray-rows
@@ -1303,6 +1913,10 @@
    report-rows
    memory-rows
    nothreads-rows
+   discovery-rows
+   lane-global-rows
+   (lane-rows "floor")
+   (lane-rows "current")
    directory-rows))
 
 ;; --- the run ------------------------------------------------------------------------
@@ -1363,6 +1977,8 @@
          "        run: scripts/ci/check-chez.sh \"$RUNNER_TEMP/chez-threads\"")
    (list "report-sodium.sh" "main" "      - name: Report the runner's libsodium"
          "        run: scripts/ci/report-sodium.sh")
+   (list "check-sodium.sh" "main" "      - name: The runner's libsodium is the floor"
+         "        run: scripts/ci/check-sodium.sh --discovery")
    (list "build-chez.sh" "memory" "      - name: Build Chez"
          "        run: scripts/ci/build-chez.sh \"$RUNNER_TEMP/chez-threads\"")
    (list "check-chez.sh" "memory" "      - name: Check the Chez this job runs"
@@ -1370,7 +1986,23 @@
    (list "build-chez.sh" "nothreads" "      - name: Build Chez without threads"
          "        run: scripts/ci/build-chez.sh \"$RUNNER_TEMP/chez-nothreads\" --nothreads")
    (list "check-chez.sh" "nothreads" "      - name: Check the Chez this job runs"
-         "        run: scripts/ci/check-chez.sh \"$RUNNER_TEMP/chez-nothreads\" --nothreads")))
+         "        run: scripts/ci/check-chez.sh \"$RUNNER_TEMP/chez-nothreads\" --nothreads")
+   (list "build-chez.sh" "floor" "      - name: Build Chez"
+         "        run: scripts/ci/build-chez.sh \"$RUNNER_TEMP/chez-threads\"")
+   (list "check-chez.sh" "floor" "      - name: Check the Chez this job runs"
+         "        run: scripts/ci/check-chez.sh \"$RUNNER_TEMP/chez-threads\"")
+   (list "build-sodium.sh" "floor" "      - name: Build libsodium at its floor"
+         "        run: scripts/ci/build-sodium.sh \"$RUNNER_TEMP/sodium-floor\"")
+   (list "check-sodium.sh" "floor" "      - name: Check the libsodium this job runs"
+         "        run: scripts/ci/check-sodium.sh \"$RUNNER_TEMP/sodium-floor\"")
+   (list "build-chez.sh" "current" "      - name: Build Chez"
+         "        run: scripts/ci/build-chez.sh \"$RUNNER_TEMP/chez-threads\"")
+   (list "check-chez.sh" "current" "      - name: Check the Chez this job runs"
+         "        run: scripts/ci/check-chez.sh \"$RUNNER_TEMP/chez-threads\"")
+   (list "build-sodium.sh" "current" "      - name: Build libsodium at the current release"
+         "        run: scripts/ci/build-sodium.sh \"$RUNNER_TEMP/sodium-current\" --current")
+   (list "check-sodium.sh" "current" "      - name: Check the libsodium this job runs"
+         "        run: scripts/ci/check-sodium.sh \"$RUNNER_TEMP/sodium-current\" --current")))
 
 (define (noexec-msg name)
   (string-append "runs scripts/ci/" name ", which is missing or not executable: "
@@ -1387,7 +2019,8 @@
           (else (loop (cdr ss) acc)))))
 
 (define script-names
-  '("check-action-pins.sh" "build-chez.sh" "check-chez.sh" "report-sodium.sh"))
+  '("check-action-pins.sh" "build-chez.sh" "check-chez.sh" "report-sodium.sh"
+    "build-sodium.sh" "check-sodium.sh"))
 
 (define (must-run argv)
   (let ((r (capture-command argv)))
@@ -1428,7 +2061,7 @@
    (script-row (string-append name " missing: every step that runs it is named")
                (lambda (d) (must-run (list "rm" (string-append d "/" name))))
                (script-problems name)))
- '("build-chez.sh" "report-sodium.sh"))
+ '("build-chez.sh" "report-sodium.sh" "check-sodium.sh"))
 
 ;; floor.sh is run with sh by the other scripts, never by its path.
 (script-row "floor.sh without its execute bit: the workflow passes"

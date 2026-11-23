@@ -91,7 +91,9 @@
 * Verify it with `make check-guix`, run on the host.
 * `CHEZ_SODIUM_LIBRARY` names a libsodium by its absolute path. A floor run sets it
   to the floor's library, and `C_INCLUDE_PATH` to the floor's headers, so a C oracle
-  compiles against the library the suite loads.
+  compiles against the library the suite loads. In the container, put the floor's
+  headers first in `C_INCLUDE_PATH`, never in its place: Guix's gcc finds the kernel
+  headers through it (`.plans/traps.md`).
 * Anything that needs the network or git runs on the host: fetches, pushes,
   downloads, `make check-pins`, `make site-deps`, and
   `git submodule update --init --recursive`,

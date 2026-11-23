@@ -13,11 +13,17 @@ name: CI
 # Actions tab. No path filter: a check that a change skips is no check.
 #   main        every action pinned to a commit, the runner's libsodium
 #               reported, then found by discovery and accepted (ADR-0002's
-#               install check), every check, then the suites.
+#               install check) and asserted to be the floor, every check,
+#               then the suites.
 #   memory      the Valgrind gate (ADR-0011): the planted defects must fail
 #               it, then every suite runs under it.
 #   nothreads   every library under src/ must be refused, by name, on a Chez
 #               built with --nothreads (ADR-0004).
+#   floor       libsodium at its floor, built from a release tarball: its
+#               soname, header and version checked, then make build and the
+#               suites against it (ADR-0003).
+#   current     the same against the current release, which the build script
+#               pins.
 #
 # This workflow states no floor. scripts/ci/build-chez.sh takes no version and
 # reads its own from packaging/floors.sexp, and so does any step that needs a
@@ -32,11 +38,13 @@ name: CI
 # way.
 #
 # `make check-ci` (tests/check-ci.sh), which make test runs, holds this file
-# to the one shape it reads: these triggers, these three jobs and their keys,
-# each check as a step's whole run line, no if: but on the Chez cache's own
-# steps, no continue-on-error:, no variable that would steer a check, and no
-# key spelled so that a text check would miss it. A change to this file
-# changes tests/check-ci.sh with it.
+# to the one shape it reads: these triggers, these five jobs and their keys,
+# each check as a step's whole run line, no if: but on the caches' own steps,
+# no continue-on-error:, no variable that would steer a check (but the two
+# names floor and current hold, as exact env keys of the steps that run a
+# libsodium build's check, make build and make test), and no key spelled so
+# that a text check would miss it. A
+# change to this file changes tests/check-ci.sh with it.
 
 on:
   push:
@@ -65,7 +73,10 @@ concurrency:
 # needs: a cold cache costs each job a build, once, and the first to save
 # wins. Whether it was built or restored, scripts/ci/check-chez.sh then asks
 # the Chez itself for its version and (threaded?), so a cache that serves
-# another build fails the job before any check runs on it.
+# another build fails the job before any check runs on it. The two libsodium
+# caches are keyed the same way, by the scripts that build and check them, the
+# runner's image and the C compiler (and, for the floor's, by the floors file
+# and its reader), and are checked after a restore as after a build.
 
 jobs:
   main:
@@ -145,6 +156,14 @@ jobs:
         env:
           CHEZ: ${{ runner.temp }}/chez-threads/bin/scheme
         run: make build
+
+      # The library the install check found, with no override named, must be
+      # the floor: only CI knows that this runner's package is meant to be it.
+      # The step takes no argument, and no env but CHEZ.
+      - name: The runner's libsodium is the floor
+        env:
+          CHEZ: ${{ runner.temp }}/chez-threads/bin/scheme
+        run: scripts/ci/check-sodium.sh --discovery
 
       # CHEZ is the real binary, not a symlink or a wrapper. make test runs
       # check-ci, which holds this file's shape.
@@ -279,3 +298,201 @@ jobs:
         env:
           CHEZ: ${{ runner.temp }}/chez-nothreads/bin/scheme
         run: make check-nothreads
+
+  # libsodium at its floor, built from its release tarball by
+  # scripts/ci/build-sodium.sh. The suites must pass on it. The steps
+  # that run its check, make build and make test carry the library and the
+  # header directory of this build, exactly, and no other step of any job does.
+  floor:
+    name: floor (the suites against libsodium at its floor, built from source)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+
+      - name: Install the packages in packaging/debian-prereqs.txt
+        run: |
+          pkgs=$(grep -v -e '^#' -e '^$' packaging/debian-prereqs.txt | tr '\n' ' ')
+          if [ -z "$pkgs" ]; then
+            echo "::error::packaging/debian-prereqs.txt yielded no packages: a broken step, not an empty list"
+            exit 1
+          fi
+          sudo apt-get update -qq
+          # shellcheck disable=SC2086
+          sudo apt-get install -y --no-install-recommends $pkgs
+
+      - name: Identify the runner image
+        id: image
+        run: |
+          . /etc/os-release
+          echo "id=${ID}-${VERSION_ID}-${RUNNER_ARCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Chez
+        id: chez
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/chez-threads
+          key: chez-threads-${{ hashFiles('packaging/floors.sexp', 'scripts/ci/floor.sh', 'scripts/ci/build-chez.sh', 'scripts/ci/check-chez.sh') }}-${{ steps.image.outputs.id }}
+
+      - name: Build Chez
+        if: steps.chez.outputs.cache-hit != 'true'
+        run: scripts/ci/build-chez.sh "$RUNNER_TEMP/chez-threads"
+
+      - name: Save Chez
+        if: steps.chez.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/chez-threads
+          key: ${{ steps.chez.outputs.cache-primary-key }}
+
+      - name: Check the Chez this job runs
+        run: scripts/ci/check-chez.sh "$RUNNER_TEMP/chez-threads"
+
+      # The compiler is in the key, so that a lane tests a library its own
+      # image's compiler built: an image that moves cc rebuilds, and never
+      # serves a library another compiler made.
+      - name: Name the C compiler for the cache key
+        id: cc
+        run: echo "id=$(cc --version | head -n 1 | tr -c '[:alnum:].' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore libsodium at its floor
+        id: sodium
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/sodium-floor
+          key: sodium-floor-${{ hashFiles('packaging/floors.sexp', 'scripts/ci/floor.sh', 'scripts/ci/build-sodium.sh', 'scripts/ci/check-sodium.sh') }}-${{ steps.image.outputs.id }}-${{ steps.cc.outputs.id }}
+
+      - name: Build libsodium at its floor
+        if: steps.sodium.outputs.cache-hit != 'true'
+        env:
+          CHEZ: ${{ runner.temp }}/chez-threads/bin/scheme
+        run: scripts/ci/build-sodium.sh "$RUNNER_TEMP/sodium-floor"
+
+      - name: Save libsodium at its floor
+        if: steps.sodium.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/sodium-floor
+          key: ${{ steps.sodium.outputs.cache-primary-key }}
+
+      - name: Check the libsodium this job runs
+        env:
+          CHEZ: ${{ runner.temp }}/chez-threads/bin/scheme
+          CHEZ_SODIUM_LIBRARY: ${{ runner.temp }}/sodium-floor/lib/libsodium.so.23
+          C_INCLUDE_PATH: ${{ runner.temp }}/sodium-floor/include
+        run: scripts/ci/check-sodium.sh "$RUNNER_TEMP/sodium-floor"
+
+      - name: Load libsodium at its floor
+        env:
+          CHEZ: ${{ runner.temp }}/chez-threads/bin/scheme
+          CHEZ_SODIUM_LIBRARY: ${{ runner.temp }}/sodium-floor/lib/libsodium.so.23
+          C_INCLUDE_PATH: ${{ runner.temp }}/sodium-floor/include
+        run: make build
+
+      - name: The suites against libsodium at its floor
+        env:
+          CHEZ: ${{ runner.temp }}/chez-threads/bin/scheme
+          CHEZ_SODIUM_LIBRARY: ${{ runner.temp }}/sodium-floor/lib/libsodium.so.23
+          C_INCLUDE_PATH: ${{ runner.temp }}/sodium-floor/include
+        run: make test
+
+  # libsodium at the current release, built from its release tarball by
+  # scripts/ci/build-sodium.sh --current. The suites must pass on it. The steps
+  # that run its check, make build and make test carry the library and the
+  # header directory of this build, exactly, and no other step of any job does.
+  current:
+    name: current (the suites against libsodium at the current release, built from source)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+
+      - name: Install the packages in packaging/debian-prereqs.txt
+        run: |
+          pkgs=$(grep -v -e '^#' -e '^$' packaging/debian-prereqs.txt | tr '\n' ' ')
+          if [ -z "$pkgs" ]; then
+            echo "::error::packaging/debian-prereqs.txt yielded no packages: a broken step, not an empty list"
+            exit 1
+          fi
+          sudo apt-get update -qq
+          # shellcheck disable=SC2086
+          sudo apt-get install -y --no-install-recommends $pkgs
+
+      - name: Identify the runner image
+        id: image
+        run: |
+          . /etc/os-release
+          echo "id=${ID}-${VERSION_ID}-${RUNNER_ARCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Chez
+        id: chez
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/chez-threads
+          key: chez-threads-${{ hashFiles('packaging/floors.sexp', 'scripts/ci/floor.sh', 'scripts/ci/build-chez.sh', 'scripts/ci/check-chez.sh') }}-${{ steps.image.outputs.id }}
+
+      - name: Build Chez
+        if: steps.chez.outputs.cache-hit != 'true'
+        run: scripts/ci/build-chez.sh "$RUNNER_TEMP/chez-threads"
+
+      - name: Save Chez
+        if: steps.chez.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/chez-threads
+          key: ${{ steps.chez.outputs.cache-primary-key }}
+
+      - name: Check the Chez this job runs
+        run: scripts/ci/check-chez.sh "$RUNNER_TEMP/chez-threads"
+
+      # The compiler is in the key, so that a lane tests a library its own
+      # image's compiler built: an image that moves cc rebuilds, and never
+      # serves a library another compiler made.
+      - name: Name the C compiler for the cache key
+        id: cc
+        run: echo "id=$(cc --version | head -n 1 | tr -c '[:alnum:].' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore libsodium at the current release
+        id: sodium
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/sodium-current
+          key: sodium-current-${{ hashFiles('scripts/ci/build-sodium.sh', 'scripts/ci/check-sodium.sh') }}-${{ steps.image.outputs.id }}-${{ steps.cc.outputs.id }}
+
+      - name: Build libsodium at the current release
+        if: steps.sodium.outputs.cache-hit != 'true'
+        env:
+          CHEZ: ${{ runner.temp }}/chez-threads/bin/scheme
+        run: scripts/ci/build-sodium.sh "$RUNNER_TEMP/sodium-current" --current
+
+      - name: Save libsodium at the current release
+        if: steps.sodium.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/sodium-current
+          key: ${{ steps.sodium.outputs.cache-primary-key }}
+
+      - name: Check the libsodium this job runs
+        env:
+          CHEZ: ${{ runner.temp }}/chez-threads/bin/scheme
+          CHEZ_SODIUM_LIBRARY: ${{ runner.temp }}/sodium-current/lib/libsodium.so.26
+          C_INCLUDE_PATH: ${{ runner.temp }}/sodium-current/include
+        run: scripts/ci/check-sodium.sh "$RUNNER_TEMP/sodium-current" --current
+
+      - name: Load libsodium at the current release
+        env:
+          CHEZ: ${{ runner.temp }}/chez-threads/bin/scheme
+          CHEZ_SODIUM_LIBRARY: ${{ runner.temp }}/sodium-current/lib/libsodium.so.26
+          C_INCLUDE_PATH: ${{ runner.temp }}/sodium-current/include
+        run: make build
+
+      - name: The suites against libsodium at the current release
+        env:
+          CHEZ: ${{ runner.temp }}/chez-threads/bin/scheme
+          CHEZ_SODIUM_LIBRARY: ${{ runner.temp }}/sodium-current/lib/libsodium.so.26
+          C_INCLUDE_PATH: ${{ runner.temp }}/sodium-current/include
+        run: make test
