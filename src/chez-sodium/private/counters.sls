@@ -14,15 +14,11 @@
 ;;; section (locked, below): no interrupt that escapes can leave the mutex
 ;;; held.
 ;;;
-;;; It also keeps the exit checks a library may register, for
-;;; suite-exit-status to run (register-exit-check!, below). No library under
-;;; src/ registers one.
-;;;
 ;;; It never loads libsodium, so any suite can import it. R6RS forbids
-;;; assigning an exported variable, so the counts and the checks are reached
+;;; assigning an exported variable, so the counts are reached
 ;;; through procedures.
 (library (chez-sodium private counters)
-  (export native-kinds count-up! count-down! native-counts register-exit-check! exit-checks)
+  (export native-kinds count-up! count-down! native-counts)
   (import (chez-sodium private require-threaded)
           (rnrs)
           (only (chezscheme) critical-section make-mutex with-mutex))
@@ -90,38 +86,4 @@
   ;; Every kind with its count, in native-kinds order, read at one moment.
   (define (native-counts)
     (let ((now (locked lock (lambda () (vector->list counts)))))
-      (map cons native-kinds now)))
-
-  ;; --- the exit checks -------------------------------------------------------
-  ;; A check of what a native library holds at a suite's end, which only that
-  ;; library can make. A library that loads one registers its check once the
-  ;; load has succeeded, so a process that never loaded it has none to run.
-  ;; No library under src/ registers one.
-  ;; The checks are kept here because suite-exit-status already reads this
-  ;; library, and registering one loads nothing. A check is a procedure of no
-  ;; arguments that answers (pass TEXT), (fail TEXT) or (unavailable TEXT);
-  ;; suite-exit-status runs each at a suite's end and names its outcome.
-
-  ;; The checks, newest first, each (NAME . CHECK), behind the counts' mutex.
-  (define checks '())
-
-  ;; register-exit-check! : Symbol (-> (List Symbol String)) -> Void
-  ;; CHECK, under NAME, for every suite-exit-status from now on, after the
-  ;; checks registered before it. There is no way to drop one. A NAME that is
-  ;; no symbol and a CHECK that is no procedure are assertion violations,
-  ;; whose irritants begin with a rule symbol, not-a-name or not-a-procedure,
-  ;; and nothing is registered. A NAME given twice registers two checks.
-  (define (register-exit-check! name check)
-    (unless (symbol? name)
-      (assertion-violation 'register-exit-check! "an exit check's name is a symbol"
-                           'not-a-name name))
-    (unless (procedure? check)
-      (assertion-violation 'register-exit-check! "an exit check is a procedure"
-                           'not-a-procedure name check))
-    (locked lock (lambda () (set! checks (cons (cons name check) checks)))))
-
-  ;; exit-checks : -> (Listof (Pairof Symbol (-> (List Symbol String))))
-  ;; Every check registered, each with its name, in the order registered, in
-  ;; a fresh list.
-  (define (exit-checks)
-    (reverse (locked lock (lambda () checks)))))
+      (map cons native-kinds now))))
