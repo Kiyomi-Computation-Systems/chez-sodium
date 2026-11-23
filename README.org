@@ -23,13 +23,16 @@ planned.
 
 ** Status
 
-*Nothing is built yet.* The project is at its plan:
-[[file:.plans/2026-11-22-chez-sodium-project-brief.md][the brief]] sets out what will be bound, and why. Its names may change before
+*One verb is built so far.* chez-sodium finds libsodium, checks that it is
+new enough, and loads it, and =sodium-version= names the version it loaded.
+The four jobs above come next.
+[[file:.plans/2026-11-22-chez-sodium-project-brief.md][The brief]] sets out what will be bound, and why. Its names may change before
 the first release, and the API may change in any release before 1.0.
 
 ** Requirements
 
-These are planned, and not yet tested:
+CI tests each on Linux at its oldest version, and libsodium at its latest
+release too:
 
 - Chez Scheme 10.4.0 or later, built with threads
 - libsodium 1.0.18 or later

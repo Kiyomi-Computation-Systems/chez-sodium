@@ -22,17 +22,20 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   2026-11-23). Six slices, one PR each: 0, the plan and the records; 1, the pure core; 2, the
   load and the checks of the FFI; 3, refusals end to end; 4, the public library; 5, the `floor`
   and `current` lanes. Then M1's closing review.
-- **Slice 0 is on `m1-plan`:** the plan; ADR-0002, ADR-0003, ADR-0006, ADR-0007 and ADR-0011
+- **Slices 0 to 4 are merged,** as PRs #3 to #7, squashed onto `main` on 2026-11-23, bottom
+  up. Each merge's tree equals the head CI passed (`.plans/traps.md`, "A stacked PR conflicts
+  once the one below is squash-merged"). Their close-outs follow M1's closing review.
+- **Slice 0 (#3):** the plan; ADR-0002, ADR-0003, ADR-0006, ADR-0007 and ADR-0011
   amended; ADR-0012 new; the constraints, the brief, `traps.md` and AGENTS.md to match; the
   plan's probes in [research/m1-plan/](research/m1-plan/README.md).
   - **Its review** ([research/m1-slice-0-review/](research/m1-slice-0-review/README.md)) found
     a blocker, six majors and thirteen minors, each fixed. The owner chose the wipe fused with
     the free (ADR-0008, amended) and native's load in one section (ADR-0007, amended); ADR-0001
     is amended for the allow-lists.
-- **Slice 1 is on `m1-slice-1`,** stacked on slice 0: `conditions`, `load-state`, `discovery`
+- **Slice 1 (#4):** `conditions`, `load-state`, `discovery`
   and `verify`, built from chez-sqlite3 v0.1.1 by trim tables checked before any code, and the
   exit checks removed ([its mutation log](m1-slice-1-mutation-log.md)).
-- **Slice 2 is on `m1-slice-2`,** stacked on slice 1: the load in one section, the block
+- **Slice 2 (#5):** the load in one section, the block
   helper with the wipe fused with the free, `check-seam` with rule (m), the convention table
   and `test-constants` ([its mutation log](m1-slice-2-mutation-log.md)).
   - **Its three builders shared the main tree,** on disjoint files, by the owner's choice: the
@@ -40,7 +43,7 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   - **Native exports 13 names,** among them `call-with-block`, `call-in-section` and the five raw
     bindings; never `foreign-block` or `free-foreign-block!`.
   - **Its review** found no blocker, two majors and six minors, each fixed.
-- **Slice 3 is on `m1-slice-3`,** stacked on slice 2: refusals end to end, through the decoy,
+- **Slice 3 (#6):** refusals end to end, through the decoy,
   the probe and six `test-library-loading-*` suites; `make dev` and `check-dev`; CI's `main`
   running `make build` by discovery; and the row tying `every-entry` to the convention table
   ([its mutation log](m1-slice-3-mutation-log.md)).
@@ -57,15 +60,33 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
     every arm passed.
   - **Its review** ([research/m1-slice-3-review/](research/m1-slice-3-review/README.md)), over
     slices 3 and 4 together, found no blocker, five majors and nine minors, each fixed.
-- **Slice 4 is on `m1-slice-4`,** stacked on slice 3: `(chez-sodium)`, which defines nothing and
+- **Slice 4 (#7):** `(chez-sodium)`, which defines nothing and
   re-exports ADR-0012's eight M1 names, each `eq?` to its definition; `test-public`; and
   `test-never-loads`, whose child references every condition export with no libsodium to load
   ([its mutation log](m1-slice-4-mutation-log.md)). CI's `nothreads` now refuses nine libraries
   by name, `(chez-sodium)` among them.
   - **Its review** was slice 3's, over both slices: two majors and two minors on slice 4, each
     fixed.
-- **Next: slice 5,** the `floor` and `current` lanes: `build-sodium.sh`, `check-sodium.sh` with
-  `--discovery`, and `test-ci-sodium`.
+- **Slice 5 is on `m1-slice-5`,** from `main`: CI's `floor` and `current` lanes, each building
+  its pinned tarball and checking it with `check-sodium.sh` before the suites run against it;
+  `main`'s `check-sodium.sh --discovery`; `test-ci-sodium`, and `check-ci`'s rules for the lanes
+  ([its mutation log](m1-slice-5-mutation-log.md); the measurements in
+  [research/m1-slice-5-measurements/](research/m1-slice-5-measurements/README.md)).
+  - **For M1's closing review:**
+    - a floor raise now also moves:
+      - `build-sodium.sh`'s `floor_archive` and soname;
+      - `check-sodium.sh`'s soname and `--discovery`'s path;
+      - the floor lane's library in `ci.yml`, `check-ci.sh` and `test-check-ci`;
+      - `test-ci-sodium`'s reviewed copies.
+
+      ADR-0003's "Raising the floor" and ADR-0011's list name none of them. A floor raised to
+      `current_version` would also fail `check-floors` until `current` moves;
+    - no job holds the "Identify the runner image" step, so a deleted one leaves every cache key
+      ending in an empty id;
+    - `build-chez.sh` lets `curl` follow a redirect to plain HTTP, and traps `EXIT` alone. The
+      new scripts have `--proto '=https'` and the signal trap ([slice 5's review](research/m1-slice-5-review/README.md),
+      S5-F3 and S5-F12).
+- **Next:** slice 5's PR, then M1's closing review, then the close-outs.
 
 ## Answered for M1
 

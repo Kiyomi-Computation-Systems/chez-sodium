@@ -27,11 +27,14 @@
 # oracle, the decoy and the free() interposer.
 build-essential
 
-# --- to fetch the Chez release tarball ------------------------------------------
-# scripts/ci/build-chez.sh downloads Chez's tarball with curl, checks its
-# sha256, and unpacks it with tar. The runner image has curl already; each is
-# listed so that this file is the whole truth about a bare machine. tar and
-# gzip are Essential Debian packages, so they need no line here.
+# --- to fetch the Chez and libsodium release tarballs ---------------------------
+# scripts/ci/build-chez.sh and scripts/ci/build-sodium.sh each download a
+# tarball with curl, check its sha256 with sha256sum, and unpack it with tar;
+# build-sodium.sh then runs libsodium's configure, make and the C compiler
+# that build-essential gives. The runner image has curl already; each is
+# listed so that this file is the whole truth about a bare machine. tar,
+# gzip and coreutils' sha256sum are Essential Debian packages, so they need
+# no line here.
 ca-certificates
 curl
 
@@ -39,7 +42,8 @@ curl
 # libsodium-dev gives sodium.h, which scripts/ci/report-sodium.sh, test-constants,
 # the C oracle and the decoy compile against, and pulls in libsodium23, the
 # runner's libsodium, which it reports. libsodium23 is what the suites of
-# the main job load.
+# the main job load, and scripts/ci/check-sodium.sh --discovery requires it
+# and libsodium-dev's /usr/include/sodium.h to be the floor.
 libsodium-dev
 
 # --- the memory gate (ADR-0011) -------------------------------------------------
