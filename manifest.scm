@@ -7,8 +7,10 @@
 
 (specifications->manifest
  '(;; Chez, and libsodium bound with no C shim (ADR-0001). "libsodium"
-   ;; brings libsodium.so.26 and sodium.h (ADR-0011); gcc-toolchain compiles
-   ;; the C programs the tests build.
+   ;; brings libsodium.so.26 and sodium.h (ADR-0011): the library the suites
+   ;; load, and the header test-constants, the C oracle and the decoy compile
+   ;; against. gcc-toolchain compiles those programs and the free() interposer
+   ;; test-wipe preloads, each at test time.
    "chez-scheme" "libsodium" "gcc-toolchain"
    ;; The memory gate (ADR-0011).
    "valgrind"

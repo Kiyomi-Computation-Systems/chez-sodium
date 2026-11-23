@@ -32,7 +32,16 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
 - **Slice 1 is on `m1-slice-1`,** stacked on slice 0: `conditions`, `load-state`, `discovery`
   and `verify`, built from chez-sqlite3 v0.1.1 by trim tables checked before any code, and the
   exit checks removed ([its mutation log](m1-slice-1-mutation-log.md)).
-- **Next: slice 2,** the load and the checks of the FFI.
+- **Slice 2 is on `m1-slice-2`,** stacked on slice 1: the load in one section, the block
+  helper with the wipe fused with the free, `check-seam` with rule (m), the convention table
+  and `test-constants` ([its mutation log](m1-slice-2-mutation-log.md)).
+  - **Its three builders shared the main tree,** on disjoint files, by the owner's choice: the
+    harness's worktrees came from `main`, and fast-forwarding one was denied.
+  - **Native exports 13 names,** among them `call-with-block`, `call-in-section` and the five raw
+    bindings; never `foreign-block` or `free-foreign-block!`.
+  - **Its review** found no blocker, two majors and six minors, each fixed.
+- **Next: slice 3,** refusals end to end, with the row tying `library-loading.sls`'s entries to
+  the convention table.
 
 ## Answered for M1
 
@@ -61,6 +70,10 @@ M0 left five questions to M1. The M1 plan, §4.1, answers each, and the owner ac
   - how row 24 reaches a verb's blocks;
   - whether `test-constants` gains a constants half, each size function against its header's
     macro.
+  - a check of ADR-0001 decision 2, that every constant is read through libsodium's own
+    function: nothing holds it once v0.1.1's constants half is dropped (slice 2's tables);
+  - `unsigned-64` joins the argument allow-list with its first row, `crypto_generichash`'s
+    `inlen` (ADR-0001, amended).
 
 ## Owed to M3
 
@@ -71,7 +84,8 @@ From the M1 plan, §3 and §4.2, item 6:
   Scheme copies of its string, which ADR-0008 forbids for a secret, so M3's writers bound every
   write by the block's size, and answer a string changed mid-write as data;
 - `&sodium-failed`'s first raise, and its export;
-- the oracle's hex mode (row 4), and the FIFO decoy (row 19).
+- the oracle's hex mode (row 4), and the FIFO decoy (row 19);
+- `test-conventions`' rows for the collect-safe calls, the first to use `collect-safe`.
 
 ## Owed to M4
 
