@@ -40,8 +40,24 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   - **Native exports 13 names,** among them `call-with-block`, `call-in-section` and the five raw
     bindings; never `foreign-block` or `free-foreign-block!`.
   - **Its review** found no blocker, two majors and six minors, each fixed.
-- **Next: slice 3,** refusals end to end, with the row tying `library-loading.sls`'s entries to
-  the convention table.
+- **Slice 3 is on `m1-slice-3`,** stacked on slice 2: refusals end to end, through the decoy,
+  the probe and six `test-library-loading-*` suites; `make dev` and `check-dev`; CI's `main`
+  running `make build` by discovery; and the row tying `every-entry` to the convention table
+  ([its mutation log](m1-slice-3-mutation-log.md)).
+  - **Its builders shared the main tree** with slice 4's, on disjoint files.
+  - **For its close-out:**
+    - a child under the gate takes 3.85 s in the container, not the plan's 2.6 s, so each suite
+      runs at most 14 children;
+    - not-found's world is three empty directories, so it lists all ten candidates;
+    - `version-bom`, `--init-after` and `--wipe` were added (plan §2.2);
+    - CI's first measured times, which plan §5.2 owes.
+  - **Its first CI run is the first by discovery.** The container always exports
+    `CHEZ_SODIUM_LIBRARY`, so discovery's FHS arm, `make build` and `check-dev` run by
+    discovery on `main` alone. The review simulated that world against Ubuntu's 1.0.18, and
+    every arm passed.
+  - **Its review** ([research/m1-slice-3-review/](research/m1-slice-3-review/README.md)), over
+    slices 3 and 4 together, found no blocker, five majors and nine minors, each fixed.
+- **Next: slice 4,** the public library, stacked on slice 3.
 
 ## Answered for M1
 
@@ -73,7 +89,17 @@ M0 left five questions to M1. The M1 plan, §4.1, answers each, and the owner ac
   - a check of ADR-0001 decision 2, that every constant is read through libsodium's own
     function: nothing holds it once v0.1.1's constants half is dropped (slice 2's tables);
   - `unsigned-64` joins the argument allow-list with its first row, `crypto_generichash`'s
-    `inlen` (ADR-0001, amended).
+    `inlen` (ADR-0001, amended);
+  - a check of the decoy's `volatile uintptr_t` rule, which nothing holds in M1: no M1 entry is
+    `nonnull`. A `-Werror` compile holds it only for a `nonnull` parameter, and `nonnull` is per
+    function: in 1.0.22, `randombytes_buf`'s `buf` and `crypto_generichash`'s `out` alone. Its
+    `in` and `key`, and `sodium_memcmp`'s and `sodium_memzero`'s pointers, would compile tested
+    directly. So the check reads the decoy's source: each pointer parameter's only use is its
+    `volatile uintptr_t` read ([slice 3's review](research/m1-slice-3-review/README.md),
+    S3-F3);
+  - the missing-entry rows split again, four ways as in v0.1.1, once M2's entries arrive: one
+    suite holds the five M1 entries today, within its 14 children
+    ([slice 3's mutation log](m1-slice-3-mutation-log.md)).
 
 ## Owed to M3
 

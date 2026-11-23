@@ -272,7 +272,14 @@
 (define chk-n "scripts/ci/check-chez.sh \"$RUNNER_TEMP/chez-nothreads\" --nothreads")
 (define bld-n "scripts/ci/build-chez.sh \"$RUNNER_TEMP/chez-nothreads\" --nothreads")
 (define make-line
-  "make check-help check-suites check-pins check-floors check-ci test check-test-fails check-clean")
+  "make check-help check-suites check-pins check-floors check-ci test check-test-fails check-dev check-clean")
+(define build-run "make build")
+(define install-hdr "      - name: The install check, by discovery")
+(define build-line "        run: make build")
+(define (install-step)
+  (span "      # ADR-0002's install check." "        run: make build\n"))
+(define chk-step-hdr "      - name: Check the Chez this job runs\n")
+(define (main-chk-step) (string-append chk-step-hdr "        run: " chk-t "\n"))
 (define launcher "sh tests/guix-env-launcher.sh")
 (define gate-run "make check-memory-gate")
 (define mem-run "make test-memory")
@@ -449,7 +456,7 @@
 
 (define make-words
   '("check-help" "check-suites" "check-pins" "check-floors" "check-ci" "test"
-    "check-test-fails" "check-clean"))
+    "check-test-fails" "check-dev" "check-clean"))
 
 (define (without-word line word)
   (let* ((at (find-sub line (string-append " " word) 0)))
@@ -674,7 +681,8 @@
 
 ;; (job header run chez-value): the five steps that run make or sh with Chez.
 (define make-steps
-  (list (list "main" "      - name: Checks and suites" make-line chez-t)
+  (list (list "main" install-hdr build-run chez-t)
+        (list "main" "      - name: Checks and suites" make-line chez-t)
         (list "main" "      - name: The launcher's host-side tests" launcher chez-t)
         (list "memory" "      - name: The gate must fail on planted defects" gate-run chez-t)
         (list "memory" "      - name: Every suite under Valgrind" mem-run chez-t)
@@ -946,15 +954,37 @@
         (list (e (span "      # The launcher's own tests run no Guix" "run: sh tests/guix-env-launcher.sh\n") "")
               (e "      # CHEZ is the real binary" (string-append "      - name: The launcher's host-side tests\n" (env-text chez-t) "        run: sh tests/guix-env-launcher.sh\n\n      # CHEZ is the real binary")))
         (list (list "        run: sh tests/guix-env-launcher.sh" (out-of-order "main" launcher make-line))))
+   (row "main's install check deleted"
+        (list (e (string-append (install-step) "\n") ""))
+        (list (list "  main:" (n-steps "main" build-run 0))))
+   (row "main's install check written twice"
+        (list (e (string-append (install-step) "\n")
+                 (string-append (install-step) "\n" (install-step) "\n")))
+        (list (list "  main:" (n-steps "main" build-run 2))))
+   (row "main's install check moved after Checks and suites"
+        (list (e (string-append (install-step) "\n") "")
+              (e (make-run) (string-append (make-run) "\n" (install-step))))
+        (list (list (string-append "        run: " make-line) (out-of-order "main" make-line build-run))))
+   (row "main's install check moved before Check the Chez"
+        (list (e (string-append (install-step) "\n") "")
+              (le "main" (main-chk-step) (string-append (install-step) "\n" (main-chk-step))))
+        (list (list (hdr-in "main" #f build-line) (out-of-order "main" build-run chk-t))))
+   (row "main's install check with an argument, make build X"
+        (list (le "main" "        run: make build\n" "        run: make build X\n"))
+        (list (list "  main:" (n-steps "main" build-run 0))))
+   (row "main's install check as a block scalar"
+        (list (le "main" "        run: make build\n" "        run: |\n          make build\n"))
+        (list (list "  main:" (n-steps "main" build-run 0))))
    (row "main's make line with an argument"
         (list (e (make-run) (string-append "        run: " make-line " build\n")))
         (list (list "  main:" (n-steps "main" make-line 0))))
    (row "main's make line as a block scalar"
         (list (e (make-run) (string-append "        run: |\n          " make-line "\n")))
         (list (list "  main:" (n-steps "main" make-line 0))))
-   (row "main's make line replaced by make build: it is no step check-ci reads"
+   (row "main's make line replaced by make build: the install check is then written twice, and no step runs the make line"
         (list (e (make-run) (string-append "        run: make build\n")))
-        (list (list "  main:" (n-steps "main" make-line 0))))))
+        (list (list "  main:" (n-steps "main" build-run 2))
+              (list "  main:" (n-steps "main" make-line 0))))))
 
 (define make-word-rows
   (map (lambda (w)

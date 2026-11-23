@@ -58,7 +58,7 @@ MEMORY_LOGS := build/memory
 
 # One physical line: check-help reads it with awk, and fails if it ends in
 # a backslash.
-.PHONY: help check-help check-guix check-guix-inside deps build check-pins test check-suites check-seam check-floors check-ci check-nothreads check-test-fails test-memory check-memory-gate clean check-clean
+.PHONY: help check-help check-guix check-guix-inside deps build dev check-dev check-pins test check-suites check-seam check-floors check-ci check-nothreads check-test-fails test-memory check-memory-gate clean check-clean
 
 .DEFAULT_GOAL := help
 
@@ -145,6 +145,24 @@ deps: ## Link vendor/chez-srfi into build/scheme-libs; never fetches
 build: ## Load libsodium as chez-sodium would and name it; fail with the reason when it is refused
 	@scripts/require-tools "$(GOAL)" $(CHEZ)
 	@$(CHEZ) --libdirs src --program tests/preflight.sps
+
+# Runs make deps and make build, then a REPL with the suites' library path:
+# chez-sodium's own libraries, (chez-sodium-testing) and SRFI-64. A refused
+# libsodium stops make at build, before any REPL starts. Import
+# (chez-sodium private native) there to load it, and read what it loaded.
+dev: deps build ## Start a REPL with the suites' library path, after make build; a refused libsodium stops it
+	@scripts/require-tools "$(GOAL)" $(CHEZ)
+	@$(CHEZ) --libdirs $(LIBDIRS)
+
+# Runs make dev through make, in a fresh copy of the tree with no build/, with
+# forms piped into its REPL. It requires build's report, the banner, and two
+# lines those forms print only once (chez-sodium private native),
+# (chez-sodium-testing) and (srfi :64) have imported, naming the version and
+# path build named. With CHEZ_SODIUM_LIBRARY naming no file, make dev must
+# fail with build's refusal before any REPL starts (tests/check-dev.sh).
+check-dev: ## Fail unless make dev runs build, then a REPL with the suites' libraries; a refused libsodium must stop it
+	@scripts/require-tools "$(GOAL)" $(TIMEOUT) $(CHEZ)
+	@MAKE='$(MAKE)' TIMEOUT='$(TIMEOUT)' sh tests/check-dev.sh
 
 # Three places name the chez-srfi commit, and nothing else keeps them equal:
 # Akku.lock (what a consumer installs), the gitlink the superproject records

@@ -105,6 +105,25 @@ chez-sodium, M1's slice 0 and slice 2 reviews.
 - **The rule:** a mutant of memory safety is run under the gate too, and a row that only the gate
   can fail says so in its suite's header.
 
+### An exit status cannot tell which raise reached the default handler
+
+chez-sodium, M1's slice 3 review.
+
+- **What happened.** Preflight's row for a raise that is no refusal asserted exit 255, an empty
+  stdout and no `(reason ` line. Its builder widened preflight's guard from
+  `sodium-library-unavailable?` to `error?`, and every row passed, so the mutant was logged as
+  equivalent. It is not: the handler's first checked accessor raises in place of the bug, and
+  `make build` prints the accessor's complaint, not the bug.
+- **Why.** Every uncaught raise ends the same way under Chez's default handler: exit 255, with
+  text on stderr. Only that text says which raise it was.
+- **Reproduced** by the review and again at the join: on the raising fixture, the clean run's
+  stderr names `loaded-libsodium`; the mutant's names `sodium-library-unavailable-candidates`.
+- **What changed.** The row requires preflight's stderr to equal that of
+  `tests/fixtures/raising/unguarded.sps`, which meets the same raise with no guard. That compares
+  two outputs and writes no message (ADR-0006).
+- **The rule:** a row about an uncaught raise compares its stderr with the same raise left
+  unguarded. An exit status and a missing line can't tell one raise from another.
+
 ### Under Valgrind, a suite's `LD_PRELOAD` holds Valgrind's preloads
 
 chez-sodium, M1's plan.

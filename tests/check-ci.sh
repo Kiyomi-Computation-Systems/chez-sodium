@@ -31,7 +31,8 @@
 #     save of it in each job, and the checks each job must run, each as one
 #     step's whole run line, in order:
 #       main        the Chez build, check-chez, the two report steps, the
-#                   checks, then the launcher's tests;
+#                   install check (make build), the checks, then the
+#                   launcher's tests;
 #       memory      the Chez build, check-chez, make check-memory-gate, then
 #                   make test-memory, both bare;
 #       nothreads   the --nothreads Chez build, its check-chez, then make
@@ -40,7 +41,9 @@
 #     the cache's save, a step that runs make carries the env CHEZ of its job's
 #     Chez, and in job main, between its check-chez step and its make step, the
 #     steps "Report the versions this run uses" (its run block, line for line)
-#     and "Report the runner's libsodium" (its run line), in that order;
+#     and "Report the runner's libsodium" (its run line), in that order, and
+#     the install check, make build, as one step's whole run line, after
+#     check-chez and before the make step;
 #   - a uses: step may only be actions/checkout@, actions/cache/restore@ or
 #     actions/cache/save@; the cache's restore comes before its build, and its
 #     save after the build and before the cache's check; and the checkout of
@@ -209,7 +212,7 @@ function gaterun(g, j) {
 
 # nreq(j): fills rq[1..n] with the run lines job j must run, in order, and
 # rqk[i] with what each one is: bld (the Chez build, which carries the cache's
-# if) or env (a make line, which carries the env CHEZ).
+# if) or env (a make line, make build among them, which carries the env CHEZ).
 function nreq(j,   n) {
   split("", rqk)
   if (j == "nothreads") {
@@ -219,8 +222,9 @@ function nreq(j,   n) {
   }
   rq[1] = BLDT; rqk[1] = "bld"; rq[2] = CHKT
   if (j == "main") {
-    rq[3] = MAKELINE; rqk[3] = "env"; rq[4] = LAUNCHER; rqk[4] = "env"
-    return 4
+    rq[3] = BUILDLINE; rqk[3] = "env"; rq[4] = MAKELINE; rqk[4] = "env"
+    rq[5] = LAUNCHER; rqk[5] = "env"
+    return 5
   }
   rq[3] = "make check-memory-gate"; rqk[3] = "env"; rq[4] = "make test-memory"; rqk[4] = "env"
   return 4
@@ -460,11 +464,12 @@ BEGIN {
   HASHLIST = "'packaging/floors.sexp', 'scripts/ci/floor.sh', 'scripts/ci/build-chez.sh', 'scripts/ci/check-chez.sh'"
   IFLINE = "if: steps.chez.outputs.cache-hit != 'true'"
   PINRUN = "scripts/ci/check-action-pins.sh .github/workflows"
+  BUILDLINE = "make build"
   BLDT = "scripts/ci/build-chez.sh \"$RUNNER_TEMP/chez-threads\""
   CHKT = "scripts/ci/check-chez.sh \"$RUNNER_TEMP/chez-threads\""
   BLDN = "scripts/ci/build-chez.sh \"$RUNNER_TEMP/chez-nothreads\" --nothreads"
   CHKN = "scripts/ci/check-chez.sh \"$RUNNER_TEMP/chez-nothreads\" --nothreads"
-  MAKELINE = "make check-help check-suites check-pins check-floors check-ci test check-test-fails check-clean"
+  MAKELINE = "make check-help check-suites check-pins check-floors check-ci test check-test-fails check-dev check-clean"
   LAUNCHER = "sh tests/guix-env-launcher.sh"
   VERS = "Report the versions this run uses"
   SODN = "Report the runner's libsodium"
