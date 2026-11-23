@@ -1,6 +1,7 @@
 # ADR-0002: Find libsodium at runtime: an override, else one candidate list, the newer soname first, loaded once
 
-- **Status:** Accepted (the owner, 2026-11-22), approved with the brief.
+- **Status:** Accepted (the owner, 2026-11-22), approved with the brief. Amended 2026-11-23 in
+  M1's plan, and accepted by the owner that day ([amendment](#amendment-2026-11-23-m1s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** chez-sodium, on Linux distributions and Guix environments
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §7.2's discovery and load,
@@ -46,8 +47,9 @@
 4. **One load, in order, never fall through** (X-m4): choose; load; bind the version entries;
    check the floor; call `sodium_init`; bind the rest. Every entry point is required, so there
    is no `bind-optional` (X-m3). The load runs once, and a failure is remembered and raised
-   again.
-5. **`sodium_init` answering 1 loads.** Only -1 is refused, as `init-failed`.
+   again. Each milestone binds its own verbs' entry points in the last step.
+5. **`sodium_init` answering 0 or 1 loads,** and the load records the answer. Any other answer
+   is `init-failed`, its detail the answer.
 6. **Every refusal is a `&sodium-library-unavailable`** ([ADR-0006]) carrying a reason:
    `invalid-override`, `not-found`, `load-failed`, `below-floor`, `missing-api` or
    `init-failed`. `not-found` lists every candidate it checked.
@@ -69,13 +71,29 @@
 - **CI's `main` job finds Ubuntu 24.04's 1.0.18 by discovery,** and asserts that it loaded the
   floor. The `floor` and `current` jobs name their builds through the override ([ADR-0003]).
 - **Rows reach every reason** (brief §8.1, rows 20 and 21; P-F12):
-  - decoys reach `below-floor`, `missing-api` and `init-failed`, and a `sodium_init` that
-    answers 1, which loads;
+  - decoys reach `below-floor`, `missing-api` and `init-failed`, from a `sodium_init` that
+    answers -1 and one that answers 2, and a `sodium_init` that answers 1, which loads;
   - `invalid-override` comes from a bare name in the override, `load-failed` from a text file
     or a missing path, and `not-found` from discovery's tests, with no decoy;
   - a child calls the real `sodium_init` through its own binding, then loads chez-sodium. It
     loads, and a second direct call answers 1.
 - **The reason symbols are the contract.** Tests assert the reason, never the text.
+
+## Amendment, 2026-11-23: M1's plan
+
+Accepted (the owner, 2026-11-23), proposed in [the M1 plan](../2026-11-22-m1-plan.md), §4.2,
+items 2, 3 and 12.
+
+- **Decision 5 refused only -1, so an undocumented 2 would have loaded.** libsodium documents 0,
+  1 and -1 alone (brief §3.4), and answered 0, then 1, at 1.0.18 and 1.0.22 (measured,
+  [research/m1-plan/](../research/m1-plan/README.md)). Now 0 and 1 load, and any other answer is
+  `init-failed`. Decoys answer -1 and 2, so that no single value passes for "refused", as
+  chez-sqlite3 refuses any `sqlite3_initialize` answer but `SQLITE_OK`.
+- **The load records `sodium_init`'s answer,** for rows 21 and 22 to read.
+- **M1 binds five entry points:** `sodium_version_string`, `sodium_library_version_major` and
+  `_minor`, `sodium_init` and `sodium_memzero`. Each later milestone appends its own verbs'
+  entry points to the load's last step, each with its row in the convention table, the decoy,
+  the `missing-api` rows and row 22.
 
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md

@@ -12,9 +12,10 @@ record it comes from, and where a rule and its record disagree, the record wins.
   by name while it is expanded, and every library under `src/` imports it first ([ADR-0004]).
   `make check-nothreads` refuses every library under `src/` by name on CI's `--nothreads` Chez
   ([ADR-0004]).
-- **libsodium's floor is read from `sodium_version_string`,** parsed strictly as three naturals
-  and compared with the file. `sodium_library_version_major` and `_minor` are libtool numbers:
-  reported beside it, never compared ([ADR-0003]).
+- **libsodium's floor is read from `sodium_version_string`,** parsed strictly as three naturals,
+  with no sign, space or leading zero, and compared with the file. NULL, or a string that is not
+  three naturals, is `below-floor`. `sodium_library_version_major` and `_minor` are libtool
+  numbers: reported beside it, never compared ([ADR-0003]).
 - **The floors are written once, in `packaging/floors.sexp`, in their dotted form.**
   `make check-floors` holds README.org's Requirements to the file, and refuses a floor's dotted
   text wherever it reads. CI reads floors through `scripts/ci/floor.sh` and writes none. The code
@@ -36,6 +37,14 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **The verbs' names are the brief's §4, with no prefix,** exported by `(chez-sodium)`. Every
   exported procedure has a Typed Racket style signature comment, and `docs/reference.md` is held
   to them by a test ([ADR-0005]).
+- **`(chez-sodium)` defines nothing:** it re-exports its private libraries' names, each `eq?` to
+  its definition. It exports predicates and accessors, never a `&` name or a constructor
+  ([ADR-0012]).
+- **`check-seam` reads `src/` alone,** with chez-sqlite3's rules (c) to (i) and (k), and rule
+  (m): only `native` imports `(chez-sodium private memory)`, and no library exports a name it
+  imports from `memory` ([ADR-0012]).
+- **Inside native, `foreign-block` and `free-foreign-block!` appear only in `call-with-block`'s
+  definition,** held by a `test-native` row that reads native's body as data ([ADR-0012]).
 
 ## Binding libsodium
 
@@ -59,7 +68,7 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **One library holds `foreign-procedure`, and one holds `foreign-alloc`** ([ADR-0001]).
 - **Every binding has a row in the convention table,** which `test-conventions` holds every
   `foreign-procedure` form to, and `test-constants`' compiled prototype check holds to
-  `sodium.h` ([ADR-0001]).
+  `sodium.h`. The allow-lists are exactly the types the rows use ([ADR-0001]).
 - **Every return code the brief's §3.4 states is confirmed by a row against the real library**
   before code relies on it ([ADR-0001]).
 
@@ -74,7 +83,10 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **One load, in order, never fall through:** choose, load, bind the version entries, check the
   floor, call `sodium_init`, bind the rest. No entry point is optional. The load runs once, and a
   failure is remembered and raised again ([ADR-0002]).
-- **`sodium_init` answering 1 loads.** Only -1 is refused, as `init-failed` ([ADR-0002]).
+- **`sodium_init` answering 0 or 1 loads,** and the load records the answer. Any other answer is
+  `init-failed`, its detail the answer ([ADR-0002]).
+- **Each milestone binds its own verbs' entry points,** in the load's last step, each with its
+  convention row, its decoy entry, its `missing-api` row and row 22 ([ADR-0002]).
 - **A refusal carries a reason symbol:** `invalid-override`, `not-found`, `load-failed`,
   `below-floor`, `missing-api` or `init-failed`. `not-found` lists every candidate it checked
   ([ADR-0002]).
@@ -85,14 +97,20 @@ record it comes from, and where a rule and its record disagree, the record wins.
 
 - **Every library condition is a `&chez-sodium-error`:** `&sodium-library-unavailable`, or
   `&sodium-failed`, whose one case is `crypto_pwhash_str` answering -1 for limits that passed
-  their range check ([ADR-0006]).
+  their range check. `&sodium-failed`'s fields are `function` and `code` ([ADR-0006]).
+- **Every raise carries `&who`:** `chez-sodium` for the load's refusals, the public verb for a
+  refusal raised through the public surface, the given WHO for a helper's, and its own name for
+  an internal invariant's. A condition Chez raises is passed on as raised ([ADR-0006]).
+- **A refusal raised through the public surface leads its irritants with the rule's symbol**
+  ([ADR-0006]).
 - **A caller's mistake is an assertion violation, raised before C:** a wrong type; a size, key
   length or limit out of range; an input over the cap, other than a hash string; an empty key
   ([ADR-0006]).
 - **`password-verify` answers `#f` for libsodium's -1,** whatever caused it, and raises no
   condition for it ([ADR-0006]).
 - **No secret reaches a condition.** A refusal of a secret parameter names the parameter and its
-  kind only, whatever the value's type. Every string and bytevector parameter is secret: a
+  kind only, whatever the value's type: irritants `(RULE PARAMETER (kind K))`, through
+  `refuse-secret`, in every helper too. Every string and bytevector parameter is secret: a
   password, a hash string, `blake2b`'s input and key, `constant-time-bytevector=?`'s operands,
   and Tier 2's inputs and HMAC key. `shown-value` is for sizes, limits and preset names only
   ([ADR-0006]).
@@ -111,14 +129,23 @@ record it comes from, and where a rule and its record disagree, the record wins.
   cap fails the pre-check instead ([ADR-0007], [ADR-0009]).
 - **No claims, positions or sweeps:** a stateless verb shares no state across sections
   ([ADR-0007]).
+- **`call-in-section` is the one section:** THUNK in one `critical-section`, a raise inside
+  caught there and raised again once it ends. `sodium-version` holds none ([ADR-0007]).
+- **Native's load runs in one critical section,** which answers data, and a refusal is raised
+  after it ([ADR-0007]).
+- **Every engine row references the library once before its first engine.** A library first
+  reached inside an engine that is then abandoned stays wedged. The load's section narrows the
+  window to the ticks before it starts, and no code closes it ([ADR-0007]).
 - **An engine row runs every verb at each fuel from 1 until it completes,** and each run answers
   right, raises nothing and leaves no live block ([ADR-0007]).
 
 ## Wiping
 
-- **Every block the library frees is wiped first,** secret or not, by one `sodium_memzero` call
-  over the block's size, in `call-with-block`'s critical cleanup, just before the free. Never in
-  a wrapper, never inside the callback, never as a `foreign-set!` loop ([ADR-0008]).
+- **Every block the library frees is wiped first,** secret or not. The wipe is fused with the
+  free: `call-with-block`'s critical cleanup hands `free-foreign-block!` the wipe, which checks
+  that the block is live, wipes it with one `sodium_memzero` call over its size, then frees it,
+  as one step. A block that is not live is never wiped. Never in a wrapper, never inside the
+  callback, never as a `foreign-set!` loop ([ADR-0008]).
 - **No Scheme copy of a secret.** A password's UTF-8 is written straight into its block, and a
   caller's bytevector is copied straight into its block, with no `bytevector-copy`
   ([ADR-0008]).
@@ -178,11 +205,16 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **One memory job, with no shards** ([ADR-0011]).
 - **A child that reaches native code starts through `gated-command`,** under the gate's own
   Valgrind, with its own log. A child started any other way runs outside Valgrind, unseen. A
-  child that runs only Scheme, as `test-counters`' does, is outside the rule. The wipe row's
+  child that runs only Scheme is outside the rule. The wipe row's
   child is the exception: it runs outside Valgrind, whose allocator bypasses its `free()`
   interposer ([ADR-0011], [ADR-0008]; chez-sqlite3 ADR-0005, amended).
 - **The C oracle is a program named `libsodium-oracle`.** The gate's rule for child logs names
   it ([ADR-0011]).
+- **The wipe row's child sets `LD_PRELOAD` to the interposer alone,** never appended: under the
+  gate a suite's own holds Valgrind's preloads ([ADR-0011]).
+- **No exit checks:** the block count is a suite's one check at its end ([ADR-0011]).
+- **A decoy reads each pointer it logs through a `volatile uintptr_t`,** and tests only that
+  ([ADR-0011]).
 - **CI's workflow has one shape, which `make check-ci` holds and `make test` runs.** M0's shape
   is `main`, without `make build` and `check-dev`; `memory`; and `nothreads`. M1 adds `floor` and
   `current`. Actions are pinned by SHA ([ADR-0011]; chez-sqlite3 ADR-0005, amended).
@@ -198,3 +230,4 @@ record it comes from, and where a rule and its record disagree, the record wins.
 [ADR-0009]: decisions/0009-what-needs-rehash-means.md
 [ADR-0010]: decisions/0010-linux-only.md
 [ADR-0011]: decisions/0011-the-harness-after-chez-sqlite3.md
+[ADR-0012]: decisions/0012-the-public-library-and-the-seam.md

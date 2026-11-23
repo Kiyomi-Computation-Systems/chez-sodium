@@ -3,14 +3,15 @@
 ## Where the project stands
 
 * **No verb exists yet.** M0 built the records, the container, the test harness, the
-  memory gate and CI. `.plans/progress.md` says where the project stands and what comes
-  next.
+  memory gate and CI. M1, the load and the block helper, is under way: its plan is
+  `.plans/2026-11-22-m1-plan.md`. `.plans/progress.md` says where the project stands
+  and what comes next.
 * The plan is the brief, `.plans/2026-11-22-chez-sodium-project-brief.md`. Read it before
   any work.
   - Its §11 holds the owner's decisions; its §10 records that nothing is open.
   - Its adversarial review, every finding with its evidence and probes, is in
     `.plans/research/brief-review/`.
-* The records are `.plans/decisions/`, ADR-0001 to ADR-0011.
+* The records are `.plans/decisions/`, ADR-0001 to ADR-0012.
   `.plans/global-constraints.md` holds their hard rules, and binds every task brief.
 * The brief's pattern is chez-sqlite3, at `../chez-sqlite3`. Its FFI rules come from
   chez-sqlite3 and chez-libuv, at `../chez-libuv`. Read the file there before copying
@@ -47,8 +48,10 @@
     the value's type.
   - `shown-value` shows numbers, symbols, characters and lists of them as they are,
     so it is for sizes, limits and preset names only.
-* Every block the library frees is wiped first, by one `sodium_memzero` call inside
-  `call-with-block`'s critical cleanup, just before the free (brief §6.3).
+* Every block the library frees is wiped first. The wipe is fused with the free:
+  `free-foreign-block!` checks the block is live, wipes it with one `sodium_memzero`
+  call, then frees it, inside `call-with-block`'s critical cleanup (brief §6.3;
+  ADR-0008, amended). A block that is not live is never wiped.
   - Never in a wrapper: the block is already freed by then.
   - Never as a `foreign-set!` loop: it costs as much as the copy.
 * No Scheme copy of a secret. A password's UTF-8 goes straight into its block, and a
@@ -207,12 +210,22 @@
 * The load runs once, and a failure is remembered and raised again: Chez wedges
   on a library body that failed with a non-serious raise (chez-sqlite3
   `private/load-state.sls`).
+* Hold every mutex inside a critical section. An engine abandoned after
+  `with-mutex` takes the mutex, and before it winds, leaves it held
+  (`.plans/traps.md`).
+* A library first reached inside an engine that is then abandoned stays wedged.
+  Native's load runs in one critical section, which narrows the window to the
+  ticks before it; nothing closes it. Every engine row references the library
+  once before its first engine (ADR-0007, amended).
 * Nothing raises inside `critical-section` or a critical `dynamic-wind` thunk:
   a handler of the raise runs with interrupts disabled, and another thread's
   collection waits. Answer data there, and raise after the section.
 * A `guard` whose clauses don't match re-enters the raise's extent to raise
   again, so a `dynamic-wind` before thunk that refuses a re-entry replaces the
-  caller's condition with its own. Let a re-entry through. An after thunk whose
+  caller's condition with its own. Let a re-entry through where the wind has
+  nothing to refuse. `call-with-block` refuses one, which is safe only because
+  every block is made under `call-in-section`'s catch-all guard (ADR-0007). An
+  after thunk whose
   work isn't idempotent, such as wiping and freeing a block, acts once, behind a
   flag, and whatever runs after a re-entry reads that flag first.
 * Chez's foreign `int` takes −2³¹ to 2³²−1, hands 2³¹ and above to C as

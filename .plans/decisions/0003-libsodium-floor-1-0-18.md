@@ -1,7 +1,8 @@
 # ADR-0003: The libsodium floor is 1.0.18, read from the version string
 
 - **Status:** Accepted (the owner, 2026-11-22), brief §11.7. Decisions 4 and 5, the versions
-  tested, are brief §11.5; decision 6, the tarball, is brief §7.2 (P-F16).
+  tested, are brief §11.5; decision 6, the tarball, is brief §7.2 (P-F16). Amended 2026-11-23 in
+  M1's plan, and accepted by the owner that day ([amendment](#amendment-2026-11-23-m1s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** every libsodium chez-sodium loads, and the ones CI tests
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §3.4, §7.2, §8.3, §11.5's
@@ -31,10 +32,12 @@ What ships where (brief §8.3, from packages.ubuntu.com on 2026-11-22; the revie
 
 1. **The floor is 1.0.18,** written once, as `(sodium "1.0.18")` in `packaging/floors.sexp`
    ([ADR-0011]).
-2. **The floor is read from `sodium_version_string`,** parsed strictly as three naturals and
-   compared with the file. A lower version is refused as `below-floor` ([ADR-0002]), 1.0.17
-   among them.
-3. **Major and minor are reported beside the string, never compared.**
+2. **The floor is read from `sodium_version_string`,** parsed strictly as three naturals, with
+   no sign, space or leading zero, and compared with the file. A lower version is refused as
+   `below-floor` ([ADR-0002]), 1.0.17 among them. So is NULL, or a string that is not three
+   naturals: the floor is met only when the string shows it.
+3. **Major and minor are reported beside the string, never compared:** in the load's report,
+   and by `make build`.
 4. **Supported versions** (brief §11.5):
    - test the floor, Guix's version and the latest point release;
    - bump `current` at each point release;
@@ -69,5 +72,21 @@ What ships where (brief §8.3, from packages.ubuntu.com on 2026-11-22; the revie
 - **Raising the floor** is a new record, and the edits chez-sqlite3 ADR-0008 lists
   ([ADR-0011]).
 
+## Amendment, 2026-11-23: M1's plan
+
+Accepted (the owner, 2026-11-23), proposed in [the M1 plan](../2026-11-22-m1-plan.md), §4.1,
+item 1, and §4.2, item 4.
+
+- **A string the parse cannot read is `below-floor`,** its detail the string, or `#f` for NULL.
+  No release answers one: 1.0.18 and 1.0.22 answer `"1.0.18"` and `"1.0.22"` (measured,
+  [research/m1-plan/](../research/m1-plan/README.md)). One rule, "accepted only when read as
+  three naturals at or above the floor", covers NULL, a malformed string and a lower one, in the
+  one place the string is read. A seventh reason was rejected: it would edit brief §5,
+  [ADR-0002] and [ADR-0006] for a string no release answers.
+- **Where major and minor are reported:** the load's report, `loaded-libsodium` in
+  `(chez-sodium private native)`, and `make build`'s line, `version: 1.0.18 (library 10.3)`. No
+  condition carries them.
+
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md
 [ADR-0011]: 0011-the-harness-after-chez-sqlite3.md
+[ADR-0006]: 0006-errors-and-no-secret-shown.md

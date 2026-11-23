@@ -1,6 +1,7 @@
 # ADR-0011: The harness is chez-sqlite3's: the memory gate, the pinned Guix container, floors in one file, and SRFI-64 vendored
 
-- **Status:** Accepted (the owner, 2026-11-22), approved with the brief.
+- **Status:** Accepted (the owner, 2026-11-22), approved with the brief. Amended 2026-11-23 in
+  M1's plan, and accepted by the owner that day ([amendment](#amendment-2026-11-23-m1s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** development tooling, the suites and CI; no library change
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §7, §8.2, §9's M0, and
@@ -48,7 +49,13 @@ where the text means the library. Only what differs is written here.
      default. No row needs a high limit: the collect-safe row blocks a decoy on a FIFO
      (brief §8.2).
    - **The wipe row's child runs outside Valgrind,** whose allocator bypasses the row's
-     `free()` interposer ([ADR-0008]).
+     `free()` interposer ([ADR-0008]). Its `LD_PRELOAD` is set to the interposer alone, never
+     appended: under the gate, a suite's own `LD_PRELOAD` holds Valgrind's preloads.
+   - **No exit checks.** `counters` keeps no `register-exit-check!` or `exit-checks`, and the
+     testing library runs none. libsodium keeps no count of its own, so the block count is a
+     suite's one check at its end. chez-sqlite3 ADR-0005 registers SQLite's memory check.
+   - **A decoy reads each pointer it logs through a `volatile uintptr_t`,** and tests only that
+     (brief §7.2; P-F7).
 2. **The container** (chez-sqlite3 ADR-0006):
    - **The pin stays `b532aa7`,** if M0's measurement of it passes (the M0 plan §5).
    - **The manifest holds `libsodium` for `sqlite`,** and leaves out `cmark-gfm`, `tar` and
@@ -94,6 +101,21 @@ where the text means the library. Only what differs is written here.
 - **Changing a floor** edits the file, README.org's Requirements, the code's check and the
   literal rows that name the old floor. Each place left behind fails by name. A libsodium floor
   moves only by a new record ([ADR-0003]).
+
+## Amendment, 2026-11-23: M1's plan
+
+Accepted (the owner, 2026-11-23), proposed in [the M1 plan](../2026-11-22-m1-plan.md), §4.1,
+items 4 and 6, and §4.2, item 8.
+
+- **No exit checks.** The M0 plan kept them for M1 to decide. Nothing registers one: libsodium
+  has no counterpart to `sqlite3_memory_used`, and M2 and M3 add none. M1 removes them.
+- **The decoy's pointer rule is recorded here.** Brief §7.2 and AGENTS.md carried it, and no
+  record did. `-Werror=nonnull-compare` fires only on a function `sodium.h` marks `nonnull`:
+  `randombytes_buf` does, `sodium_memzero` does not (measured on GCC 16.2,
+  [research/m1-plan/](../research/m1-plan/README.md)). None of M1's entry points can show the
+  trap, so the rule is applied, not discovered.
+- **The wipe child's `LD_PRELOAD` is set alone** (measured: a parent under Valgrind holds
+  `vgpreload_core` and `vgpreload_memcheck` in its own).
 
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md
 [ADR-0004]: 0004-a-threaded-chez.md

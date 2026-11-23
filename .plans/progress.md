@@ -9,7 +9,8 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
 - **M0 is done and merged** (PR #2; [the M0 plan](2026-11-22-m0-plan.md); its close-out is
   below).
   - **The records:** ADR-0001 to ADR-0011, `global-constraints.md` and `traps.md`. Each is
-    Accepted: the owner settled it in brief §11, or approved it with the brief.
+    Accepted: the owner settled it in brief §11, or approved it with the brief. M1 adds
+    ADR-0012.
   - **The container,** pinned to Guix `b532aa7`. It has Chez 10.4.0, threaded, and libsodium
     1.0.22 as `libsodium.so.26` ([research/m0-container/](research/m0-container/README.md)).
   - **The harness.** `make test` runs seven suites, and `make check-test-fails` plants a fault
@@ -17,25 +18,32 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   - **The memory gate.** Valgrind ran the container's Chez loading libsodium clean, with
     `default.supp` alone ([research/m0-memory-gate/](research/m0-memory-gate/README.md)).
   - **CI:** `main`, `memory` and `nothreads`.
-- **Next: M1's plan:** `conditions`, discovery, the load and the floor, `sodium-version`, and
-  the block helper.
+- **M1 is under way** ([the M1 plan](2026-11-22-m1-plan.md), accepted by the owner on
+  2026-11-23). Six slices, one PR each: 0, the plan and the records; 1, the pure core; 2, the
+  load and the checks of the FFI; 3, refusals end to end; 4, the public library; 5, the `floor`
+  and `current` lanes. Then M1's closing review.
+- **Slice 0 is on `m1-plan`:** the plan; ADR-0002, ADR-0003, ADR-0006, ADR-0007 and ADR-0011
+  amended; ADR-0012 new; the constraints, the brief, `traps.md` and AGENTS.md to match; the
+  plan's probes in [research/m1-plan/](research/m1-plan/README.md).
+  - **Its review** ([research/m1-slice-0-review/](research/m1-slice-0-review/README.md)) found
+    a blocker, six majors and thirteen minors, each fixed. The owner chose the wipe fused with
+    the free (ADR-0008, amended) and native's load in one section (ADR-0007, amended); ADR-0001
+    is amended for the allow-lists.
+- **Next: slice 1,** the pure core, built beside slice 0 on disjoint files.
 
-## Owed to M1
+## Answered for M1
 
-Questions the records leave to M1, each needing an answer in M1's plan:
+M0 left five questions to M1. The M1 plan, §4.1, answers each, and the owner accepted them on
+2026-11-23:
 
-- **The reason for a version string that is not three naturals.** ADR-0003 parses it
-  strictly, and ADR-0006's six reasons name none for this case.
-- **`&sodium-failed`'s fields,** and whether conditions carry `&who`, as chez-sqlite3
-  ADR-0013's do.
-- **Whether the load registers an exit check.** `(chez-sodium private counters)` keeps
-  `register-exit-check!`, which `suite-exit-status` runs. chez-sqlite3 registered SQLite's
-  memory check there, and libsodium has no such check. If nothing registers one, M1 removes
-  it.
-- **The C oracle's name is fixed: `libsodium-oracle`.** The gate's rule for child logs names
-  it (ADR-0011).
-- **The decoy logs each pointer through a `volatile uintptr_t`** (brief §7.2, P-F7). AGENTS.md
-  carries the rule, and no record does: M1's plan restates it.
+- **A version string that is not three naturals,** or NULL, is `below-floor` (ADR-0003,
+  amended).
+- **`&sodium-failed`'s fields are `function` and `code`;** every raise carries `&who`; a
+  refusal's irritants lead with the rule's symbol; a secret is shown as `(kind K)` (ADR-0006,
+  amended).
+- **No exit checks:** M1 removes them, in slice 1 (ADR-0011, amended).
+- **The C oracle is `libsodium-oracle`** (ADR-0011).
+- **The decoy's pointer rule** is in ADR-0011, amended.
 
 ## Owed to M2
 
@@ -43,9 +51,29 @@ Questions the records leave to M1, each needing an answer in M1's plan:
   lengths, checked before C; `random-bytes 0` answering `#vu8()` without C; and
   `constant-time-bytevector=?` answering `#f` on unequal lengths without C. M2's plan restates
   them.
+- **From the M1 plan, §3:**
+  - `randombytes_buf`, `crypto_generichash` with its six sizes, and `sodium_memcmp`: their
+    bindings, rows, decoy entries and return-code rows;
+  - the input cap and its check;
+  - how row 24 reaches a verb's blocks;
+  - whether `test-constants` gains a constants half, each size function against its header's
+    macro.
+
+## Owed to M3
+
+From the M1 plan, §3 and §4.2, item 6:
+
+- the password verbs and their bindings, two of them collect-safe;
+- `call-with-c-string` for the hash string, and the password's UTF-8 writer. v0.1.1's makes two
+  Scheme copies of its string, which ADR-0008 forbids for a secret, so M3's writers bound every
+  write by the block's size, and answer a string changed mid-write as data;
+- `&sodium-failed`'s first raise, and its export;
+- the oracle's hex mode (row 4), and the FIFO decoy (row 19).
 
 ## Owed to M4
 
+- **The documents' notes from M1:** the first reference under an engine (ADR-0007, amended),
+  `sodium_init`'s 1, and what wiping cannot reach.
 - **The docs rule of `check-floors`** waits for `docs/`.
 - **The install-line checks of `test-manifest`** wait for the first release, which writes the
   install lines.

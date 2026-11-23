@@ -1,0 +1,4 @@
+$ readelf -d /usr/lib/x86_64-linux-gnu/libsodium.so.23 | grep -E 'NEEDED|SONAME'
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+ 0x0000000000000001 (NEEDED)             Shared library: [ld-linux-x86-64.so.2]
+ 0x000000000000000e (SONAME)             Library soname: [libsodium.so.23]

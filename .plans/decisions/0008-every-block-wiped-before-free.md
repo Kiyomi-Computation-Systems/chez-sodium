@@ -1,7 +1,8 @@
 # ADR-0008: Every block is wiped before it is freed, and the binding keeps no Scheme copy of a secret
 
 - **Status:** Accepted (the owner, 2026-11-22), brief §11.2. Decisions 3 and 4, no Scheme copy,
-  are brief §11.5.
+  are brief §11.5. Amended 2026-11-23 after slice 0's review, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-23-slice-0s-review)).
 - **Date:** 2026-11-22
 - **Scope:** every foreign block chez-sodium frees, and every secret it copies into C
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §6.3, §11.2, §11.5's "no
@@ -24,10 +25,11 @@
 
 ## Decision
 
-1. **The wipe sits in `call-with-block`'s critical cleanup, just before
-   `free-foreign-block!`:** one plain `sodium_memzero` call over the block's size. Never in a
-   wrapper, never inside the callback, and never as a `foreign-set!` loop, which would cost as
-   much as the copy.
+1. **The wipe is fused with the free.** `call-with-block`'s critical cleanup hands
+   `free-foreign-block!` the wipe. `free-foreign-block!` checks that the block is live, wipes it
+   with one plain `sodium_memzero` call over its size, then frees it, as one step under memory's
+   lock. A block that is not live is never wiped. Never in a wrapper, never inside the callback,
+   and never as a `foreign-set!` loop, which would cost as much as the copy.
 2. **Every block the library frees is wiped, secret or not:** the password, the hash string and
    keys; random bytes; `blake2b`'s input and output; `constant-time-bytevector=?`'s operands;
    the HMAC key and state. One rule means there is no list of which blocks are secret, and one
@@ -64,6 +66,23 @@
 - **Rows 3 and 12 hold the password's encoding:** a non-ASCII password whose last character
   changes verifies false (P-F5), and `"a\x0;b"` verifies against its own hash and not `"a"`'s.
 
+## Amendment, 2026-11-23: slice 0's review
+
+Accepted (the owner, 2026-11-23), from M1 slice 0's review, S0-F1.
+
+- **Decision 1 placed the wipe just before `free-foreign-block!`.** chez-sqlite3 v0.1.1's
+  `call-with-block` has a path for a PROC that freed its own block, and a row that takes it. On
+  that path the wipe would write freed memory: X-B1 again. Reproduced: `foreign-free`, then
+  `sodium_memzero` over the block, exits 0 when run plainly, and Valgrind reports "Invalid write
+  of size 8".
+- **Now the liveness check, the wipe and the free are one step,** inside `free-foreign-block!`,
+  which native hands its `sodium_memzero`. That is the review's "wipe fused with the free",
+  clean in 28 of 28 runs (X-B1). `memory` still holds no `foreign-procedure`: the wipe is a
+  procedure it is given.
+- **Dropping the path was rejected:** it would leave no defence if the check that only
+  `call-with-block` frees a block were loosened ([ADR-0012]).
+
 [ADR-0005]: 0005-the-subset-rule.md
 [ADR-0007]: 0007-one-critical-section-per-verb.md
 [ADR-0011]: 0011-the-harness-after-chez-sqlite3.md
+[ADR-0012]: 0012-the-public-library-and-the-seam.md

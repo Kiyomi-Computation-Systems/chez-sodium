@@ -1,0 +1,14 @@
+== decoy-ternary-nonnull.c: must fail under -Wall -Werror
+decoy-ternary-nonnull.c:8:3: error: 'nonnull' argument 'buf' compared to NULL [-Werror=nonnull-compare]
+cc1: all warnings being treated as errors
+exit status: 1
+== decoy-volatile-nonnull.c: must compile
+exit status: 0
+== engine-invoke2.sps import
+completed before the flag was seen, after 1 steps: ((body-ran 1) 1)
+then a plain reference: ((body-ran 1) 1)
+and another: ((body-ran 1) 1)
+== engine-invoke2.sps eval
+body started; engine abandoned after 1 expiries
+then a plain reference: ((body-ran 1) 1)
+and another: ((body-ran 1) 1)
