@@ -1,7 +1,9 @@
 # ADR-0001: Bind libsodium directly, with no C shim, loaded at runtime
 
 - **Status:** Accepted (the owner, 2026-11-22), approved with the brief. Decision 3's integer
-  types are brief §11.7.
+  types are brief §11.7. Decision 10's allow-lists amended 2026-11-23, after M1 slice 0's review,
+  and accepted by the owner that day; recorded in this form after M1's closing review
+  ([amendment](#amendment-2026-11-23-the-allow-lists)).
 - **Date:** 2026-11-22
 - **Scope:** chez-sodium: every binding to libsodium
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §2, §3.4, §6.1 and §6.4
@@ -53,10 +55,10 @@
    read the seam.
 10. **Every binding has a row in a convention table** (X-M6). `test-conventions` holds each
     `foreign-procedure` form to its row. `test-constants`' prototype half compiles against
-    `sodium.h` and holds each row's prototype to the header. The allow-lists are exactly the
-    types the rows use, so `size_t` joins each list, and `unsigned-64` the arguments, with the
-    first row that uses it. The prototype map gains `size_t` → `size_t` and
-    `unsigned long long` → `unsigned-64` (brief §7.2; P-F20; amended after slice 0's review).
+    `sodium.h` and holds each row's prototype to the header. `size_t` joins both allow-lists,
+    for arguments and for results, and the prototype map gains `size_t` → `size_t` and
+    `unsigned long long` → `unsigned-64` (brief §7.2; P-F20). Amended: see
+    [below](#amendment-2026-11-23-the-allow-lists).
 
 ### Rejected
 
@@ -79,6 +81,25 @@
 - **A collect-safe call costs about 55 ns, a plain one about 13 ns** (brief §6.4).
 - **Every input costs one counted block and one copy** ([ADR-0011]), and every block is wiped
   before it is freed ([ADR-0008]).
+
+## Amendment, 2026-11-23: the allow-lists
+
+Accepted (the owner, 2026-11-23), from M1 slice 0's review, S0-F7. Slice 0 rewrote decision 10
+in place; M1's closing review (M1-F9) restored its first text above and moved the change here.
+
+- **Decision 10 joined `size_t` to both allow-lists at once.** v0.1.1's rows, which this
+  project keeps, refuse a list that allows a type no row uses, so `size_t` among the results,
+  before any row returns one, fails them. Had those rows been dropped instead, the lists could
+  allow a type nothing binds.
+- **Now each allow-list is exactly what the convention table's rows use:**
+  - the argument list is every type a row uses as an argument or as a non-void result, so `int`
+    is in it from `sodium_init`'s result, though no M1 row takes an `int`;
+  - the result list is every type a row returns, and `void`.
+- **Each type joins with the first row that uses it.** In M1 the lists are `(int uptr size_t)`
+  and `(int uptr void)`: `size_t` is an argument only, as `sodium_memzero`'s length. `size_t`
+  joins the results with M2's first size function, and `unsigned-64` the arguments with
+  `crypto_generichash`'s `inlen`.
+- **`test-conventions` holds it:** "the types its rows use are exactly the allowlists'".
 
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md

@@ -2,10 +2,11 @@
 
 ## Where the project stands
 
-* **No verb exists yet.** M0 built the records, the container, the test harness, the
-  memory gate and CI. M1, the load and the block helper, is under way: its plan is
-  `.plans/2026-11-22-m1-plan.md`. `.plans/progress.md` says where the project stands
-  and what comes next.
+* **M1 is done: one verb, `sodium-version`.** M0 built the records, the container, the
+  test harness, the memory gate and CI. M1 built the load, the block helper and CI's
+  `floor` and `current` lanes (its plan is `.plans/2026-11-22-m1-plan.md`). M2 comes
+  next: `random-bytes`, `blake2b` and `constant-time-bytevector=?`, built on M1's
+  helper. `.plans/progress.md` says where the project stands and what comes next.
 * The plan is the brief, `.plans/2026-11-22-chez-sodium-project-brief.md`. Read it before
   any work.
   - Its §11 holds the owner's decisions; its §10 records that nothing is open.
@@ -193,6 +194,8 @@
   short (brief §4.4).
 * **Each verb's whole extent is one `critical-section`** (brief §6.2): making the
   blocks, copying in, the C call, copying out, the wipe and the free.
+  `sodium-version`, which makes no block and calls no C, holds none (ADR-0007,
+  decision 8).
   - Arguments are checked before it.
   - It answers data, and the verb raises only after it.
   - Without it, an engine's expiry frees the block, and the resume is refused as a
@@ -219,6 +222,12 @@
   Native's load runs in one critical section, which narrows the window to the
   ticks before it; nothing closes it. Every engine row references the library
   once before its first engine (ADR-0007, amended).
+* A library body first reached on two threads at once refuses the second with
+  Chez's "cyclic dependency" condition, not a refusal; a later reference answers.
+  A critical section defers only its own thread's interrupts: another thread that
+  needs a collection waits for it to end, then answers, so the window is the whole
+  body. Every row that forks a thread which reaches the library references it
+  once first (ADR-0007, amended).
 * Nothing raises inside `critical-section` or a critical `dynamic-wind` thunk:
   a handler of the raise runs with interrupts disabled, and another thread's
   collection waits. Answer data there, and raise after the section.

@@ -61,6 +61,13 @@
 #     value (floor's library is libsodium.so.23, current's .so.26), stand on
 #     the steps that run the check, make build and make test, each of which
 #     must carry both and CHEZ, and on no other step;
+#   - in every job, the step "Identify the runner image", which names the
+#     runner's OS release and architecture in the caches' keys: exactly one,
+#     with id: image and a run block of exactly its two lines (. /etc/os-release,
+#     then the echo of id=${ID}-${VERSION_ID}-${RUNNER_ARCH} to GITHUB_OUTPUT),
+#     before the job's first cache restore; each Chez restore's key, held whole
+#     (its prefix, the hashFiles list, then -${{ steps.image.outputs.id }}); and each job's timeout-minutes, 120
+#     for memory and 60 for every other job;
 #   - a uses: step may only be actions/checkout@, actions/cache/restore@ or
 #     actions/cache/save@; each cache's restore comes before its build, and its
 #     save after the build and before the cache's check (a cache is told by
@@ -270,13 +277,18 @@ function nreq(j,   n) {
   return 4
 }
 
-# keyok(v): v is a restore's key: the job's prefix, then the hashFiles list,
-# then nothing or a "-" and more.
+# keyok(v): v begins with the job's prefix and the hashFiles list, then nothing
+# or a "-"; the whole key is held after it, by chezkey().
 function keyok(v,   want, tail) {
   want = prefix[job] "${{ hashFiles(" HASHLIST ") }}"
   if (substr(v, 1, length(want)) != want) return 0
   tail = substr(v, length(want) + 1)
   return (tail == "" || substr(tail, 1, 1) == "-")
+}
+
+# chezkey(): the one key a job's Chez restore holds, ending in the runner image's id.
+function chezkey() {
+  return prefix[job] "${{ hashFiles(" HASHLIST ") }}-${{ steps.image.outputs.id }}"
 }
 
 function stepkey(   u) {
@@ -351,6 +363,8 @@ function cachestep(   restore, want) {
   if (restore) {
     if (!keyok(S_key[sn]))
       prob(S_keyln[sn] ? S_keyln[sn] : S_ln[sn], "the cache key in job " job " does not begin with " prefix[job] "${{ hashFiles(" HASHLIST ") }}")
+    else if (S_key[sn] != chezkey())
+      prob(S_keyln[sn] ? S_keyln[sn] : S_ln[sn], "the cache key in job " job " is not exactly " chezkey())
     # The id names the restore's outputs, which the build's if and the save's
     # key read.
     if (S_id[sn] != "chez")
@@ -511,6 +525,31 @@ function sodorder(s, restore, first, last,   t) {
     prob(S_ln[s], "job " job " restores the libsodium cache before the step that names the C compiler, and must restore it after")
 }
 
+# imagestep(first, last): the one step named IMGN, with id: image and its run
+# block held line for line, before the job's first cache restore.
+function imagestep(first, last,   s, c, at, fr, n, i, m, rl) {
+  c = 0; at = 0; fr = 0
+  for (s = first; s <= last; s++) {
+    if (S_name[s] == "name: " IMGN) { c++; at = s }
+    if (!fr && S_uses[s] ~ /^actions\/cache\/restore@/) fr = s
+  }
+  if (c != 1) { prob(jln, "job " job " has " c " steps named \"" IMGN "\", not one"); return }
+  if (S_id[at] != "image") prob(S_idln[at] ? S_idln[at] : S_ln[at], "job " job "'s step \"" IMGN "\" is not id: image")
+  if (fr && at > fr) prob(S_ln[at], "job " job " runs step \"" IMGN "\" after its first cache restore, and must run it before")
+  rl = S_runln[at] ? S_runln[at] : S_ln[at]
+  if (S_run[at] != "run: |") { prob(rl, "job " job "'s step \"" IMGN "\" does not run a block: it must be run: |"); return }
+  n = bn[at]
+  m = (n > nimg) ? n : nimg
+  for (i = 1; i <= m; i++) {
+    if (i > n) { prob(bln[at, n] ? bln[at, n] : rl, "job " job "'s step \"" IMGN "\" has a run block that ends early: expected \"" imgl[i] "\""); break }
+    if (i > nimg) { prob(bln[at, i], "job " job "'s step \"" IMGN "\" has a run line it must not: \"" bl[at, i] "\""); break }
+    if (bl[at, i] != imgl[i]) {
+      prob(bln[at, i], "job " job "'s step \"" IMGN "\" has a run line that differs from the one check-ci holds: expected \"" imgl[i] "\", found \"" bl[at, i] "\"")
+      break
+    }
+  }
+}
+
 function endjob(   i, s, c, at, pos, lastp, m, x, lastx, first, last, isb, k, okstep) {
   if (job == "") return
   endstep()
@@ -526,6 +565,8 @@ function endjob(   i, s, c, at, pos, lastp, m, x, lastx, first, last, isb, k, ok
       prob((first + 1 <= last) ? S_ln[first + 1] : jln, "job main's second step is not run: " PINRUN)
     lastp = 2; lastx = PINRUN
   }
+  imagestep(first, last)
+  if (jto ~ /^[0-9]+$/ && jto != twant[job]) prob(jtoln, "job " job " has timeout-minutes " jto ", not " twant[job])
   m = nreq(job)
   # A required line must be the run line of exactly one step.
   split("", rqn); split("", hn); split("", hit); split("", okrun)
@@ -641,6 +682,11 @@ BEGIN {
   VERS = "Report the versions this run uses"
   SODN = "Report the runner's libsodium"
   SODRUN = "scripts/ci/report-sodium.sh"
+  IMGN = "Identify the runner image"
+  nimg = 2
+  imgl[1] = "          . /etc/os-release"
+  imgl[2] = "          echo \"id=${ID}-${VERSION_ID}-${RUNNER_ARCH}\" >> \"$GITHUB_OUTPUT\""
+  twant["main"] = "60"; twant["memory"] = "120"; twant["nothreads"] = "60"; twant["floor"] = "60"; twant["current"] = "60"
   nvl = 5
   vl[1] = "          \"$RUNNER_TEMP/chez-threads/bin/scheme\" --version"
   vl[2] = "          cc --version | head -n 1"
@@ -777,7 +823,7 @@ fileno == 1 {
     if (!(key in wantjob)) { prob(ln, "job \"" key "\" is not one of " JOBS); next }
     if (key in jobseen) { prob(ln, "job \"" key "\" is written twice"); next }
     jobseen[key] = 1; job = key; jln = ln; jfirst = sn + 1
-    split("", jkseen); curjk = ""; instep = 0; jbad = 0
+    split("", jkseen); curjk = ""; instep = 0; jbad = 0; jto = ""; jtoln = 0
     if (val != "") prob(ln, HASVAL)
     next
   }
@@ -792,6 +838,7 @@ fileno == 1 {
     jkseen[key] = 1; curjk = key
     if (key == "runs-on" && val != "ubuntu-24.04") prob(ln, "job " job " has runs-on other than ubuntu-24.04")
     if (key == "timeout-minutes" && val !~ /^[0-9]+$/) prob(ln, "job " job " has a timeout-minutes that is not a whole number")
+    if (key == "timeout-minutes") { jto = val; jtoln = ln }
     if (key == "steps" && val != "") prob(ln, HASVAL)
     next
   }

@@ -44,7 +44,9 @@ record it comes from, and where a rule and its record disagree, the record wins.
   (m): only `native` imports `(chez-sodium private memory)`, and no library exports a name it
   imports from `memory` ([ADR-0012]).
 - **Inside native, `foreign-block` and `free-foreign-block!` appear only in `call-with-block`'s
-  definition,** held by a `test-native` row that reads native's body as data ([ADR-0012]).
+  definition,** and native imports `(chez-sodium private memory)` exactly once, as the plain
+  import set. `test-native` rows read native's body and import clause as data ([ADR-0012],
+  amended).
 
 ## Binding libsodium
 
@@ -68,7 +70,8 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **One library holds `foreign-procedure`, and one holds `foreign-alloc`** ([ADR-0001]).
 - **Every binding has a row in the convention table,** which `test-conventions` holds every
   `foreign-procedure` form to, and `test-constants`' compiled prototype check holds to
-  `sodium.h`. The allow-lists are exactly the types the rows use ([ADR-0001]).
+  `sodium.h`. The argument allow-list is every type a row uses as an argument or as a non-void
+  result; the result allow-list is every result type, and `void` ([ADR-0001], amended).
 - **Every return code the brief's §3.4 states is confirmed by a row against the real library**
   before code relies on it ([ADR-0001]).
 
@@ -91,7 +94,8 @@ record it comes from, and where a rule and its record disagree, the record wins.
   `below-floor`, `missing-api` or `init-failed`. `not-found` lists every candidate it checked
   ([ADR-0002]).
 - **CI's `main` finds Ubuntu 24.04's 1.0.18 by discovery, and asserts that it loaded the floor**
-  ([ADR-0002], [ADR-0003]).
+  ([ADR-0002], [ADR-0003]). A floor raise moves this too, by its own record ([ADR-0003],
+  amended).
 
 ## Conditions and secrets
 
@@ -101,8 +105,8 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **Every raise carries `&who`:** `chez-sodium` for the load's refusals, the public verb for a
   refusal raised through the public surface, the given WHO for a helper's, and its own name for
   an internal invariant's. A condition Chez raises is passed on as raised ([ADR-0006]).
-- **A refusal raised through the public surface leads its irritants with the rule's symbol**
-  ([ADR-0006]).
+- **A caller's mistake refused through the public surface leads its irritants with the rule's
+  symbol;** a load refusal carries its reason in its `reason` field ([ADR-0006]).
 - **A caller's mistake is an assertion violation, raised before C:** a wrong type; a size, key
   length or limit out of range; an input over the cap, other than a hash string; an empty key
   ([ADR-0006]).
@@ -136,6 +140,12 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **Every engine row references the library once before its first engine.** A library first
   reached inside an engine that is then abandoned stays wedged. The load's section narrows the
   window to the ticks before it starts, and no code closes it ([ADR-0007]).
+- **Every row that forks a thread which reaches the library references it once first.** A
+  library body first reached on two threads at once refuses the second with Chez's "cyclic
+  dependency" condition, not a refusal; a later reference answers. A critical section defers
+  only its own thread's interrupts: another thread that needs a collection waits for it to end,
+  and then answers, so the window is the whole body, and a row can pass by luck ([ADR-0007],
+  amended).
 - **An engine row runs every verb at each fuel from 1 until it completes,** and each run answers
   right, raises nothing and leaves no live block ([ADR-0007]).
 

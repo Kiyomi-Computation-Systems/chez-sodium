@@ -10,9 +10,10 @@
 ;;;                        types and result type, its convention, and the
 ;;;                        records that decide it
 ;;;   allowed-argument-types, allowed-result-types
-;;;                        the only types a binding may write: exactly the
-;;;                        types the table uses as arguments, and as results
-;;;                        with void
+;;;                        the only types a binding may write: the argument
+;;;                        list is every type a row uses as an argument or
+;;;                        as a non-void result, and the result list every
+;;;                        result type, and void (ADR-0001, amended)
 ;;;   scan-tree            every foreign-procedure form under a directory,
 ;;;                        read as data, each with the library it sits in
 ;;;   violations           the scan held against a table: what a suite
@@ -101,8 +102,10 @@
 
   ;; allowed-argument-types, allowed-result-types : (Listof Symbol)
   ;; Written here, not read from the table: a table loosened together with the
-  ;; binding it holds would otherwise pass. Each is exactly the types the
-  ;; table writes there: size_t is an argument only, and void a result only.
+  ;; binding it holds would otherwise pass. The argument list is every type a
+  ;; row uses as an argument or as a non-void result, and the result list every
+  ;; result type, and void: size_t is an argument only, and void a result only
+  ;; (ADR-0001, amended).
   (define allowed-argument-types '(int uptr size_t))
   (define allowed-result-types '(int uptr void))
 

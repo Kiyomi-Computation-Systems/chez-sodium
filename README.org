@@ -25,7 +25,8 @@ planned.
 
 *One verb is built so far.* chez-sodium finds libsodium, checks that it is
 new enough, and loads it, and =sodium-version= names the version it loaded.
-The four jobs above come next.
+Random bytes, BLAKE2b and the constant-time compare come next, then the
+password verbs.
 [[file:.plans/2026-11-22-chez-sodium-project-brief.md][The brief]] sets out what will be bound, and why. Its names may change before
 the first release, and the API may change in any release before 1.0.
 

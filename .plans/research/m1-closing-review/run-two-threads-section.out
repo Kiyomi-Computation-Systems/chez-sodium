@@ -1,0 +1,4 @@
+(plain ready (raised "cyclic dependency involving invocation of library ~s") (later ready))
+(alloc ready ready (later ready))
+(plain ready (raised "cyclic dependency involving invocation of library ~s") (later ready))
+(alloc ready ready (later ready))

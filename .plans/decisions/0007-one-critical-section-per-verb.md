@@ -3,7 +3,10 @@
 - **Status:** Accepted (the owner, 2026-11-22), brief §11.3. Decision 5's cap is brief §11.5.
   Amended 2026-11-23 in M1's plan, and accepted by the owner that day
   ([amendment](#amendment-2026-11-23-m1s-plan)). Amended 2026-11-23 after slice 0's review, and
-  accepted by the owner that day ([amendment](#amendment-2026-11-23-slice-0s-review)).
+  accepted by the owner that day ([amendment](#amendment-2026-11-23-slice-0s-review)); that
+  amendment's probe note says which program each count came from, after M1's closing review.
+  Amended 2026-11-23 after M1's closing review, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-23-the-first-reference-on-two-threads)).
 - **Date:** 2026-11-22
 - **Scope:** every public verb
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §4.4, §6.2, §11.3 and
@@ -108,8 +111,11 @@ Accepted (the owner, 2026-11-23), from M1 slice 0's review, S0-F4 and S0-F18.
 - **The first amendment gave a false mechanism:** "a section defers the expiry to its end, still
   inside the library's body". An engine spends no ticks inside a section (chez-sqlite3
   `traps.md`). Measured: with a library body's work in one critical section, an engine abandoned
-  in the 11 ticks before the section began (slices 44,209 to 44,219 at fuel 1) wedged the
-  library; abandoned at any point after, it never did. Without the section, every abandon from
+  in the 11 ticks before the section began (slices 44,209 to 44,219 at fuel 1, in slice 0's
+  review's own sweep, which is not committed) wedged the library; abandoned at any point after,
+  it never did. The committed probe, `research/m1-plan/engine-section.sps`, a different program,
+  puts the same edge at expiries 45,158 and 45,159, in every run: the count depends on the
+  program, and the edge, the section's start, does not. Without the section, every abandon from
   the body's start to past slice 50,000 wedged.
 - **So the owner chose decision 9:** native's load runs in one section that answers data, and
   refusals are raised after it. The window shrinks from the whole load, `dlopen`, every bind
@@ -117,6 +123,25 @@ Accepted (the owner, 2026-11-23), from M1 slice 0's review, S0-F4 and S0-F18.
   stands.
 - **Decision 7 gains the plan's sentence:** THUNK answers data. A caller's handler runs at depth
   0 through `call-in-section` (probed), so the net works, but no verb leans on it.
+
+## Amendment, 2026-11-23: the first reference on two threads
+
+Accepted (the owner, 2026-11-23), from M1's closing review, M1-F10, and its second review,
+R2-F3 and R2-F5. It sits beside the engine rule because it is the same window, met by a thread
+instead of an engine.
+
+- **A library body first reached on two threads at once refuses the second** with Chez's
+  "cyclic dependency involving invocation of library", not a `&sodium-library-unavailable`;
+  `load-state` never sees it, and a later reference answers. Measured on a toy library and on
+  native itself ([research/m1-closing-review/](../research/m1-closing-review/README.md)).
+- **A critical section does not close it.** A section defers only its own thread's interrupts.
+  Another thread that reaches the library meanwhile is refused, unless it needs a collection
+  first: that waits for the section to end, and then the reference answers. So the window is the
+  whole body, and a row that tries to show the race can pass by luck.
+- **Only a first reference through `eval`, the REPL or a lazily invoked library meets it.** A
+  program that references the library's bindings runs the body before its first line.
+- **The rule:** every row that forks a thread which reaches the library references it once
+  first, as every engine row does before its first engine. The documents say it, in M4.
 
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0006]: 0006-errors-and-no-secret-shown.md

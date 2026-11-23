@@ -16,6 +16,7 @@ bad() { echo "check-guix: FAILED $*" >&2; fail=1; }
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+trap 'exit 1' HUP INT TERM
 
 # Assertion 1: nothing of the host's HOME is visible. The container's HOME
 # holds at most the directories leading down to the repository, which it

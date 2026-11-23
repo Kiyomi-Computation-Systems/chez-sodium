@@ -54,6 +54,7 @@
 ;;; text of a child names sodium-version only inside a quoted datum for eval:
 ;;; a program that names it anywhere runs native's body before its first line.
 (import (rnrs)
+        (only (rnrs eval) environment)
         (srfi :64)
         (only (chezscheme) directory-list file-directory? file-symbolic-link? getenv library-exports)
         (chez-sodium-testing))
@@ -321,6 +322,39 @@
 
 ;; --- the condition exports ----------------------------------------------------
 
+;; verb-names : (Listof Symbol)
+;; The exports of (chez-sodium) that load libsodium. Every other export is a
+;; condition export.
+(define verb-names '(sodium-version))
+
+;; condition-names : (Listof Symbol)
+;; The exports of (chez-sodium) less the verbs, as Chez lists them, sorted.
+(define condition-names
+  (guard (e (#t (list (string->symbol (describe e)))))
+    ;; environment loads (chez-sodium) so library-exports can list it, and
+    ;; runs no body: nothing of it is referenced.
+    (environment '(chez-sodium))
+    (list-sort (lambda (a b) (string<? (symbol->string a) (symbol->string b)))
+               (filter (lambda (n) (not (memq n verb-names)))
+                       (library-exports '(chez-sodium))))))
+
+;; checked-names : (Listof Symbol)
+;; The condition exports the children's lines below call and check, written
+;; out. A row holds them to condition-names.
+(define checked-names
+  (list-sort (lambda (a b) (string<? (symbol->string a) (symbol->string b)))
+             '(chez-sodium-error?
+               sodium-library-unavailable?
+               sodium-library-unavailable-reason
+               sodium-library-unavailable-path
+               sodium-library-unavailable-source
+               sodium-library-unavailable-detail
+               sodium-library-unavailable-candidates)))
+
+(test-equal "the condition exports of (chez-sodium), its exports less the verbs, are exactly the names the condition children check"
+  checked-names
+  condition-names)
+
 ;; The program of the condition children. It does not import (chez-sodium),
 ;; and names sodium-version only inside quoted data for eval. A made
 ;; condition has a distinct value in each field, so an accessor that read the
@@ -331,6 +365,7 @@
    "(import (rnrs) (rnrs eval) (only (chez-sodium private conditions) make-sodium-library-unavailable))\n"
    "(define env (environment '(rnrs) '(chez-sodium)))\n"
    "(define (pub n) (eval n env))\n"
+   "(define referenced (map pub '(" (apply string-append (map (lambda (n) (string-append (symbol->string n) " ")) condition-names)) ")))\n"
    maps-scan-text
    "(define (yes-no x) (cond ((eq? x #t) 'yes) ((eq? x #f) 'no) (else (list 'neither x))))\n"
    "(define made (make-sodium-library-unavailable 'not-found \"/p\" 'system 7 '(\"c\")))\n"

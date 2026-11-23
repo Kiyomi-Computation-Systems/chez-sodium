@@ -56,20 +56,17 @@ version=$(sh "$here/floor.sh" chez) || {
 # asset, and equals the digest the GitHub releases API lists for the asset.
 floor_sha256=54d0d19e4cd51878f88fb4b7ddb44079be6ca12bcf14163f8ea53cbcb4633385
 
-# sha256_of FILE: the sha256 of FILE. sha256sum on Linux, shasum elsewhere.
+# sha256_of FILE: the sha256 of FILE.
 sha256_of() {
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{ print $1 }'
-  else
-    shasum -a 256 "$1" | awk '{ print $1 }'
-  fi
+  sha256sum "$1" | awk '{ print $1 }'
 }
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/build-chez.XXXXXX")
 trap 'rm -rf "$work"' EXIT
+trap 'exit 1' HUP INT TERM
 
 tarball=$work/csv$version.tar.gz
-curl -fsSL --retry 3 -o "$tarball" \
+curl -fsSL --proto '=https' --retry 3 -o "$tarball" \
   "https://github.com/cisco/ChezScheme/releases/download/v$version/csv$version.tar.gz"
 
 got=$(sha256_of "$tarball")

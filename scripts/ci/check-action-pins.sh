@@ -73,6 +73,7 @@ canonical='^[0-9]+:[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]+[A-Za-z0-9_.-]+/
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/check-action-pins.XXXXXX")
 trap 'rm -rf "$work"' EXIT
+trap 'exit 1' HUP INT TERM
 
 find "$dir" ! -type d | sort >"$work/files"
 [ -s "$work/files" ] || fail "$dir holds no file"

@@ -284,9 +284,10 @@ check-floors: ## Fail unless README.org's Requirements state the floors in packa
 	@$(CHEZ) --libdirs tests --program tests/check-floors.sps packaging/floors.sexp README.org .github/workflows scripts/ci
 
 # Holds .github/workflows/ci.yml to the one shape tests/check-ci.sh reads
-# (ADR-0011): its triggers, its three jobs and every key in them, each check
-# as a step's whole run line, no if: but the Chez cache's own, no variable that
-# steers a check, and no key spelled so that a text check would miss it. make
+# (ADR-0011): its triggers, its five jobs and every key in them, each check
+# as a step's whole run line, no if: but on the caches' own steps, no variable
+# that steers a check but the floor and current lanes' two, and no key spelled
+# so that a text check would miss it. make
 # test runs it, so every make test, the container's self-test and CI's main
 # job among them, holds the workflow. tests/test-check-ci.sps plants each fault
 # in a copy of the real file. It reads text with sh and awk, and needs no deps.

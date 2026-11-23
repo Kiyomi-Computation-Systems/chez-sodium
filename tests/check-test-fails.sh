@@ -17,8 +17,8 @@
 #   leaks        a suite whose tests pass,     make test names it FAIL, and
 #                but which counts a block      suite-exit-status names the
 #                up and never down             block left (ADR-0011)
-#   seam         a private library that      check-seam names the import,
-#                imports foreign-alloc, a    and no suite runs
+#   seam         a private library that        check-seam names the import,
+#                imports foreign-alloc, a      and no suite runs
 #                name only (chez-sodium
 #                private memory) may import
 #   floors       README's Chez line says       check-floors names the line,
