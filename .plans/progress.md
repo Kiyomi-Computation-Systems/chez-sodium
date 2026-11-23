@@ -57,7 +57,15 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
     every arm passed.
   - **Its review** ([research/m1-slice-3-review/](research/m1-slice-3-review/README.md)), over
     slices 3 and 4 together, found no blocker, five majors and nine minors, each fixed.
-- **Next: slice 4,** the public library, stacked on slice 3.
+- **Slice 4 is on `m1-slice-4`,** stacked on slice 3: `(chez-sodium)`, which defines nothing and
+  re-exports ADR-0012's eight M1 names, each `eq?` to its definition; `test-public`; and
+  `test-never-loads`, whose child references every condition export with no libsodium to load
+  ([its mutation log](m1-slice-4-mutation-log.md)). CI's `nothreads` now refuses nine libraries
+  by name, `(chez-sodium)` among them.
+  - **Its review** was slice 3's, over both slices: two majors and two minors on slice 4, each
+    fixed.
+- **Next: slice 5,** the `floor` and `current` lanes: `build-sodium.sh`, `check-sodium.sh` with
+  `--discovery`, and `test-ci-sodium`.
 
 ## Answered for M1
 

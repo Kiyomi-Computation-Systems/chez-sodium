@@ -10,8 +10,8 @@
 ;;;
 ;;; Every library form, in any .sls file under the directory, is checked,
 ;;; private ones too: ADR-0004 has every library under src/ import
-;;; the refusal first, so each must be refused. (chez-sodium) is checked, with
-;;; no edit here, when it arrives. The program finds the libraries by reading
+;;; the refusal first, so each must be refused. (chez-sodium), the public
+;;; library, is one of them. The program finds the libraries by reading
 ;;; the files as data. It puts the directory on Chez's library path itself, so
 ;;; one argument says both where to look and where Chez finds the libraries.
 ;;;
