@@ -300,7 +300,7 @@ check-ci: ## Fail unless .github/workflows holds ci.yml alone, in the one shape 
 # refuses a Chez that is not threaded: a syntax violation from chez-sodium,
 # whose message starts with the refusal's marker. Every library under src/
 # imports require-threaded first (ADR-0004), so every one must be refused,
-# the public (chez-sodium) too, when it arrives. It fails if it finds no
+# the public (chez-sodium) too. It fails if it finds no
 # library, and names each one that loaded or raised something else
 # (tests/check-nothreads.sps). tests/test-check-nothreads.sps holds each rule
 # on a fixture tree. On the threaded Chez that make test runs, every import
