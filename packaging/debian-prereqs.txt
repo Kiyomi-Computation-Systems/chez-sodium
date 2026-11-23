@@ -22,8 +22,9 @@
 # (ADR-0011). With ./configure --disable-x11 --disable-curses, Chez's BUILDING
 # file asks for nothing but a C compiler and make, so there is no libx11-dev
 # and no libncurses-dev. build-essential is the C toolchain: gcc, g++, make
-# and libc6-dev. It also compiles report-sodium.sh's program and the memory
-# gate's C plant.
+# and libc6-dev. It also compiles report-sodium.sh's program, the memory
+# gate's C plant, and the programs the suites build at test time: the C
+# oracle, the decoy and the free() interposer.
 build-essential
 
 # --- to fetch the Chez release tarball ------------------------------------------
@@ -35,8 +36,10 @@ ca-certificates
 curl
 
 # --- libsodium ------------------------------------------------------------------
-# libsodium-dev gives sodium.h, which scripts/ci/report-sodium.sh compiles
-# against, and pulls in libsodium23, the runner's libsodium, which it reports.
+# libsodium-dev gives sodium.h, which scripts/ci/report-sodium.sh, test-constants,
+# the C oracle and the decoy compile against, and pulls in libsodium23, the
+# runner's libsodium, which it reports. libsodium23 is what the suites of
+# the main job load.
 libsodium-dev
 
 # --- the memory gate (ADR-0011) -------------------------------------------------

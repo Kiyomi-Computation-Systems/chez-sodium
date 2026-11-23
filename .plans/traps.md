@@ -88,6 +88,23 @@ chez-sodium, M1's plan.
 
 ## Checks and environment
 
+### A wipe over a freed block passes a plain run
+
+chez-sodium, M1's slice 0 and slice 2 reviews.
+
+- **What happened.** Slice 0's review found that a wipe placed just before
+  `free-foreign-block!` would wipe a block PROC had already freed. Slice 2's builder planted that
+  wipe: `make test` passed, and only `make test-memory` failed, with Valgrind's "Invalid write of
+  size 1" in `__explicit_bzero_chk`.
+- **Why.** Writing zeros into a freed glibc chunk usually corrupts nothing a test reads. Only
+  Valgrind sees the write.
+- **Reproduced** by slice 2's load builder and its reviewer, each under the gate.
+- **What changed.** The wipe is fused with the free ([ADR-0008], amended), and `test-wipe`'s
+  child, outside Valgrind, catches the mutant in a plain run: a block PROC freed, refilled at
+  the same address, must still hold its bytes.
+- **The rule:** a mutant of memory safety is run under the gate too, and a row that only the gate
+  can fail says so in its suite's header.
+
 ### Under Valgrind, a suite's `LD_PRELOAD` holds Valgrind's preloads
 
 chez-sodium, M1's plan.
@@ -107,3 +124,4 @@ None yet.
 
 [ADR-0007]: decisions/0007-one-critical-section-per-verb.md
 [ADR-0011]: decisions/0011-the-harness-after-chez-sqlite3.md
+[ADR-0008]: decisions/0008-every-block-wiped-before-free.md

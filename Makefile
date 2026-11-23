@@ -58,7 +58,7 @@ MEMORY_LOGS := build/memory
 
 # One physical line: check-help reads it with awk, and fails if it ends in
 # a backslash.
-.PHONY: help check-help check-guix check-guix-inside deps check-pins test check-suites check-floors check-ci check-nothreads check-test-fails test-memory check-memory-gate clean check-clean
+.PHONY: help check-help check-guix check-guix-inside deps build check-pins test check-suites check-seam check-floors check-ci check-nothreads check-test-fails test-memory check-memory-gate clean check-clean
 
 .DEFAULT_GOAL := help
 
@@ -134,6 +134,18 @@ deps: ## Link vendor/chez-srfi into build/scheme-libs; never fetches
 	done
 	@echo "deps: $(SRFI_SRC) linked into $(SRFI_LIBS)/srfi"
 
+# Loads libsodium as chez-sodium would, through tests/preflight.sps, and names
+# it: its path and source, its version and major.minor. A refused libsodium
+# fails it, exit 1, with the reason, the path, the detail, the candidates
+# checked and a remedy. Its last line, on either stream, is its counts, all
+# zero (ADR-0011). chez-sodium compiles nothing (ADR-0001), so this is the
+# question an install asks. It writes nothing. build is in .PHONY: the build/
+# directory exists, and without it make would answer that build is up to date
+# and run nothing. make test does not depend on it.
+build: ## Load libsodium as chez-sodium would and name it; fail with the reason when it is refused
+	@scripts/require-tools "$(GOAL)" $(CHEZ)
+	@$(CHEZ) --libdirs src --program tests/preflight.sps
+
 # Three places name the chez-srfi commit, and nothing else keeps them equal:
 # Akku.lock (what a consumer installs), the gitlink the superproject records
 # (what a clone checks out) and the submodule's checkout (what the tests
@@ -193,9 +205,9 @@ check-pins: ## Fail unless Akku.lock, the gitlink and the checkout name one chez
 # failed or hung, or if none matched. --foreground keeps a suite in make's
 # process group, so Ctrl-C at a terminal reaches it at once, and does not
 # wait out the timeout. `make check-test-fails` proves the loop fails. The
-# checks come first: check-help, check-suites, check-floors and check-ci each
-# stop it.
-test: deps check-help check-suites check-floors check-ci ## Run every tests/test-*.sps under timeout; fail if one fails or hangs, or none exists
+# checks come first: check-help, check-suites, check-seam, check-floors and
+# check-ci each stop it.
+test: deps check-help check-suites check-seam check-floors check-ci ## Run every tests/test-*.sps under timeout; fail if one fails or hangs, or none exists
 	@scripts/require-tools "$(GOAL)" $(TIMEOUT) $(CHEZ)
 	@case '$(TEST_TIMEOUT)' in \
 	  '' | *[!0-9]* | 0*) \
@@ -230,6 +242,17 @@ test: deps check-help check-suites check-floors check-ci ## Run every tests/test
 check-suites: deps ## Fail unless every tests/test-*.sps ends with the shared exit form
 	@scripts/require-tools "$(GOAL)" $(CHEZ)
 	@$(CHEZ) --libdirs $(LIBDIRS) --program tests/check-suites.sps $(SUITES)
+
+# Reads every library under src/ as data, and fails unless each keeps to the
+# seam (ADR-0012, tests/check-seam.sps): the family, the import lists, the
+# names only some libraries may import, and which library may import (chez-sodium
+# private memory). It names each library that breaks a rule, with the file and
+# the import or the export. tests/test-check-seam.sps runs it on a fixture
+# tree for each rule. It imports only (rnrs) and a few of Chez's own bindings,
+# so it needs no deps.
+check-seam: ## Fail unless every library under src/ keeps to the seam: the family, the import lists, the names only some libraries may import, and who imports memory
+	@scripts/require-tools "$(GOAL)" $(CHEZ)
+	@$(CHEZ) --program tests/check-seam.sps src
 
 # Holds README.org, and every file under .github/workflows and scripts/ci, to
 # packaging/floors.sexp, the one file that writes the floors (ADR-0011,
@@ -271,11 +294,13 @@ check-nothreads: ## Fail unless every library under src/ refuses to import, by n
 	@scripts/require-tools "$(GOAL)" $(CHEZ)
 	@$(CHEZ) --program tests/check-nothreads.sps src
 
-# Plants bad suites, a block counted up and never down, and a README that
-# disagrees with the floors file, one at a time, in a copy of the tree, and
-# requires make test to fail on each by name. tests/check-test-fails.sh lists
-# the plants. The copy has no .git, so nothing in it runs git.
-check-test-fails: ## Plant bad suites, none at all, a leaked block and a stale README, in a copy; make test must fail on each, by name
+# Plants bad suites, a block counted up and never down, a README that
+# disagrees with the floors file, a workflow with a key it may not have and a
+# private library that imports a name only another may, one at a time, in a
+# copy of the tree, and requires make test to fail on each by name.
+# tests/check-test-fails.sh lists the plants. The copy has no .git, so nothing
+# in it runs git.
+check-test-fails: ## Plant bad suites, none at all, a leaked block, a stale README, a bad workflow and a bad import, in a copy; make test must fail on each, by name
 	@scripts/require-tools "$(GOAL)" $(TIMEOUT) $(CHEZ)
 	@MAKE='$(MAKE)' TIMEOUT='$(TIMEOUT)' CHEZ='$(CHEZ)' sh tests/check-test-fails.sh
 

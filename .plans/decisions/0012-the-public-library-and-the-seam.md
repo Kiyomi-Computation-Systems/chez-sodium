@@ -57,10 +57,12 @@
 
 ## Consequences
 
-- **Rule (m) and decision 7's row are row 24's structural half,** which no other check holds:
+- **Rule (m) and decision 7's rows are row 24's structural half,** which no other check holds:
   `test-wipe` reads the blocks `call-with-block` frees, and these hold that no other path makes
   or frees one. Rule (m) alone would leave two: native's own code outside `call-with-block`, and
-  a re-export of memory's names (slice 0's review, S0-F3).
+  a re-export of memory's names (slice 0's review, S0-F3). Decision 7's rows also hold that
+  native imports memory once, under memory's own names: a renamed second import got past both
+  (slice 2's review, S2-F1).
 - **Rule (m) and the row have no source,** so their rows are written and watched failing like
   any new check.
 - **`check-nothreads` refuses `(chez-sodium)` by name,** as every library under `src/`.

@@ -17,6 +17,10 @@
 #   leaks        a suite whose tests pass,     make test names it FAIL, and
 #                but which counts a block      suite-exit-status names the
 #                up and never down             block left (ADR-0011)
+#   seam         a private library that      check-seam names the import,
+#                imports foreign-alloc, a    and no suite runs
+#                name only (chez-sodium
+#                private memory) may import
 #   floors       README's Chez line says       check-floors names the line,
 #                10.3.0, not the floor         and no suite runs
 #   floors-      a script under scripts/ci     check-floors names the line,
@@ -35,9 +39,9 @@
 # A case requires a non-zero exit, and compares the lines starting
 # "check-suites: " or "test: " as a whole: check-suites' verdict, the plant's
 # outcome, the after-suite's pass line, and the count. The leaks case also
-# compares the lines starting "suite-exit-status: ", whole, the floors and
-# floors-script cases those starting "check-floors: ", and the ci case those
-# starting "check-ci: ".
+# compares the lines starting "suite-exit-status: ", whole, the seam case those
+# starting "check-seam: ", the floors and floors-script cases those starting
+# "check-floors: ", and the ci case those starting "check-ci: ".
 #
 # The copy is the working tree without .git, build/ and .claude/ (Claude
 # Code's local state, which can hold whole worktrees), and with the
@@ -51,6 +55,8 @@
 # README.org and packaging/floors.sexp are the tree's own, and agree, so
 # check-floors passes in every case but floors, and the tree's own workflow
 # and scripts/ci, copied with it, pass check-ci in every case but ci.
+#
+# Every case also runs check-seam on the copy's two libraries, which pass.
 #
 # The leaks plant counts a block up through (chez-sodium private counters)
 # and never down, as a verb that allocated a block and lost it would. The
@@ -322,6 +328,32 @@ run_case "leaks: a suite whose tests pass, but which counts a block up and never
 
 # The plant is gone, so only the after-suite is left to check.
 rm -f "${copy:?}/${plant:?}"
+
+# The seam case: a library under the copy's src/ imports a name from
+# (chezscheme) that only (chez-sodium private memory) may, and
+# check-seam names it by rule (f). The copy's src/ holds no memory library,
+# and the rule needs none. Without check-seam among make test's prerequisites,
+# or with it reading a directory but src/, no check sees the plant and make
+# test passes: the case fails then (each new prerequisite comes with its
+# plant). check-seam passes before and after: the plant is removed.
+cat >"$plant_dir/seam" <<'EOF'
+#!r6rs
+;;; Planted by tests/check-test-fails.sh: a private library that allocates
+;;; foreign memory itself, which only (chez-sodium private memory) may.
+(library (chez-sodium private planted)
+  (export planted)
+  (import (chez-sodium private require-threaded)
+          (rnrs)
+          (only (chezscheme) foreign-alloc))
+  (define planted 1))
+EOF
+cp "$plant_dir/seam" "$copy/src/chez-sodium/private/planted.sls"
+run_case "seam: check-seam names a private library that imports foreign-alloc, and no suite runs" \
+  "$(checked 1
+     echo 'check-seam: src/chez-sodium/private/planted.sls: (chez-sodium private planted) imports foreign-alloc from (chezscheme), but library-only-chez-names in tests/check-seam.sps allows it only in (chez-sodium private memory)'
+     echo 'check-seam: FAILED (problems: 1)')" \
+  '^(check-suites|check-seam|test): '
+rm -f "${copy:?}/src/chez-sodium/private/planted.sls"
 
 # The floors case: the copy's README states an older Chez than the floors
 # file does. The file's floor is read from the file, so this script is no
