@@ -1,0 +1,25 @@
+#!r6rs ; -*- scheme -*-
+(import (akku format manifest))
+
+;; No `depends` clause and no `scripts` clause, both deliberately.
+;;
+;; depends: the libraries bind libsodium directly, with no C shim
+;; (ADR-0001), and find it on the host when they load (ADR-0002). They need
+;; no Scheme library at runtime. chez-srfi is the test suites' (SRFI-64), not
+;; a consumer's, so it stays in depends/dev (ADR-0011). Akku.lock locks it:
+;; its version names the commit vendor/chez-srfi pins.
+;;
+;; scripts: Akku's script mechanism would run a build, but it prompts for
+;; approval on every install until the package is vetted in the index, and
+;; the prompt can simply be declined, after which no script runs and the
+;; install still reports success. There is nothing to build, since no C is
+;; compiled (ADR-0001). See chez-cmark-gfm ADR-0017.
+;;
+;; The version is CHANGELOG.md's latest release, or 0.0.0 while there is
+;; none; test-manifest holds the two.
+(akku-package ("chez-sodium" "0.0.0")
+  (synopsis "libsodium bindings for Chez Scheme")
+  (authors "Kiyomi Computation Systems LLC")
+  (homepage "https://github.com/Kiyomi-Computation-Systems/chez-sodium")
+  (license "BSD-3-Clause")
+  (depends/dev ("chez-srfi" "^0.0.0-akku.181.7879b52")))

@@ -294,7 +294,10 @@ pattern:
 ### 4.4 The input cap
 
 - **Every byte or string input, and `random-bytes`' output, is at most 64 KiB**
-  (§11.5). Above that is a caller's mistake, raised before C.
+  (§11.5), counted in bytes: a string counts its UTF-8 bytes. Above that is a caller's
+  mistake, raised before C.
+  - **The hash string is the exception.** One over the cap fails the pre-check, and is
+    answered, not raised (§4.1, §4.2).
 - **Why a cap.** Each verb's whole extent runs in one critical section (§6.2), and
   Scheme's copy loops there hold up every thread's collection. A byte-by-byte copy
   costs about 30 ms per MiB (X-M4), so 64 KiB keeps a section's copying near 2 ms.
@@ -342,15 +345,18 @@ Smaller than chez-sqlite3's tree, with the same shape and helpers.
 - **A caller's mistake is an assertion violation, raised before C.** The mistakes are:
   - a wrong type;
   - a size, key length or limit out of range;
-  - an input over the cap;
+  - an input over the cap, except a hash string, which is answered (§4.1);
   - an empty key.
 - **No secret ever reaches a condition** (L-F9, P-F8).
-  - A refusal of a secret parameter names the parameter and its kind only, whatever
-    the value's type. The secret parameters are a password, a hash string, a key,
-    `constant-time-bytevector=?`'s operands, and an HMAC key.
+  - **Every string and bytevector parameter is secret:**
+    - a password and a hash string;
+    - `blake2b`'s input, which is Techo's API key, and its key;
+    - `constant-time-bytevector=?`'s operands;
+    - Tier 2's inputs and HMAC key.
+  - A refusal of a secret parameter names the parameter and its kind only, whatever the
+    value's type.
   - chez-sqlite3's `shown-value` shows numbers, symbols, characters and lists of them
-    as they are. It is used only for parameters that are not secret, such as sizes and
-    limits.
+    as they are. It is used only for sizes, limits and preset names.
 - **Raised after the section** (X-M2). A verb's critical section answers data, and the
   verb raises only once it is out (§6.2).
 - Tests assert the reason symbol, never the message.
@@ -560,7 +566,7 @@ it catches.
 | 12 | A password with U+0000 | `"a\x0;b"` verifies against its own hash, and not against `"a"`'s | a C-string length |
 | 13 | Random bytes | The length asked for. Every byte position varies across k calls. 0 gives `#vu8()` and calls no C. Over the cap raises. | a short copy |
 | 14 | `constant-time-bytevector=?` | Equal pairs; pairs that differ only in the first byte, or only in the last; a prefix pair; different lengths; both empty. The decoy logs `sodium_memcmp`'s length as the whole length. | `bytevector=?`; a short length; comparing only the shorter length |
-| 15 | A caller's mistakes | For each verb: each wrong type; each size, key length or limit out of range; an input over the cap; an empty key. Each raises `&assertion`, and the decoy's log shows no libsodium call. | a missing range check. C will not catch sizes of 1 to 15 bytes (P-F9) |
+| 15 | A caller's mistakes | For each verb: each wrong type; each size, key length or limit out of range; an input over the cap, other than a hash string (row 9); an empty key. Each raises `&assertion`, and the decoy's log shows no libsodium call. | a missing range check. C will not catch sizes of 1 to 15 bytes (P-F9) |
 | 16 | Secrets in conditions | Pass a secret-looking symbol, number and character list as each verb's secret parameters. No message or irritant holds any of it. | `shown-value` used on a secret |
 | 17 | Raised after the section | A decoy `crypto_pwhash_str` answers -1, under a guard for something else. The outer guard catches the `&sodium-failed` itself. | a raise from inside the extent (X-M2) |
 | 18 | Engines | Each verb under an engine, at every fuel from 1 until it completes. Each run answers right, raises nothing, and leaves no live block. | §6.2's section missing (X-M1) |
@@ -586,7 +592,7 @@ it catches.
 | 1.0.18, Ubuntu 24.04's package (`1.0.18-1ubuntu0.24.04.1`) | CI's `main`, found by discovery. `main` asserts that it loaded the floor. | a distribution's build, with its own patches |
 | 1.0.18, built from `libsodium-1.0.18.tar.gz` | CI's `floor`, through `CHEZ_SODIUM_LIBRARY` and `C_INCLUDE_PATH` | ours, with known flags. chez-sqlite3 runs both for the same reason (P-F3). |
 | 1.0.22, Guix's at the pinned channel `b532aa7` | the development container | |
-| the latest point release, built from source | CI's `current` | 1.0.22 today |
+| the latest point release, built from source | CI's `current`, through `CHEZ_SODIUM_LIBRARY` and `C_INCLUDE_PATH` | 1.0.22 today |
 
 Ubuntu's own packages confirm the floor and the newer soname (packages.ubuntu.com,
 2026-11-22):
@@ -606,6 +612,7 @@ policy for which versions are tested.
 | M3 | The password verbs, collect-safe, with §4.2's rules | Techo's slice 3 (accounts, login, keys), at a commit. Techo pins its siblings as git submodules (Techo ADR-0011), so it needs no release (P-F19). |
 | M4 | `docs/`, and `docs/reference.md` with `test-reference`; the site and its job; `CHANGELOG.md`; release 0.1.0 | |
 | M5 | Tier 2: `sha256` and `hmac-sha256` | Techo's attachments |
+| Later | Publication on Akku, once Techo has battle-tested chez-sodium (§11.8) | Chez users outside Techo |
 
 **The records M0 writes** (§11.5), as chez-sqlite3 began with its own:
 
@@ -623,17 +630,21 @@ policy for which versions are tested.
 
 ## 10. Open
 
-Each item names the milestone it blocks. Neither blocks M0.
-
-1. **Akku** (M4): whether to publish at 0.1.0. It does not gate Techo.
-2. **For Techo:** does slice 2's `techo user add` need `password-hash` before slice 3?
-   If it does, M3 must land before Techo's slice 2.
+Nothing is open.
 
 No longer open:
+- whether Techo's slice 2 needs `password-hash`. The owner decided in Techo, on
+  2026-11-22, that it does not:
+  - `techo user add` lands in Techo's slice 3, and slice 2's CLI does schema and
+    migrations only (Techo `progress.md`);
+  - so M3 is needed before Techo's slice 3, as §9 has it;
+  - Techo's slice 2 also waits for chez-http-server's `await-outside` (Techo ADR-0008,
+    amended), so nothing in Techo needs chez-sodium soon;
 - the sonames, which §7.2 has;
 - the input cap and the supported versions, which §11.5 decides;
 - a threaded Chez, which §11.6 decides;
-- the integer types, the floor, the default limits and the names, which §11.7 decides.
+- the integer types, the floor, the default limits and the names, which §11.7 decides;
+- publishing on Akku, which §11.8 decides.
 
 ## 11. Decisions
 
@@ -667,7 +678,8 @@ The owner's decisions, 2026-11-22, on the questions the review left open.
      - Bump `current` at each point release.
      - Raise the floor only by a record.
    - **M0 writes the eleven records of §9.**
-6. **A threaded Chez is required**, as the siblings require one. The deciding reasons:
+6. **A threaded Chez, 10.4.0 or later, is required**, as the siblings require one. The
+   deciding reasons:
    - `counters` and `memory` import `make-mutex`, which an unthreaded Chez lacks;
    - Techo hashes on worker threads.
 7. **The rest of what was open.**
@@ -685,3 +697,7 @@ The owner's decisions, 2026-11-22, on the questions the review left open.
      migrates hashes if the default rises.
    - **The names** are §4's. Two were renamed from the first draft: `generic-hash`
      became `blake2b`, and `bytes=?` became `constant-time-bytevector=?` (§3.1).
+8. **chez-sodium will be published on Akku, once Techo has battle-tested it.**
+   - That may come later than 0.1.0, so 0.1.0 is not published there.
+   - Techo pins its siblings as git submodules (Techo ADR-0011), so it needs no Akku
+     release to use chez-sodium.

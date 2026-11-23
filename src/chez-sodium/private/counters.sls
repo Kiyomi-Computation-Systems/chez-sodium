@@ -1,0 +1,127 @@
+#!r6rs
+;;; (chez-sodium private counters): a count of every native object
+;;; chez-sodium holds, by kind (ADR-0011).
+;;;
+;;; Each count rises when an object of its kind is made, and falls when it
+;;; is freed. The counts are per process. They sit behind one mutex,
+;;; since two threads may each make and free objects at once. There is no
+;;; reset: a suite compares the counts before and after, and
+;;; (chez-sodium-testing)'s suite-exit-status fails a suite whose counts are
+;;; not all zero at its end. They are the leak gate for native objects a Chez
+;;; object held, which Valgrind sees as still reachable.
+;;;
+;;; Each count is read and written under the mutex, inside a critical
+;;; section (locked, below): no interrupt that escapes can leave the mutex
+;;; held.
+;;;
+;;; It also keeps the exit checks a library may register, for
+;;; suite-exit-status to run (register-exit-check!, below). No library under
+;;; src/ registers one.
+;;;
+;;; It never loads libsodium, so any suite can import it. R6RS forbids
+;;; assigning an exported variable, so the counts and the checks are reached
+;;; through procedures.
+(library (chez-sodium private counters)
+  (export native-kinds count-up! count-down! native-counts register-exit-check! exit-checks)
+  (import (chez-sodium private require-threaded)
+          (rnrs)
+          (only (chezscheme) critical-section make-mutex with-mutex))
+
+  ;; native-kinds : (Listof Symbol)
+  ;; The kinds of native object counted, in the order native-counts
+  ;; answers them:
+  ;;
+  ;;   block       a foreign block chez-sodium allocated itself
+  (define native-kinds '(block))
+
+  ;; The counts, one per kind, in native-kinds order, and the mutex every
+  ;; read and write holds.
+  (define counts (make-vector (length native-kinds) 0))
+  (define lock (make-mutex))
+
+  ;; locked : Mutex (-> Any) -> Any
+  ;; THUNK's value, run holding LOCK, in a critical section. Chez's
+  ;; with-mutex is a dynamic-wind whose before thunk takes the mutex, so an
+  ;; interrupt that escapes between the take and the wind would leave it
+  ;; held, with no after thunk to release it, and block every other thread.
+  ;; Every mutex here is held through locked.
+  (define (locked lock thunk)
+    (critical-section (with-mutex lock (thunk))))
+
+  ;; kind-index : Symbol Symbol -> Natural
+  ;; Where KIND's count stands; an assertion violation from WHO for a
+  ;; symbol that is not a kind, whose irritants are not-a-kind, then KIND.
+  (define (kind-index who kind)
+    (let loop ((kinds native-kinds) (i 0))
+      (cond ((null? kinds)
+             (assertion-violation who "not a kind of native object chez-sodium counts"
+                                   'not-a-kind kind))
+            ((eq? (car kinds) kind) i)
+            (else (loop (cdr kinds) (+ i 1))))))
+
+  ;; count-up! : Symbol -> Void
+  ;; One more object of KIND. A KIND that is not a kind is an assertion
+  ;; violation, whose irritants are not-a-kind, then KIND, and nothing is counted.
+  (define (count-up! kind)
+    (let ((i (kind-index 'count-up! kind)))
+      (locked lock
+        (lambda () (vector-set! counts i (+ (vector-ref counts i) 1))))))
+
+  ;; count-down! : Symbol -> Void
+  ;; One object of KIND fewer. A count at zero stays at zero, and the call
+  ;; raises an assertion violation: one more object freed than was made is
+  ;; a double free, whose irritants are double-free, then KIND. A KIND that is
+  ;; not a kind is an assertion violation, whose irritants are not-a-kind, then
+  ;; KIND, and nothing is counted.
+  (define (count-down! kind)
+    (let* ((i (kind-index 'count-down! kind))
+           (was (locked lock
+                  (lambda ()
+                    (let ((n (vector-ref counts i)))
+                      (when (> n 0)
+                        (vector-set! counts i (- n 1)))
+                      n)))))
+      (when (= was 0)
+        (assertion-violation 'count-down!
+                             "more objects of this kind freed than made: a double free"
+                             'double-free kind))))
+
+  ;; native-counts : -> (Listof (Pairof Symbol Natural))
+  ;; Every kind with its count, in native-kinds order, read at one moment.
+  (define (native-counts)
+    (let ((now (locked lock (lambda () (vector->list counts)))))
+      (map cons native-kinds now)))
+
+  ;; --- the exit checks -------------------------------------------------------
+  ;; A check of what a native library holds at a suite's end, which only that
+  ;; library can make. A library that loads one registers its check once the
+  ;; load has succeeded, so a process that never loaded it has none to run.
+  ;; No library under src/ registers one.
+  ;; The checks are kept here because suite-exit-status already reads this
+  ;; library, and registering one loads nothing. A check is a procedure of no
+  ;; arguments that answers (pass TEXT), (fail TEXT) or (unavailable TEXT);
+  ;; suite-exit-status runs each at a suite's end and names its outcome.
+
+  ;; The checks, newest first, each (NAME . CHECK), behind the counts' mutex.
+  (define checks '())
+
+  ;; register-exit-check! : Symbol (-> (List Symbol String)) -> Void
+  ;; CHECK, under NAME, for every suite-exit-status from now on, after the
+  ;; checks registered before it. There is no way to drop one. A NAME that is
+  ;; no symbol and a CHECK that is no procedure are assertion violations,
+  ;; whose irritants begin with a rule symbol, not-a-name or not-a-procedure,
+  ;; and nothing is registered. A NAME given twice registers two checks.
+  (define (register-exit-check! name check)
+    (unless (symbol? name)
+      (assertion-violation 'register-exit-check! "an exit check's name is a symbol"
+                           'not-a-name name))
+    (unless (procedure? check)
+      (assertion-violation 'register-exit-check! "an exit check is a procedure"
+                           'not-a-procedure name check))
+    (locked lock (lambda () (set! checks (cons (cons name check) checks)))))
+
+  ;; exit-checks : -> (Listof (Pairof Symbol (-> (List Symbol String))))
+  ;; Every check registered, each with its name, in the order registered, in
+  ;; a fresh list.
+  (define (exit-checks)
+    (reverse (locked lock (lambda () checks)))))
