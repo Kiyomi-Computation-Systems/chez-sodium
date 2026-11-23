@@ -4,6 +4,8 @@
   M1's plan, and accepted by the owner that day ([amendment](#amendment-2026-11-23-m1s-plan)).
   Amended 2026-11-23 after slice 0's review, and accepted by the owner that day
   ([amendment](#amendment-2026-11-23-slice-0s-review)).
+  Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
+  review ([amendment](#amendment-2026-11-23-m2s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** every condition chez-sodium raises, and every refusal of a caller's mistake
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §5
@@ -118,6 +120,31 @@ Accepted (the owner, 2026-11-23), from M1 slice 0's review, S0-F5 and S0-F6.
 - **Every helper that refuses a secret refuses it through `refuse-secret`,** `call-with-bytes`
   among them: v0.1.1's showed its bytevector parameter through `shown-value`.
 
+## Amendment, 2026-11-23: M2's plan
+
+Accepted (the owner, 2026-11-23), proposed in [the M2 plan](../2026-11-23-m2-plan.md), §4.1, item 5,
+and §4.2, item 2, with the owner's answer of 2026-11-23.
+
+- **`&sodium-failed` has two cases.** Decision 3's `crypto_pwhash_str`, from M3, and
+  `crypto_generichash` answering anything but 0 for a size and key that passed their range
+  checks, from M2: `blake2b` then has no hash to answer, since a -1 leaves `out` as it was
+  (measured, at 1.0.18 and 1.0.22). Its function is `"crypto_generichash"`, its code the answer,
+  its `&who` `blake2b`, and it is raised after the section ([ADR-0007]). libsodium answers -1 only
+  for sizes the checks refuse, so only a decoy reaches it: row 17's M2 half. The decoy answers
+  -1 and 1, so that no single value passes for failed, as it answers -1 and 2 for
+  `sodium_init`.
+- **So the first raise is M2's, and `sodium-failed?`, `sodium-failed-function` and
+  `sodium-failed-code` join `(chez-sodium)` in M2** ([ADR-0012], amended), not M3 as the
+  first amendment said.
+- **The rule symbols M2's verbs lead with:** `not-a-natural` and `over-the-cap` for
+  `random-bytes`' `n`; `not-a-bytevector`, `over-the-cap`, `not-a-natural`,
+  `size-out-of-range`, `empty-key` and `key-length-out-of-range` for `blake2b`'s `input`, `size`
+  and `key`; `not-a-bytevector` and `over-the-cap` for each of the compare's operands. A secret is
+  `(RULE PARAMETER (kind K))`; `n` and `size` are shown by `shown-value`. Each verb checks its
+  parameters left to right, each one's type before its range, and refuses the first mistake.
+  `over-the-cap` and `not-a-natural` are M3's too.
+
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md
 [ADR-0007]: 0007-one-critical-section-per-verb.md
 [ADR-0009]: 0009-what-needs-rehash-means.md
+[ADR-0012]: 0012-the-public-library-and-the-seam.md

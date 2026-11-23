@@ -1,0 +1,20 @@
+#!/bin/sh
+# Item 1: prototypes (_Generic) and nonnull decoys, against 1.0.18 and 1.0.22 headers.
+#   scripts/guix-env sh build/m2-plan/run-1.sh
+set -u
+cd "$(dirname "$0")" || exit 2
+cc=${CC:-cc}
+for v in 1.0.18 1.0.22; do
+  inc=../slice5/prefix-$v/include
+  echo "######## headers of $v"
+  echo "== prototypes.c -Wall -Werror -std=c11"
+  $cc -Wall -Werror -std=c11 -I$inc prototypes.c -o prototypes-$v -L../slice5/prefix-$v/lib -lsodium && echo "compiled" && LD_LIBRARY_PATH=../slice5/prefix-$v/lib ./prototypes-$v
+  for kind in ternary volatile; do
+    echo "== decoys, $kind, -Wall -Werror -shared -fPIC"
+    for f in decoys/*-$kind.c; do
+      out=$($cc -Wall -Werror -shared -fPIC -I$inc $f -o /tmp/decoy-$$.so 2>&1); st=$?
+      echo "$(basename $f): exit $st $(echo "$out" | grep -o 'Werror=[a-z-]*' | sort -u | tr '\n' ' ')"
+    done
+  done
+done
+rm -f /tmp/decoy-$$.so

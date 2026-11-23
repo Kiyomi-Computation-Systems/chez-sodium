@@ -4,6 +4,8 @@
   §4.2, items 1 and 7. Decisions 6 and 7 widened after slice 0's review (S0-F3). Decision 7
   amended 2026-11-23, after slice 2's review, and accepted by the owner that day
   ([amendment](#amendment-2026-11-23-memory-imported-once)).
+  Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
+  review ([amendment](#amendment-2026-11-23-m2s-plan)).
 - **Date:** 2026-11-23
 - **Scope:** the public library, and what `make check-seam` holds under `src/`
 - **Settles:** the M1 plan §4.2, items 1 and 7
@@ -82,6 +84,24 @@ consequences in place; M1's closing review (M1-F9) moved it here, as a decision.
   spelling, and decision 7's rows find every use of them.
 - **`test-native`'s E11 holds it,** reading native's import clause as data.
 
+## Amendment, 2026-11-23: M2's plan
+
+Accepted (the owner, 2026-11-23), proposed in [the M2 plan](../2026-11-23-m2-plan.md), §4.1, item 6,
+and §4.2, item 2, with the owner's answers of 2026-11-23.
+
+- **The verbs live beside native.** `(chez-sodium private byte-verbs)` holds `random-bytes`,
+  `blake2b` and `constant-time-bytevector=?`. It imports `require-threaded` first, then `(rnrs)`,
+  native, conditions and cap, and nothing from `(chezscheme)`, which a row holds whole: `check-seam`
+  lets any library import `critical-section`. It holds no `foreign-procedure`, `foreign-ref`,
+  `foreign-set!` or block of its own, so rules (f) and (m) and decision 7 stand as they are.
+  `(chez-sodium private cap)` holds `input-cap` alone ([ADR-0007], amended). Native keeps the load,
+  the raw bindings and the helpers, as chez-sqlite3's native does beside its verbs' libraries. M3's
+  password verbs go beside it in the same way.
+- **M2's exports:** the three verbs, and `sodium-failed?`, `sodium-failed-function` and
+  `sodium-failed-code`, which decision 2 put in M3; their first raise is M2's ([ADR-0006],
+  amended).
+
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0006]: 0006-errors-and-no-secret-shown.md
+[ADR-0007]: 0007-one-critical-section-per-verb.md
 [ADR-0008]: 0008-every-block-wiped-before-free.md

@@ -1,0 +1,31 @@
+#!r6rs
+;; Item 5: per-call cost in microseconds of five operations at one size.
+;; Usage: scheme --program cost.sps LIBRARY SIZE REPS
+;; Prints: label microseconds-per-call (one line each).
+(import (chezscheme))
+(define args (cdr (command-line)))
+(load-shared-object (car args))
+(define size (string->number (cadr args)))
+(define reps (string->number (caddr args)))
+(define init (foreign-procedure "sodium_init" () int))
+(define gh (foreign-procedure "crypto_generichash" (uptr size_t uptr unsigned-64 uptr size_t) int))
+(define rb (foreign-procedure "randombytes_buf" (uptr size_t) void))
+(init)
+(define (now-ns) (let ((t (current-time 'time-monotonic))) (+ (* 1000000000 (time-second t)) (time-nanosecond t))))
+(define (measure label thunk)
+  (thunk) ; warm-up
+  (let ((t0 (now-ns)))
+    (do ((i 0 (+ i 1))) ((= i reps)) (thunk))
+    (printf "~a ~a\n" label (/ (round (* 1000 (/ (- (now-ns) t0) reps 1000.0))) 1000.0))))
+(define in (foreign-alloc size))
+(define out (foreign-alloc 64))
+(define one (foreign-alloc 1))
+(define buf (foreign-alloc size))
+(define bv (make-bytevector size 7))
+(define bv2 (make-bytevector size 0))
+(do ((i 0 (+ i 1))) ((= i size)) (foreign-set! 'unsigned-8 in i (modulo i 251)))
+(measure "generichash-32-unkeyed" (lambda () (gh out 32 in size one 0)))
+(measure "randombytes_buf" (lambda () (rb buf size)))
+(measure "foreign-set!-loop-in" (lambda () (critical-section (do ((i 0 (+ i 1))) ((= i size)) (foreign-set! 'unsigned-8 buf i (bytevector-u8-ref bv i))))))
+(measure "foreign-ref-loop-out" (lambda () (critical-section (do ((i 0 (+ i 1))) ((= i size)) (bytevector-u8-set! bv2 i (foreign-ref 'unsigned-8 buf i))))))
+(for-each foreign-free (list in out one buf))

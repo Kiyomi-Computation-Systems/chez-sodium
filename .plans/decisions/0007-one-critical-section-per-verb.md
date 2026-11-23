@@ -7,6 +7,8 @@
   amendment's probe note says which program each count came from, after M1's closing review.
   Amended 2026-11-23 after M1's closing review, and accepted by the owner that day
   ([amendment](#amendment-2026-11-23-the-first-reference-on-two-threads)).
+  Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
+  review ([amendment](#amendment-2026-11-23-m2s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** every public verb
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §4.4, §6.2, §11.3 and
@@ -143,7 +145,34 @@ instead of an engine.
 - **The rule:** every row that forks a thread which reaches the library references it once
   first, as every engine row does before its first engine. The documents say it, in M4.
 
+## Amendment, 2026-11-23: M2's plan
+
+Accepted (the owner, 2026-11-23), proposed in [the M2 plan](../2026-11-23-m2-plan.md), §4.1, items 1
+and 4.
+
+- **Brief §4.3's ranges, recorded here:**
+  - `random-bytes n`: `n` from 0 to the cap. At 0 it answers `#vu8()` and calls no C. Chez has
+    one empty bytevector, so it has no byte to share.
+  - `blake2b input [size] [key]`: `size` from libsodium's `_bytes_min` to `_bytes_max`, by
+    default `_bytes`; a key, when given, from `_keybytes_min` to `_keybytes_max` bytes, and an
+    empty key refused. Each bound is read from libsodium ([ADR-0001], amended) and checked
+    before the section, since C accepts sizes and keys of 1 to 15 bytes. With no key, the key is
+    a one-byte block, passed with a length of 0. A key needs a size: the optionals are
+    positional.
+  - `constant-time-bytevector=? a b`: lengths that differ answer `#f` and call no C. Equal
+    lengths, 0 included, go to `sodium_memcmp` over the whole length; only its 0 is `#t`.
+- **The cap is written once:** `input-cap`, 65536, in `(chez-sodium private cap)`, a library
+  that loads nothing. M3's password verbs import it too ([ADR-0012], amended).
+- **Every byte input is capped, whatever the verb does next:** the compare checks both operands'
+  types and the cap before it compares their lengths, so an operand over the cap raises even
+  against a short one.
+- **The copy is the section's cost** (measured, 1.0.22 in the container): at the cap, a
+  `foreign-set!` copy in takes 1.8 ms, 36 times the hash's 49 µs, and 48 ms under Valgrind.
+  Brief §4.4's 2 ms is the copy's, and it holds for one capped input. The compare copies two,
+  about 3.6 ms plain.
+
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0006]: 0006-errors-and-no-secret-shown.md
 [ADR-0008]: 0008-every-block-wiped-before-free.md
 [ADR-0009]: 0009-what-needs-rehash-means.md
+[ADR-0012]: 0012-the-public-library-and-the-seam.md

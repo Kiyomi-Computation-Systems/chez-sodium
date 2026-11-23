@@ -1,0 +1,156 @@
+######## 1.0.18 (../slice5/prefix-1.0.18/lib/libsodium.so.23)
+== macros.c (header of 1.0.18)
+sodium_version_string 1.0.18
+crypto_generichash_BYTES 32
+crypto_generichash_BYTES_MIN 16
+crypto_generichash_BYTES_MAX 64
+crypto_generichash_KEYBYTES 32
+crypto_generichash_KEYBYTES_MIN 16
+crypto_generichash_KEYBYTES_MAX 64
+randombytes_BYTES_MAX 4294967295
+== sizes.sps
+path <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+crypto_generichash_bytes 32
+crypto_generichash_bytes_min 16
+crypto_generichash_bytes_max 64
+crypto_generichash_keybytes 32
+crypto_generichash_keybytes_min 16
+crypto_generichash_keybytes_max 64
+foreign-entry? candidates for randombytes_BYTES_MAX:
+  randombytes_bytes_max #f
+  randombytes_BYTES_MAX #f
+  randombytes_max #f
+  randombytes_buf_max #f
+  randombytes_size_max #f
+  randombytes_seedbytes #t
+  randombytes_buf #t
+  randombytes_random #t
+  randombytes_uniform #t
+  randombytes_implementation_name #t
+== exported symbols matching randombytes (readelf)
+randombytes
+randombytes
+randombytes_buf
+randombytes_buf
+randombytes_buf_deterministic
+randombytes_buf_deterministic
+randombytes_close
+randombytes_close
+randombytes_getentropy
+randombytes_getentropy.cold
+randombytes_implementation_name
+randombytes_implementation_name
+randombytes_internal_implementation_name
+randombytes_internal_random
+randombytes_internal_random.cold
+randombytes_internal_random_buf
+randombytes_internal_random_buf.cold
+randombytes_internal_random_close
+randombytes_internal_random_stir
+randombytes_internal_random_stir.cold
+randombytes_linux_getrandom
+randombytes_linux_getrandom.cold
+randombytes_random
+randombytes_random
+randombytes_seedbytes
+randombytes_seedbytes
+randombytes_set_implementation
+randombytes_set_implementation
+randombytes_stir
+randombytes_stir
+randombytes_sysrandom
+randombytes_sysrandom_buf
+randombytes_sysrandom_buf.cold
+randombytes_sysrandom_close
+randombytes_sysrandom_implementation_name
+randombytes_sysrandom_init
+randombytes_sysrandom_stir
+randombytes_uniform
+randombytes_uniform
+######## 1.0.22 (../slice5/prefix-1.0.22/lib/libsodium.so.26)
+== macros.c (header of 1.0.22)
+sodium_version_string 1.0.22
+crypto_generichash_BYTES 32
+crypto_generichash_BYTES_MIN 16
+crypto_generichash_BYTES_MAX 64
+crypto_generichash_KEYBYTES 32
+crypto_generichash_KEYBYTES_MIN 16
+crypto_generichash_KEYBYTES_MAX 64
+randombytes_BYTES_MAX 4294967295
+== sizes.sps
+path <repo>/build/slice5/prefix-1.0.22/lib/libsodium.so.26
+crypto_generichash_bytes 32
+crypto_generichash_bytes_min 16
+crypto_generichash_bytes_max 64
+crypto_generichash_keybytes 32
+crypto_generichash_keybytes_min 16
+crypto_generichash_keybytes_max 64
+foreign-entry? candidates for randombytes_BYTES_MAX:
+  randombytes_bytes_max #f
+  randombytes_BYTES_MAX #f
+  randombytes_max #f
+  randombytes_buf_max #f
+  randombytes_size_max #f
+  randombytes_seedbytes #t
+  randombytes_buf #t
+  randombytes_random #t
+  randombytes_uniform #t
+  randombytes_implementation_name #t
+== exported symbols matching randombytes (readelf)
+randombytes
+randombytes
+randombytes_buf
+randombytes_buf
+randombytes_buf_deterministic
+randombytes_buf_deterministic
+randombytes_close
+randombytes_close
+randombytes_getentropy.part.0
+randombytes_implementation_name
+randombytes_implementation_name
+randombytes_internal_implementation_name
+randombytes_internal_random
+randombytes_internal_random.cold
+randombytes_internal_random_buf
+randombytes_internal_random_buf.cold
+randombytes_internal_random_close
+randombytes_internal_random_stir
+randombytes_internal_random_stir.cold
+randombytes_linux_getrandom
+randombytes_linux_getrandom.cold
+randombytes_random
+randombytes_random
+randombytes_seedbytes
+randombytes_seedbytes
+randombytes_set_implementation
+randombytes_set_implementation
+randombytes_stir
+randombytes_stir
+randombytes_sysrandom
+randombytes_sysrandom_buf
+randombytes_sysrandom_buf.cold
+randombytes_sysrandom_close
+randombytes_sysrandom_implementation_name
+randombytes_sysrandom_random_dev_open
+randombytes_sysrandom_stir
+randombytes_uniform
+randombytes_uniform
+######## the container's profile library and the workstation package's 1.0.18
+== /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26
+path /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26
+crypto_generichash_bytes 32
+crypto_generichash_bytes_min 16
+crypto_generichash_bytes_max 64
+crypto_generichash_keybytes 32
+crypto_generichash_keybytes_min 16
+crypto_generichash_keybytes_max 64
+foreign-entry? candidates for randombytes_BYTES_MAX:
+== <repo>/build/m1-plan/host-1.0.18/libsodium.so.23
+path <repo>/build/m1-plan/host-1.0.18/libsodium.so.23
+crypto_generichash_bytes 32
+crypto_generichash_bytes_min 16
+crypto_generichash_bytes_max 64
+crypto_generichash_keybytes 32
+crypto_generichash_keybytes_min 16
+crypto_generichash_keybytes_max 64
+foreign-entry? candidates for randombytes_BYTES_MAX:

@@ -1,6 +1,8 @@
 # ADR-0005: Bind only what Techo has a named use for; `constant-time-bytevector=?` is the one exception
 
 - **Status:** Accepted (the owner, 2026-11-22), brief §11.4. Decision 7's names are brief §11.7.
+  Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
+  review ([amendment](#amendment-2026-11-23-m2s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** what chez-sodium binds and exports
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §3, §4's names, §11.4 and
@@ -91,6 +93,16 @@
   (brief §7.3).
 - **`blake2b`'s name is held by its vectors:** row 1 holds it to BLAKE2b on every version run
   (brief §3.1).
+
+## Amendment, 2026-11-23: M2's plan
+
+Accepted (the owner, 2026-11-23), proposed in [the M2 plan](../2026-11-23-m2-plan.md), §4.2, item 1,
+with the owner's answer of 2026-11-23.
+
+- **`crypto_generichash_keybytes` is not bound.** It answers the recommended key size, and
+  `blake2b` has no default key, so it has no use. The other five size functions are bound: the
+  default size, the size's range and the key's range ([ADR-0002], amended).
+- **Brief §3.1 and §3.4 name the five.** The brief wrote the family as `_keybytes*`.
 
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md

@@ -1,0 +1,134 @@
+=== 1.0.18 headers
+32-size_t randombytes_seedbytes(void);
+33-
+34-SODIUM_EXPORT
+35:void randombytes_buf(void * const buf, const size_t size)
+36-            __attribute__ ((nonnull));
+37-
+38-SODIUM_EXPORT
+39-void randombytes_buf_deterministic(void * const buf, const size_t size,
+15-
+16-#define crypto_generichash_BYTES_MIN crypto_generichash_blake2b_BYTES_MIN
+17-SODIUM_EXPORT
+18:size_t  crypto_generichash_bytes_min(void);
+19-
+20-#define crypto_generichash_BYTES_MAX crypto_generichash_blake2b_BYTES_MAX
+21-SODIUM_EXPORT
+22:size_t  crypto_generichash_bytes_max(void);
+23-
+24-#define crypto_generichash_BYTES crypto_generichash_blake2b_BYTES
+25-SODIUM_EXPORT
+26:size_t  crypto_generichash_bytes(void);
+27-
+28-#define crypto_generichash_KEYBYTES_MIN crypto_generichash_blake2b_KEYBYTES_MIN
+29-SODIUM_EXPORT
+30:size_t  crypto_generichash_keybytes_min(void);
+31-
+32-#define crypto_generichash_KEYBYTES_MAX crypto_generichash_blake2b_KEYBYTES_MAX
+33-SODIUM_EXPORT
+34:size_t  crypto_generichash_keybytes_max(void);
+35-
+36-#define crypto_generichash_KEYBYTES crypto_generichash_blake2b_KEYBYTES
+37-SODIUM_EXPORT
+38:size_t  crypto_generichash_keybytes(void);
+39-
+40-#define crypto_generichash_PRIMITIVE "blake2b"
+41-SODIUM_EXPORT
+42-const char *crypto_generichash_primitive(void);
+--
+51-size_t  crypto_generichash_statebytes(void);
+52-
+53-SODIUM_EXPORT
+54:int crypto_generichash(unsigned char *out, size_t outlen,
+55-                       const unsigned char *in, unsigned long long inlen,
+56-                       const unsigned char *key, size_t keylen)
+57-            __attribute__ ((nonnull(1)));
+58-
+25-void sodium_stackzero(const size_t len);
+26-
+27-/*
+28: * WARNING: sodium_memcmp() must be used to verify if two secret keys
+29- * are equal, in constant time.
+30- * It returns 0 if the keys are equal, and -1 if they differ.
+31- * This function is not designed for lexicographical comparisons.
+32- */
+33-SODIUM_EXPORT
+34:int sodium_memcmp(const void * const b1_, const void * const b2_, size_t len)
+35-            __attribute__ ((warn_unused_result));
+36-
+37-/*
+38- * sodium_compare() returns -1 if b1_ < b2_, 1 if b1_ > b2_ and 0 if b1_ == b2_
+39- * It is suitable for lexicographical comparisons, or to compare nonces
+40- * and counters stored in little-endian format.
+41: * However, it is slower than sodium_memcmp().
+42- */
+43-SODIUM_EXPORT
+44-int sodium_compare(const unsigned char *b1_, const unsigned char *b2_,
+45-                   size_t len) __attribute__ ((warn_unused_result));
+=== 1.0.22 headers
+32-size_t randombytes_seedbytes(void);
+33-
+34-SODIUM_EXPORT
+35:void randombytes_buf(void * const buf, const size_t size)
+36-            __attribute__ ((nonnull));
+37-
+38-SODIUM_EXPORT
+39-void randombytes_buf_deterministic(void * const buf, const size_t size,
+15-
+16-#define crypto_generichash_BYTES_MIN crypto_generichash_blake2b_BYTES_MIN
+17-SODIUM_EXPORT
+18:size_t  crypto_generichash_bytes_min(void);
+19-
+20-#define crypto_generichash_BYTES_MAX crypto_generichash_blake2b_BYTES_MAX
+21-SODIUM_EXPORT
+22:size_t  crypto_generichash_bytes_max(void);
+23-
+24-#define crypto_generichash_BYTES crypto_generichash_blake2b_BYTES
+25-SODIUM_EXPORT
+26:size_t  crypto_generichash_bytes(void);
+27-
+28-#define crypto_generichash_KEYBYTES_MIN crypto_generichash_blake2b_KEYBYTES_MIN
+29-SODIUM_EXPORT
+30:size_t  crypto_generichash_keybytes_min(void);
+31-
+32-#define crypto_generichash_KEYBYTES_MAX crypto_generichash_blake2b_KEYBYTES_MAX
+33-SODIUM_EXPORT
+34:size_t  crypto_generichash_keybytes_max(void);
+35-
+36-#define crypto_generichash_KEYBYTES crypto_generichash_blake2b_KEYBYTES
+37-SODIUM_EXPORT
+38:size_t  crypto_generichash_keybytes(void);
+39-
+40-#define crypto_generichash_PRIMITIVE "blake2b"
+41-SODIUM_EXPORT
+42-const char *crypto_generichash_primitive(void);
+--
+51-size_t  crypto_generichash_statebytes(void);
+52-
+53-SODIUM_EXPORT
+54:int crypto_generichash(unsigned char *out, size_t outlen,
+55-                       const unsigned char *in, unsigned long long inlen,
+56-                       const unsigned char *key, size_t keylen)
+57-            __attribute__ ((nonnull(1)));
+58-
+27-void sodium_stackzero(const size_t len);
+28-
+29-/*
+30: * WARNING: sodium_memcmp() must be used to verify if two secret keys
+31- * are equal, in constant time.
+32- * It returns 0 if the keys are equal, and -1 if they differ.
+33- * This function is not designed for lexicographical comparisons.
+34- */
+35-SODIUM_EXPORT
+36:int sodium_memcmp(const void *const b1_, const void *const b2_, size_t len)
+37-    __attribute__((warn_unused_result));
+38-
+39-/*
+40- * sodium_compare() returns -1 if b1_ < b2_, 1 if b1_ > b2_ and 0 if b1_ == b2_
+41- * It is suitable for lexicographical comparisons, or to compare nonces
+42- * and counters stored in little-endian format.
+43: * However, it is slower than sodium_memcmp().
+44- */
+45-SODIUM_EXPORT
+46-int sodium_compare(const unsigned char *b1_, const unsigned char *b2_, size_t len)
+47-    __attribute__((warn_unused_result));

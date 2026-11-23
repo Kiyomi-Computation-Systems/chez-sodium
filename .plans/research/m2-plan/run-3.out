@@ -1,0 +1,216 @@
+################ ../slice5/prefix-1.0.18/lib/libsodium.so.23
+library ../slice5/prefix-1.0.18/lib/libsodium.so.23, version 1.0.18
+sodium_init 0
+
+== crypto_generichash, input "abc" (3 bytes), key block of 80 bytes of 0x11
+outlen keylen -> answer; out written?; (out block is 128 bytes of 0x5a first)
+  outlen 0 keylen 0 -> -1; out written: #f
+  outlen 1 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 15 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 16 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 64 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 65 keylen 0 -> -1; out written: #f
+-- keylen sweep at outlen 32
+  outlen 32 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 1 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 15 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 16 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 64 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 65 -> -1; out written: #f
+-- extremes
+  outlen 32 keylen 128 -> -1; out written: #f
+  outlen 128 keylen 0 -> -1; out written: #f
+
+== inlen 0 with a one-byte block, unkeyed (key block, keylen 0)
+  answer 0
+  out 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8
+
+== keylen 0: does the key block matter?
+  key block 0x00: bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  key block 0xff: bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  key block 0xa5: bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  key block 0x11 (80): bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  all four equal: #t
+  for contrast, keylen 16 differs from unkeyed: #t
+
+== sodium_memcmp
+  equal, 16 bytes -> 0
+  differ in first byte only (0 vs 1) -> -1
+  differ in first byte only (1 vs 0) -> -1
+  differ in first byte only (0x00 vs 0xff) -> -1
+  differ in first byte only (0xff vs 0x00) -> -1
+  differ in last byte only (15 vs 99) -> -1
+  differ in last byte only (99 vs 15) -> -1
+  differ in last byte only (0xff vs 0x00) -> -1
+  all bytes differ (0x00s vs 0xffs) -> -1
+  length 0, two distinct one-byte blocks (7 vs 9) -> 0
+  length 1, equal -> 0; length 1, 7 vs 9 -> -1; 9 vs 7 -> -1
+  same block against itself, length 16 -> 0
+  exhaustive: every single-byte pair (a,b), a /= b: set of answers (equal? answer) pairs seen: ((#f -1) (#t 0))
+
+== randombytes_buf, size 0 on a one-byte block
+  byte before 165, after 165
+  size 16 into zeroes: 81f379143759e3f936eaf87fc4c3880d
+################ ../slice5/prefix-1.0.22/lib/libsodium.so.26
+library ../slice5/prefix-1.0.22/lib/libsodium.so.26, version 1.0.22
+sodium_init 0
+
+== crypto_generichash, input "abc" (3 bytes), key block of 80 bytes of 0x11
+outlen keylen -> answer; out written?; (out block is 128 bytes of 0x5a first)
+  outlen 0 keylen 0 -> -1; out written: #f
+  outlen 1 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 15 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 16 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 64 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 65 keylen 0 -> -1; out written: #f
+-- keylen sweep at outlen 32
+  outlen 32 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 1 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 15 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 16 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 64 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 65 -> -1; out written: #f
+-- extremes
+  outlen 32 keylen 128 -> -1; out written: #f
+  outlen 128 keylen 0 -> -1; out written: #f
+
+== inlen 0 with a one-byte block, unkeyed (key block, keylen 0)
+  answer 0
+  out 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8
+
+== keylen 0: does the key block matter?
+  key block 0x00: bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  key block 0xff: bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  key block 0xa5: bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  key block 0x11 (80): bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  all four equal: #t
+  for contrast, keylen 16 differs from unkeyed: #t
+
+== sodium_memcmp
+  equal, 16 bytes -> 0
+  differ in first byte only (0 vs 1) -> -1
+  differ in first byte only (1 vs 0) -> -1
+  differ in first byte only (0x00 vs 0xff) -> -1
+  differ in first byte only (0xff vs 0x00) -> -1
+  differ in last byte only (15 vs 99) -> -1
+  differ in last byte only (99 vs 15) -> -1
+  differ in last byte only (0xff vs 0x00) -> -1
+  all bytes differ (0x00s vs 0xffs) -> -1
+  length 0, two distinct one-byte blocks (7 vs 9) -> 0
+  length 1, equal -> 0; length 1, 7 vs 9 -> -1; 9 vs 7 -> -1
+  same block against itself, length 16 -> 0
+  exhaustive: every single-byte pair (a,b), a /= b: set of answers (equal? answer) pairs seen: ((#f -1) (#t 0))
+
+== randombytes_buf, size 0 on a one-byte block
+  byte before 165, after 165
+  size 16 into zeroes: 375a5b065e1dcd539f9f8a702a4ea864
+################ /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26
+library /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26, version 1.0.22
+sodium_init 0
+
+== crypto_generichash, input "abc" (3 bytes), key block of 80 bytes of 0x11
+outlen keylen -> answer; out written?; (out block is 128 bytes of 0x5a first)
+  outlen 0 keylen 0 -> -1; out written: #f
+  outlen 1 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 15 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 16 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 64 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 65 keylen 0 -> -1; out written: #f
+-- keylen sweep at outlen 32
+  outlen 32 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 1 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 15 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 16 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 64 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 65 -> -1; out written: #f
+-- extremes
+  outlen 32 keylen 128 -> -1; out written: #f
+  outlen 128 keylen 0 -> -1; out written: #f
+
+== inlen 0 with a one-byte block, unkeyed (key block, keylen 0)
+  answer 0
+  out 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8
+
+== keylen 0: does the key block matter?
+  key block 0x00: bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  key block 0xff: bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  key block 0xa5: bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  key block 0x11 (80): bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  all four equal: #t
+  for contrast, keylen 16 differs from unkeyed: #t
+
+== sodium_memcmp
+  equal, 16 bytes -> 0
+  differ in first byte only (0 vs 1) -> -1
+  differ in first byte only (1 vs 0) -> -1
+  differ in first byte only (0x00 vs 0xff) -> -1
+  differ in first byte only (0xff vs 0x00) -> -1
+  differ in last byte only (15 vs 99) -> -1
+  differ in last byte only (99 vs 15) -> -1
+  differ in last byte only (0xff vs 0x00) -> -1
+  all bytes differ (0x00s vs 0xffs) -> -1
+  length 0, two distinct one-byte blocks (7 vs 9) -> 0
+  length 1, equal -> 0; length 1, 7 vs 9 -> -1; 9 vs 7 -> -1
+  same block against itself, length 16 -> 0
+  exhaustive: every single-byte pair (a,b), a /= b: set of answers (equal? answer) pairs seen: ((#f -1) (#t 0))
+
+== randombytes_buf, size 0 on a one-byte block
+  byte before 165, after 165
+  size 16 into zeroes: 60aeb26bc6dc1662d1cd1c248f034c23
+################ ../m1-plan/host-1.0.18/libsodium.so.23
+library ../m1-plan/host-1.0.18/libsodium.so.23, version 1.0.18
+sodium_init 0
+
+== crypto_generichash, input "abc" (3 bytes), key block of 80 bytes of 0x11
+outlen keylen -> answer; out written?; (out block is 128 bytes of 0x5a first)
+  outlen 0 keylen 0 -> -1; out written: #f
+  outlen 1 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 15 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 16 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 64 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 65 keylen 0 -> -1; out written: #f
+-- keylen sweep at outlen 32
+  outlen 32 keylen 0 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 1 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 15 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 16 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 64 -> 0; out written: #t; bytes past outlen intact: #t
+  outlen 32 keylen 65 -> -1; out written: #f
+-- extremes
+  outlen 32 keylen 128 -> -1; out written: #f
+  outlen 128 keylen 0 -> -1; out written: #f
+
+== inlen 0 with a one-byte block, unkeyed (key block, keylen 0)
+  answer 0
+  out 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8
+
+== keylen 0: does the key block matter?
+  key block 0x00: bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  key block 0xff: bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  key block 0xa5: bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  key block 0x11 (80): bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319
+  all four equal: #t
+  for contrast, keylen 16 differs from unkeyed: #t
+
+== sodium_memcmp
+  equal, 16 bytes -> 0
+  differ in first byte only (0 vs 1) -> -1
+  differ in first byte only (1 vs 0) -> -1
+  differ in first byte only (0x00 vs 0xff) -> -1
+  differ in first byte only (0xff vs 0x00) -> -1
+  differ in last byte only (15 vs 99) -> -1
+  differ in last byte only (99 vs 15) -> -1
+  differ in last byte only (0xff vs 0x00) -> -1
+  all bytes differ (0x00s vs 0xffs) -> -1
+  length 0, two distinct one-byte blocks (7 vs 9) -> 0
+  length 1, equal -> 0; length 1, 7 vs 9 -> -1; 9 vs 7 -> -1
+  same block against itself, length 16 -> 0
+  exhaustive: every single-byte pair (a,b), a /= b: set of answers (equal? answer) pairs seen: ((#f -1) (#t 0))
+
+== randombytes_buf, size 0 on a one-byte block
+  byte before 165, after 165
+  size 16 into zeroes: ac4220b44a111df62ad65b75e57dc89c

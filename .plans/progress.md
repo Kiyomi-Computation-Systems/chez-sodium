@@ -33,8 +33,9 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   - **CI:** five jobs. `main` finds Ubuntu 24.04's 1.0.18 by discovery and asserts it is the
     floor; `memory`; `nothreads`; `floor` and `current` build their pinned tarballs and run the
     suites against them.
-- **Next: M2,** `random-bytes`, `blake2b` and `constant-time-bytevector=?`, built on M1's helper
-  (brief §9). Its plan starts from "Owed to M2" below.
+- **M2 is under way:** `random-bytes`, `blake2b` and `constant-time-bytevector=?`, built on M1's
+  helper (brief §9; [the M2 plan](2026-11-23-m2-plan.md)). Slice 0, the plan and the records, is
+  on `m2-plan`. Then slice 1, the bindings, and slice 2, the verbs.
 
 ## Answered for M1
 
@@ -50,49 +51,35 @@ M0 left five questions to M1. The M1 plan, §4.1, answers each, and the owner ac
 - **The C oracle is `libsodium-oracle`** (ADR-0011).
 - **The decoy's pointer rule** is in ADR-0011, amended.
 
-## Owed to M2
+## Answered for M2
 
-- **Brief §4.3's ranges are in the brief alone,** with no record: `blake2b`'s size and key
-  lengths, checked before C; `random-bytes 0` answering `#vu8()` without C; and
-  `constant-time-bytevector=?` answering `#f` on unequal lengths without C. M2's plan restates
-  them.
-- **The bindings:** `randombytes_buf`, `crypto_generichash` with its six sizes, and
-  `sodium_memcmp`, each with its convention row, its decoy entry, its `missing-api` row and its
-  return codes (row 22), at the floor and the current release.
-  - `unsigned-64` joins the argument allow-list with `crypto_generichash`'s `inlen`, and `size_t`
-    joins the result allow-list with the first size function (ADR-0001, amended).
-    `test-conventions`' row that only an argument uses `size_t` changes then, and the rows that
-    count five entry points (`test-native` E3 and E5, `test-conventions`) grow.
-  - The missing-entry rows split again, four ways as in v0.1.1: one suite holds M1's five
-    within its 14 children (slice 3's mutation log).
-- **Each verb's rows from plan §1's "Waits" column:**
-  - 15: its refusals, each before any block, the decoy's log showing no call;
-  - 16: its secret parameters refused by kind;
-  - 18: under an engine, at every fuel;
-  - 24: its blocks, which `test-wipe`'s child names from inside PROC today, so row 24 needs a way
-    to reach a verb's.
-- **The input cap and its check** (ADR-0007, decision 5), before the section.
-- **The refusals' shape.**
-  - Each verb refuses its own parameters by their own names, before its section, each leading
-    with a rule symbol (ADR-0006, decision 5). `call-with-bytes`' `(not-a-bytevector bytes ...)`
-    names its own parameter, and is a net.
-  - Each verb joins `test-never-loads`' `verb-names`, the names that load libsodium; its row
-    on `(chez-sodium)`'s exports fails by name until it does.
-- **Where the verbs live.** In native, or in a library beside it. If beside it:
-  - `check-seam`'s rule (f) keeps `foreign-ref` and `foreign-set!` in native, and rule (m) keeps
-    every block in `call-with-block`;
-  - `test-never-loads`' loaders row, asserted whole, gains the new library.
-- **How a verb reads a size,** at the load or at each call, so that ADR-0001 decision 2 (every
-  constant read through libsodium's own function) gets the check it lacks.
-- **Whether `test-constants` gains a constants half,** each size function against its header's
-  macro.
-- **A check of the decoy's `volatile uintptr_t` rule,** which nothing holds in M1, since no M1
-  entry is `nonnull`.
-  - A `-Werror` compile holds it only for a `nonnull` parameter, and `nonnull` is per function.
-    In 1.0.22 only `randombytes_buf`'s `buf` and `crypto_generichash`'s `out` are marked.
-  - So the check reads the decoy's source: each pointer parameter's only use is its
-    `volatile uintptr_t` read ([slice 3's review](research/m1-slice-3-review/README.md),
-    S3-F3).
+M1 left these to M2. [The M2 plan](2026-11-23-m2-plan.md) answers each, and the owner answered
+its questions on 2026-11-23:
+
+- **Brief §4.3's ranges** are restated in plan §4.1, item 1, and recorded in ADR-0007's
+  amendment.
+- **The bindings:** eight, in plan §4.1, item 2. `crypto_generichash_keybytes` is not bound
+  (ADR-0005, amended). `unsigned-64` and `size_t` join the allow-lists as ADR-0001's amendment
+  says, and the missing-entry rows split, M1's and M2's, at most 14 children a suite.
+- **Each verb's rows 15, 16, 18 and 24:** plan §1's table. Row 24 reaches a verb's blocks
+  through the decoy, which names them to the interposer (plan §4.1, item 3; ADR-0011, amended).
+- **The input cap:** `input-cap`, in `(chez-sodium private cap)`, checked for every operand
+  before the section (plan §4.1, item 4; ADR-0007, amended).
+- **The refusals' shape:** plan §4.1, item 5's table of rule symbols (ADR-0006, amended).
+- **Where the verbs live:** `(chez-sodium private byte-verbs)`, beside native (plan §4.1,
+  item 6; ADR-0012, amended).
+- **How a verb reads a size:** once, at the load, in a new step 7, held to the library by the
+  decoy's `sizes-other` (plan §4.1, item 7; ADR-0001 and ADR-0002, amended).
+- **No constants half in `test-constants`:** the oracle prints each size and its macro, and
+  `test-native` holds native's to both (plan §4.1, item 8).
+- **The decoy's pointer rule** is held by `test-decoy-source` (plan §4.1, item 9). At 1.0.18 and
+  1.0.22, `nonnull` covers `randombytes_buf`'s `buf` and `crypto_generichash`'s `out` alone.
+- **New:** `crypto_generichash`'s answer other than 0 raises `&sodium-failed`, so its first raise
+  and its three names move from M3 to M2 (plan §4.2, item 2; ADR-0006 and ADR-0012, amended).
+  - They join `test-never-loads`' condition names, which come from `(chez-sodium)`'s exports, so
+    its condition children make a `&sodium-failed` and check the three names, and their expected
+    lines gain them; the export row fails by name until they do (M1's closing review, M1-F6;
+    plan §2.2).
 
 ## Owed to M3
 
@@ -102,11 +89,8 @@ M0 left five questions to M1. The M1 plan, §4.1, answers each, and the owner ac
   - v0.1.1's makes two Scheme copies of its string, which ADR-0008 forbids for a secret.
   - So M3's writers bound every write by the block's size, and answer a string changed
     mid-write as data.
-- `&sodium-failed`'s first raise, row 17's M3 half, and its export.
-  - `sodium-failed?`, `-function` and `-code` join `(chez-sodium)` (ADR-0012, decision 2).
-  - They join `test-never-loads`' condition names, which come from `(chez-sodium)`'s exports,
-    and its child's expected lines; its export row fails by name until they do (M1's closing
-    review, M1-F6).
+- `crypto_pwhash_str`'s `&sodium-failed`, and row 17's M3 half. The type's first raise and its
+  three names arrive in M2 (ADR-0006, amended).
 - The oracle's hex mode (row 4); the FIFO decoy (row 19).
   - Row 19 references the library once before its first fork: a library first reached on two
     threads at once refuses the second (ADR-0007, amended; M1-F10).
@@ -119,6 +103,9 @@ M0 left five questions to M1. The M1 plan, §4.1, answers each, and the owner ac
   - the first reference on two threads at once (M1-F10);
   - `sodium_init`'s 1;
   - what wiping cannot reach.
+- **The documents' notes from M2:** what the cap is; that the compare leaks only the lengths;
+  that `random-bytes` aborts the process without an entropy source; that `blake2b` can raise
+  `&sodium-failed`.
 - **The docs rule of `check-floors`** waits for `docs/`.
 - **The install-line checks of `test-manifest`** wait for the first release, which writes the
   install lines.

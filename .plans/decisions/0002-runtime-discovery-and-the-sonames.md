@@ -2,6 +2,8 @@
 
 - **Status:** Accepted (the owner, 2026-11-22), approved with the brief. Amended 2026-11-23 in
   M1's plan, and accepted by the owner that day ([amendment](#amendment-2026-11-23-m1s-plan)).
+  Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
+  review ([amendment](#amendment-2026-11-23-m2s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** chez-sodium, on Linux distributions and Guix environments
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §7.2's discovery and load,
@@ -95,8 +97,28 @@ items 2, 3 and 12.
   entry points to the load's last step, each with its row in the convention table, the decoy,
   the `missing-api` rows and row 22.
 
+## Amendment, 2026-11-23: M2's plan
+
+Accepted (the owner, 2026-11-23), proposed in [the M2 plan](../2026-11-23-m2-plan.md), §4.1, items 2
+and 7. Item 7 was put to the owner beside the verbs' home, and confirmed with this amendment.
+
+- **M2 binds eight entry points,** appended to step 6, "bind the rest", after `sodium_memzero`,
+  in this order: `randombytes_buf`, `crypto_generichash`, `crypto_generichash_bytes`, `_bytes_min`,
+  `_bytes_max`, `_keybytes_min`, `_keybytes_max`, and `sodium_memcmp`. Each is plain, and each
+  comes with its convention row, its decoy entry, its `missing-api` row and row 22.
+  `crypto_generichash_keybytes` is not bound ([ADR-0005], amended).
+- **Decision 4's order gains a step: read the sizes.** Once every entry point is bound, the load
+  calls each of the five size functions once, in that order, and records its answer
+  ([ADR-0001], amended). The order is now: choose; load; bind the version entries; check the
+  floor; call `sodium_init`; bind the rest; read the sizes. It runs inside the load's one
+  section, like every other step, and the decoy's log shows the five calls last.
+- **"The last step" now reads "step 6".** Decision 4 and the first amendment say each milestone
+  binds its entry points in the last step, which was step 6 until this one. M3 binds its own in
+  step 6 too.
+
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md
+[ADR-0005]: 0005-the-subset-rule.md
 [ADR-0006]: 0006-errors-and-no-secret-shown.md
 [ADR-0010]: 0010-linux-only.md
 [ADR-0011]: 0011-the-harness-after-chez-sqlite3.md
