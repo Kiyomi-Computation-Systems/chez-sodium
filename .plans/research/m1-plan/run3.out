@@ -1,0 +1,4 @@
+flag before the engine: #f
+body started; engine abandoned after 824 expiries
+then a plain reference: (raised "cyclic dependency involving invocation of library ~s" ((probe engbody2)))
+and another: (raised "cyclic dependency involving invocation of library ~s" ((probe engbody2)))

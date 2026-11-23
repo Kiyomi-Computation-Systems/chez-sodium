@@ -1,0 +1,4 @@
+libsodium.so.26: exit 0, 2634 ms
+decoy-volatile.so: exit 0, 2615 ms
+libsodium.so.23: exit 0, 2649 ms
+plain, no valgrind: 48 ms

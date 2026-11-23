@@ -1,6 +1,9 @@
 # ADR-0006: Errors are a small condition tree, and no condition shows a secret
 
-- **Status:** Accepted (the owner, 2026-11-22), approved with the brief.
+- **Status:** Accepted (the owner, 2026-11-22), approved with the brief. Amended 2026-11-23 in
+  M1's plan, and accepted by the owner that day ([amendment](#amendment-2026-11-23-m1s-plan)).
+  Amended 2026-11-23 after slice 0's review, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-23-slice-0s-review)).
 - **Date:** 2026-11-22
 - **Scope:** every condition chez-sodium raises, and every refusal of a caller's mistake
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §5
@@ -31,15 +34,16 @@
    &error
     └ &chez-sodium-error
        ├ &sodium-library-unavailable    reason path source detail candidates
-       └ &sodium-failed                 the verb, and what libsodium answered
+       └ &sodium-failed                 function code
    ```
 
 2. **`&sodium-library-unavailable` carries one of [ADR-0002]'s reasons:** `invalid-override`,
    `not-found`, `load-failed`, `below-floor`, `missing-api` or `init-failed`. `init-failed` is
-   `sodium_init` answering -1 only.
+   `sodium_init` answering anything but 0 or 1 ([ADR-0002], amended).
 3. **`&sodium-failed` has one case:** `crypto_pwhash_str` answering -1 for limits that passed
-   their range check, which means it could not get the memory. It carries the verb and
-   libsodium's answer, and no secret.
+   their range check, which means it could not get the memory. Its fields are `function`, the C
+   function's name as a string, and `code`, the integer it answered. The verb is its `&who`. It
+   carries no secret.
 4. **What is not a condition.** The documents say so:
    - `password-verify`'s -1 answers `#f`, whether the password was wrong, the hash unreadable,
      or the memory short;
@@ -49,12 +53,20 @@
 5. **A caller's mistake is an assertion violation, raised before C:** a wrong type; a size, key
    length or limit out of range; an input over the cap ([ADR-0007]); an empty key. A hash string
    over the cap is the exception: it fails the pre-check, and is answered ([ADR-0009]).
+   - **Every raise carries `&who`.** The load's refusals name `chez-sodium`, since no one
+     procedure raises them. A refusal raised through the public surface names the public verb,
+     and carries a `&message`; a helper raises with the WHO it is given. An internal invariant
+     (`memory`, `counters`, `load-state`) names its own procedure, and a condition Chez raises
+     is passed on as raised.
+   - **A refusal raised through the public surface leads its irritants with a symbol** naming
+     the rule: an accessor's `not-a-sodium-library-unavailable`, for example.
 6. **No secret ever reaches a condition** (L-F9, P-F8).
    - Every string and bytevector parameter is secret: a password, a hash string,
      `blake2b`'s input (Techo's API key) and key, `constant-time-bytevector=?`'s operands,
      and Tier 2's inputs and HMAC key.
    - A refusal of a secret parameter names the parameter and its kind only, whatever the
-     value's type.
+     value's type: an assertion violation from the verb, irritants `(RULE PARAMETER (kind K))`,
+     K being the value's kind, never its length.
    - `shown-value` is used only for sizes, limits and preset names.
 7. **Raised after the section** (X-M2). A verb's critical section answers data, and the verb
    raises only once it is out ([ADR-0007]).
@@ -78,6 +90,33 @@
     outer guard catches the `&sodium-failed` itself.
 - **A caller who needs to tell verify's three `#f`s apart cannot.** libsodium does not tell them
   apart either.
+
+## Amendment, 2026-11-23: M1's plan
+
+Accepted (the owner, 2026-11-23), proposed in [the M1 plan](../2026-11-22-m1-plan.md), §4.1,
+items 2 and 3.
+
+- **`&sodium-failed`'s fields are `function` and `code`,** and the verb is its `&who`, as
+  chez-sqlite3 ADR-0013 names the verb by `&who` alone. Neither field is a secret. M1 builds
+  the type; M3 raises it first, and exports its predicate and accessors then.
+- **`&who` on every raise, and the rule symbol first among a refusal's irritants,** so rows
+  assert who and irritants, never a message (chez-sqlite3 ADR-0013, decision 2, and its slice-4
+  amendment).
+- **A secret's refusal is `(RULE PARAMETER (kind K))`.** That a secret is named by its kind alone
+  was decision 6. The layout is new.
+- **`init-failed` follows [ADR-0002]'s amendment:** any answer but 0 or 1.
+
+## Amendment, 2026-11-23: slice 0's review
+
+Accepted (the owner, 2026-11-23), from M1 slice 0's review, S0-F5 and S0-F6.
+
+- **The rules on `&who` and the rule symbol were wider than the code.** M0's `counters` names
+  `count-up!` and `count-down!`, `memory` names its own procedures, and v0.1.1's
+  `checked-accessor` carried no rule symbol. chez-sqlite3 scoped the same rule. Now both rules
+  bind refusals raised through the public surface, and `checked-accessor`'s refusal is
+  `(RULE (kind K))`.
+- **Every helper that refuses a secret refuses it through `refuse-secret`,** `call-with-bytes`
+  among them: v0.1.1's showed its bytevector parameter through `shown-value`.
 
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md
 [ADR-0007]: 0007-one-critical-section-per-verb.md

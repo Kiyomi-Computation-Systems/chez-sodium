@@ -53,9 +53,10 @@
    read the seam.
 10. **Every binding has a row in a convention table** (X-M6). `test-conventions` holds each
     `foreign-procedure` form to its row. `test-constants`' prototype half compiles against
-    `sodium.h` and holds each row's prototype to the header. `size_t` joins both allow-lists,
-    for arguments and for results, and the prototype map gains `size_t` → `size_t` and
-    `unsigned long long` → `unsigned-64` (brief §7.2; P-F20).
+    `sodium.h` and holds each row's prototype to the header. The allow-lists are exactly the
+    types the rows use, so `size_t` joins each list, and `unsigned-64` the arguments, with the
+    first row that uses it. The prototype map gains `size_t` → `size_t` and
+    `unsigned long long` → `unsigned-64` (brief §7.2; P-F20; amended after slice 0's review).
 
 ### Rejected
 

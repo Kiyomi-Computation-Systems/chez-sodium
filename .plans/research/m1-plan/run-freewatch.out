@@ -1,0 +1,3 @@
+verdict, block of 'A's freed: 2 (2 = non-zero seen)
+verdict, zeroed block freed:  1 (1 = all zero seen)
+exit 0

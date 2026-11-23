@@ -1,0 +1,54 @@
+== version.c (linked against the container's libsodium)
+guile: warning: failed to install locale
+before init: version_string="1.0.22" major=26 minor=4 minimal=0
+header: SODIUM_VERSION_STRING="1.0.22" MAJOR=26 MINOR=4
+sodium_init: first=0 second=1 third=1
+sodium_memzero over 32 bytes of 0x41: all zero
+sodium_memzero with length 0: returned
+== prototypes.c
+guile: warning: failed to install locale
+sodium_version_string                    1
+sodium_library_version_major             1
+sodium_library_version_minor             1
+sodium_init                              1
+sodium_memzero                           1
+sodium_memzero                           1
+sodium_memcmp                            1
+randombytes_buf                          1
+crypto_generichash                       1
+crypto_generichash_bytes                 1
+crypto_pwhash_str                        1
+crypto_pwhash_str_verify                 1
+crypto_pwhash_str_needs_rehash           1
+crypto_pwhash_strprefix                  1
+crypto_pwhash_opslimit_min               1
+crypto_pwhash_memlimit_min               1
+crypto_pwhash_strbytes                   0
+== decoy-ternary.c: must fail under -Wall -Werror
+guile: warning: failed to install locale
+exit status of that compile: 0
+== decoy-volatile.c: must compile
+guile: warning: failed to install locale
+exit status: 0
+== ffi.sps on the container's libsodium
+path /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26
+foreign-entry?: (("sodium_version_string" . #t) ("sodium_library_version_major" . #t) ("sodium_library_version_minor" . #t) ("sodium_init" . #t) ("sodium_memzero" . #t) ("sodium_memcmp" . #t) ("randombytes_buf" . #t) ("crypto_generichash" . #t) ("crypto_generichash_bytes" . #t) ("crypto_generichash_bytes_min" . #t) ("crypto_generichash_bytes_max" . #t) ("crypto_generichash_keybytes" . #t) ("crypto_generichash_keybytes_min" . #t) ("crypto_generichash_keybytes_max" . #t) ("crypto_pwhash_str" . #t) ("crypto_pwhash_str_verify" . #t) ("crypto_pwhash_str_needs_rehash" . #t) ("crypto_pwhash_strprefix" . #t) ("crypto_pwhash_strbytes" . #t) ("crypto_pwhash_opslimit_min" . #t) ("crypto_pwhash_opslimit_max" . #t) ("crypto_pwhash_opslimit_interactive" . #t) ("crypto_pwhash_opslimit_moderate" . #t) ("crypto_pwhash_opslimit_sensitive" . #t) ("crypto_pwhash_memlimit_min" . #t) ("crypto_pwhash_memlimit_max" . #t) ("crypto_pwhash_memlimit_interactive" . #t) ("crypto_pwhash_memlimit_moderate" . #t) ("crypto_pwhash_memlimit_sensitive" . #t) ("crypto_pwhash_passwd_min" . #t) ("crypto_pwhash_passwd_max" . #t) ("crypto_hash_sha256" . #t) ("crypto_auth_hmacsha256_init" . #t) ("crypto_auth_hmacsha256_update" . #t) ("crypto_auth_hmacsha256_final" . #t) ("crypto_auth_hmacsha256_statebytes" . #t))
+before init: version "1.0.22", major 26, minor 4
+sodium_init: first 0, second 1
+foreign-sizeof size_t 8, unsigned-64 8, uptr 8, int 4
+memzero through (uptr size_t) void: all-zero
+== ffi.sps on the decoy
+path <repo>/build/m1-plan/decoy-volatile.so
+foreign-entry?: (("sodium_version_string" . #t) ("sodium_library_version_major" . #t) ("sodium_library_version_minor" . #t) ("sodium_init" . #t) ("sodium_memzero" . #t) ("sodium_memcmp" . #f) ("randombytes_buf" . #f) ("crypto_generichash" . #f) ("crypto_generichash_bytes" . #f) ("crypto_generichash_bytes_min" . #f) ("crypto_generichash_bytes_max" . #f) ("crypto_generichash_keybytes" . #f) ("crypto_generichash_keybytes_min" . #f) ("crypto_generichash_keybytes_max" . #f) ("crypto_pwhash_str" . #f) ("crypto_pwhash_str_verify" . #f) ("crypto_pwhash_str_needs_rehash" . #f) ("crypto_pwhash_strprefix" . #f) ("crypto_pwhash_strbytes" . #f) ("crypto_pwhash_opslimit_min" . #f) ("crypto_pwhash_opslimit_max" . #f) ("crypto_pwhash_opslimit_interactive" . #f) ("crypto_pwhash_opslimit_moderate" . #f) ("crypto_pwhash_opslimit_sensitive" . #f) ("crypto_pwhash_memlimit_min" . #f) ("crypto_pwhash_memlimit_max" . #f) ("crypto_pwhash_memlimit_interactive" . #f) ("crypto_pwhash_memlimit_moderate" . #f) ("crypto_pwhash_memlimit_sensitive" . #f) ("crypto_pwhash_passwd_min" . #f) ("crypto_pwhash_passwd_max" . #f) ("crypto_hash_sha256" . #f) ("crypto_auth_hmacsha256_init" . #f) ("crypto_auth_hmacsha256_update" . #f) ("crypto_auth_hmacsha256_final" . #f) ("crypto_auth_hmacsha256_statebytes" . #f))
+before init: version "1.0.18", major 26, minor 4
+sodium_init: first 1, second 1
+foreign-sizeof size_t 8, unsigned-64 8, uptr 8, int 4
+memzero through (uptr size_t) void: all-zero
+== engine-invoke.sps abandon
+first reference, in an engine of 50 ticks: expired
+engine abandoned; then a plain reference: ((body-ran 1) 1)
+and another: ((body-ran 1) 1)
+== engine-invoke.sps resume
+first reference, in an engine of 50 ticks: expired
+resumed to completion after 4809 expiries: ((body-ran 1) 1)
+then a plain reference: ((body-ran 1) 1)

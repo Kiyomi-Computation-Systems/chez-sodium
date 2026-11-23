@@ -1,0 +1,8 @@
+parent under memcheck: #t
+parent LD_PRELOAD: "/gnu/store/gsixr2n0a6aacsiy6lky6d1fjh7svqyd-valgrind-3.27.0/libexec/valgrind/vgpreload_core-amd64-linux.so:/gnu/store/gsixr2n0a6aacsiy6lky6d1fjh7svqyd-valgrind-3.27.0/libexec/valgrind/vgpreload_memcheck-amd64-linux.so"
+child LD_PRELOAD=<repo>/build/m1-plan/libfreewatch.so
+0
+5
+verdict, block of 'A's freed: 2 (2 = non-zero seen)
+verdict, zeroed block freed:  1 (1 = all zero seen)
+exit 0

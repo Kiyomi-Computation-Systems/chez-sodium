@@ -1,0 +1,9 @@
+$ for l in engbody2 engsect; do for w in pre post; do $CHEZ --libdirs lib --program engine-section.sps $l $w; done; done
+engbody2 pre: no expiry fell between the pre-flag and the flag (expiry 40903)
+  then: (raised "cyclic dependency involving invocation of library ~s")
+engbody2 post: abandoned at expiry 40903, flag set
+  then: (raised "cyclic dependency involving invocation of library ~s")
+engsect pre: abandoned at expiry 45158, pre-flag set, flag not
+  then: (raised "cyclic dependency involving invocation of library ~s")
+engsect post: abandoned at expiry 45159, flag set
+  then: ((body-ran 1) 1)

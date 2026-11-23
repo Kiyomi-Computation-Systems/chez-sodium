@@ -318,7 +318,7 @@ Smaller than chez-sqlite3's tree, with the same shape and helpers.
 &error
  └ &chez-sodium-error
     ├ &sodium-library-unavailable    reason path source detail candidates
-    └ &sodium-failed                 the verb, and what libsodium answered
+    └ &sodium-failed                 function code
 ```
 
 - **The reasons a library is unavailable:** `invalid-override`, `not-found`,
@@ -328,11 +328,14 @@ Smaller than chez-sqlite3's tree, with the same shape and helpers.
     - `invalid-override`, from a bare name in the override;
     - `load-failed`, from a text file or a missing path;
     - `not-found`, from discovery's own tests with made-up inputs.
-- **`init-failed` is `sodium_init` answering -1 only.** An answer of 1 means libsodium
-  was already initialised, and the load goes on.
+- **`init-failed` is `sodium_init` answering anything but 0 or 1** (ADR-0002, amended). An
+  answer of 1 means libsodium was already initialised, and the load goes on.
+- **`below-floor` covers a version string the load cannot read:** NULL, or a string that
+  is not three naturals (ADR-0003, amended).
 - **`&sodium-failed` has one case:** `crypto_pwhash_str` answering -1 for limits that
-  passed their range check, which means it could not get the memory. It carries the
-  verb and libsodium's answer, and no secret.
+  passed their range check, which means it could not get the memory. Its fields are
+  `function` and `code`, with the verb as its `&who` (ADR-0006, amended). It carries no
+  secret.
 - **What is not a condition** (L-F2). The documents say so:
   - `password-verify`'s -1 for no memory reads as `#f` (§4.1).
   - **In a container with a memory limit, a hash that asks for more than is left gets
@@ -430,8 +433,10 @@ shared across sections, and a stateless verb has none.
 
 Decided by the owner (§11.2).
 
-**Where the wipe goes.** Inside `call-with-block`'s critical cleanup, just before
-`free-foreign-block!`, as one plain `sodium_memzero` call over the block's size.
+**Where the wipe goes.** Fused with the free, inside `call-with-block`'s critical
+cleanup: `free-foreign-block!` checks that the block is live, wipes it with one plain
+`sodium_memzero` call over its size, then frees it (ADR-0008, amended). A block that is
+not live is never wiped.
 - **Not in a wrapper.** The block is already freed by the time a wrapper's cleanup
   runs. Wiping freed memory corrupted glibc's heap and aborted the process (X-B1).
 - **Not inside the callback.** An engine's expiry freed the block unwiped in 24 of 52
