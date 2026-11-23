@@ -3,6 +3,8 @@
 - **Status:** Accepted (the owner, 2026-11-22), brief §11.7. Decisions 4 and 5, the versions
   tested, are brief §11.5; decision 6, the tarball, is brief §7.2 (P-F16). Amended 2026-11-23 in
   M1's plan, and accepted by the owner that day ([amendment](#amendment-2026-11-23-m1s-plan)).
+  "Raising the floor" amended 2026-11-23, after M1's closing review, and accepted by the owner
+  that day ([amendment](#amendment-2026-11-23-raising-the-floor)).
 - **Date:** 2026-11-22
 - **Scope:** every libsodium chez-sodium loads, and the ones CI tests
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §3.4, §7.2, §8.3, §11.5's
@@ -70,7 +72,7 @@ What ships where (brief §8.3, from packages.ubuntu.com on 2026-11-22; the revie
 - **A row holds decision 2** (brief §8.1, row 20): a decoy whose version string and major and
   minor disagree shows that the string decides.
 - **Raising the floor** is a new record, and the edits chez-sqlite3 ADR-0008 lists
-  ([ADR-0011]).
+  ([ADR-0011]). Amended: see [below](#amendment-2026-11-23-raising-the-floor).
 
 ## Amendment, 2026-11-23: M1's plan
 
@@ -86,6 +88,35 @@ item 1, and §4.2, item 4.
 - **Where major and minor are reported:** the load's report, `loaded-libsodium` in
   `(chez-sodium private native)`, and `make build`'s line, `version: 1.0.18 (library 10.3)`. No
   condition carries them.
+
+## Amendment, 2026-11-23: raising the floor
+
+Accepted (the owner, 2026-11-23), from M1's closing review, M1-F3. M1's CI lanes and scripts
+added places a floor raise moves, and two consequences no record stated.
+
+- **A raise moves each of these,** and each place left behind fails by name, in the container or
+  on CI:
+  - `packaging/floors.sexp`, and README.org's Requirements line ([ADR-0011]);
+  - `(chez-sodium private verify)`'s `sodium-floor`, and the rows that name the old floor;
+  - `scripts/ci/build-sodium.sh`'s `floor_archive`: a new SHA-256, computed by the project and
+    checked once against the tarball's `.minisig` with libsodium's published key (decision 6);
+  - the floor's soname in `build-sodium.sh` and `check-sodium.sh`, and `check-sodium.sh
+    --discovery`'s path;
+  - the floor lane's library in `.github/workflows/ci.yml`, in `tests/check-ci.sh` and in
+    `tests/test-check-ci.sps`;
+  - `tests/test-ci-sodium.sps`'s reviewed copies: the pins, the floor's soname and
+    `--discovery`'s path;
+  - `global-constraints.md`'s line on `main`, with `main`'s assertion.
+- **The soname follows the release:** `libsodium.so.23` through 1.0.18, `libsodium.so.26` from
+  1.0.19. A raise past 1.0.18 gives the `floor` and `current` lanes one soname, and the raise's
+  record says how each lane then names its library.
+- **`main`'s runner must ship the new floor, or `main`'s floor assertion changes.** `main` loads
+  the runner's own package by discovery and asserts that it is the floor (decision 5), and
+  Ubuntu 24.04 ships 1.0.18 alone. So the raise's own record decides which: a runner image
+  whose package is the new floor, or another assertion for `main`.
+- **`current` moves past the new floor first.** `current_version` is written in `scripts/ci/`,
+  where `check-floors` refuses the floor's text, so a floor raised to the current release fails
+  until `current` moves.
 
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md
 [ADR-0011]: 0011-the-harness-after-chez-sqlite3.md

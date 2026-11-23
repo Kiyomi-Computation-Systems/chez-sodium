@@ -48,7 +48,10 @@ chez-sodium, M1's plan.
   runs it there, which can be inside an engine.
 - **Reproduced** with the plan's `engine-invoke3.sps`, and with `engine-section.sps`: at fuel 1,
   the sectioned body abandoned at expiry 45,158, its prologue, wedged; at 45,159, after its
-  section, it answered `((body-ran 1) 1)` ([research/m1-plan/](research/m1-plan/README.md)).
+  section, it answered `((body-ran 1) 1)` ([research/m1-plan/](research/m1-plan/README.md),
+  `run-engine-section.out`), in every rerun. Slice 0's review's own sweep, a different program
+  and not committed, put the edge at slices 44,209 to 44,219, as ADR-0007 has it: the count
+  depends on the program, and the edge, the section's start, does not.
 - **What changed.** Native's load runs in one section ([ADR-0007], amended after slice 0's
   review).
 - **The rule:** every engine row references the library once before its first engine. The
@@ -67,6 +70,34 @@ chez-sodium, M1's plan.
   steps".
 - **The rule:** reach the library only through `eval` in a probe of its body's timing, and read
   a flag the body sets to show where it ran.
+
+### A library first reached on two threads at once refuses the second
+
+chez-sodium, M1's closing review (M1-F10).
+
+- **What happened.** A library whose body takes a second, first referenced through `eval` on a
+  forked thread and then, 0.1 s later, on the main thread. The thread answered; the main thread
+  got Chez's "cyclic dependency involving invocation of library"; a third reference, after both,
+  answered.
+- **Why.** Chez marks a library as being invoked while its body runs, and a second invocation
+  meanwhile reads as a cycle. A critical section defers only its own thread's interrupts, so it
+  does not close the window: another thread that reaches the library meanwhile is refused, unless
+  it needs a collection first, which waits for the section to end, after which the reference
+  answers. So the window is the whole body, and a row that tries to show the race can pass by
+  luck.
+- **What it means here.** On native, the second thread gets Chez's own condition: not a
+  `&sodium-library-unavailable`, and `load-state` never sees it. A program that references the
+  library's bindings runs the body before its first line, so only `eval`, the REPL or a lazily
+  invoked library can meet it.
+- **Reproduced** by the closing review on a toy library and on native itself, with
+  `CHEZ_SODIUM_LIBRARY` at Ubuntu's 1.0.18, and again at the fixes, in the container, with the
+  committed probes in [research/m1-closing-review/](research/m1-closing-review/README.md):
+  - `two-threads.sps`, a body that sleeps: `#(ready (raised "cyclic dependency involving
+    invocation of library ~s") (later ready))`;
+  - `two-threads-section.sps`, a body in one critical section: a main thread that does not
+    allocate is refused, and one that allocates first waits and answers `ready`, two runs each.
+- **The rule:** every row that forks a thread which reaches the library references it once
+  first ([ADR-0007], amended). The documents say it, in M4.
 
 ## libsodium
 

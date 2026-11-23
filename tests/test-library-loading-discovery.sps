@@ -189,11 +189,44 @@
 (define guix-not-found-candidates
   (guix-candidates-in empty-environment empty-profile empty-home))
 
+;; fhs-triple : Symbol -> (U String #f)
+;; The Debian multiarch directory under /usr/lib for MACHINE-TYPE, written out
+;; here, not asked of discovery, which maps the machine type itself.
+(define (fhs-triple type)
+  (case type
+    ((ta6le a6le) "x86_64-linux-gnu")
+    ((tarm64le arm64le) "aarch64-linux-gnu")
+    (else #f)))
+
+;; append-map : (A -> (Listof B)) (Listof A) -> (Listof B)
+(define (append-map f lst) (apply append (map f lst)))
+
+;; fhs-candidate-paths : (Listof String)
+;; Every FHS candidate, as ADR-0002 orders them, written out: each standard
+;; directory in turn, .so.26 before .so.23 in each.
+(define fhs-candidate-paths
+  (let ((triple (fhs-triple (machine-type))))
+    (append-map
+     (lambda (directory)
+       (list (string-append directory "/libsodium.so.26")
+             (string-append directory "/libsodium.so.23")))
+     (append '("/usr/local/lib")
+             (if triple (list (string-append "/usr/lib/" triple)) '())
+             '("/usr/lib64" "/usr/lib")))))
+
+;; Runs in every world. The FHS rows below run only where the standard
+;; directories are the world's, and take their expected path from the list
+;; above, so this row holds that list to discovery's.
+(test-equal "the hand-written FHS candidate list is the one discovery gives for this machine type"
+  fhs-candidate-paths
+  (guard (e (#t (list 'raised (describe e))))
+    (map car (libsodium-candidates 'fhs (machine-type) getenv))))
+
 ;; first-standard : (U String (List 'no-fhs-candidate-exists) (List 'raised String))
-;; The first FHS candidate that exists here, as discovery would choose it.
+;; The first FHS candidate that exists here, from the hand-written list.
 (define first-standard
   (guard (e (#t (list 'raised (describe e))))
-    (or (find file-exists? (map car (libsodium-candidates 'fhs (machine-type) getenv)))
+    (or (find file-exists? fhs-candidate-paths)
         (list 'no-fhs-candidate-exists))))
 
 ;; loaded-fhs : -> Expected

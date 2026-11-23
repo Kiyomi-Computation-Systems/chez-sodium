@@ -137,6 +137,8 @@
   ;;               (missing-api), the integer sodium_init answered
   ;;               (init-failed), #f (not-found)
   ;;   candidates  (Listof String): every path checked, in order (not-found)
+  ;;
+  ;; sodium-library-unavailable? : Any -> Boolean
   (define-condition-type &sodium-library-unavailable &chez-sodium-error
     unchecked-make-sodium-library-unavailable sodium-library-unavailable?
     (reason unchecked-sodium-library-unavailable-reason)
@@ -147,6 +149,14 @@
 
   ;; Each accessor checks its argument first: anything else is an assertion
   ;; violation from the accessor, naming it by kind.
+  ;;
+  ;; sodium-library-unavailable-reason : SodiumLibraryUnavailable -> Reason
+  ;;   Reason = (U 'invalid-override 'not-found 'load-failed 'below-floor
+  ;;               'missing-api 'init-failed)
+  ;; sodium-library-unavailable-path : SodiumLibraryUnavailable -> (U String #f)
+  ;; sodium-library-unavailable-source : SodiumLibraryUnavailable -> (U Symbol #f)
+  ;; sodium-library-unavailable-detail : SodiumLibraryUnavailable -> Any
+  ;; sodium-library-unavailable-candidates : SodiumLibraryUnavailable -> (Listof String)
   (define sodium-library-unavailable-reason
     (checked-accessor 'sodium-library-unavailable-reason
                       'not-a-sodium-library-unavailable
@@ -204,11 +214,15 @@
   ;;   code      the integer it answered
   ;;
   ;; The verb is the raise's &who. Neither field is a secret.
+  ;;
+  ;; sodium-failed? : Any -> Boolean
   (define-condition-type &sodium-failed &chez-sodium-error
     unchecked-make-sodium-failed sodium-failed?
     (function unchecked-sodium-failed-function)
     (code unchecked-sodium-failed-code))
 
+  ;; sodium-failed-function : SodiumFailed -> String
+  ;; sodium-failed-code : SodiumFailed -> Integer
   (define sodium-failed-function
     (checked-accessor 'sodium-failed-function 'not-a-sodium-failed sodium-failed? "a &sodium-failed"
                       unchecked-sodium-failed-function))

@@ -42,6 +42,7 @@ scheme=$prefix/bin/scheme
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/check-chez.XXXXXX")
 trap 'rm -rf "$work"' EXIT
+trap 'exit 1' HUP INT TERM
 
 # scheme-version-number answers three values, major, minor and patch; a
 # threaded build answers #t to (threaded?).

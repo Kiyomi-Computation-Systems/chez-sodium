@@ -30,6 +30,7 @@ cc=${CC:-cc}
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/report-sodium.XXXXXX")
 trap 'rm -rf "$work"' EXIT
+trap 'exit 1' HUP INT TERM
 
 dpkg-query -W -f '${Package} ${Version}\n' 'libsodium*' >"$work/packages" 2>"$work/dpkg.err" ||
   fail "dpkg-query cannot list a libsodium package: $(head -n 1 "$work/dpkg.err")"

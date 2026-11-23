@@ -211,6 +211,9 @@
   (if (or (string=? j "floor") (string=? j "current"))
       (string-append "the cache path in job " j " is not one of " p " or ${{ runner.temp }}/sodium-" j)
       (string-append "the cache path in job " j " is not " p)))
+;; chez-key-exact : String -> String
+(define (chez-key-exact j)
+  (string-append "the cache key in job " j " is not exactly " (cache-dir j) "-${{ hashFiles(" hash-list ") }}-${{ steps.image.outputs.id }}"))
 (define (restore-id j) (string-append "the cache's restore in job " j " is not id: chez"))
 (define (restores j n) (string-append "job " j " has " (number->string n) " restores of the Chez cache, not one"))
 (define (saves j n) (string-append "job " j " has " (number->string n) " saves of the Chez cache, not one"))
@@ -438,14 +441,15 @@
 
 (define (insert-after old new-lines) (e old (string-append old new-lines)))
 
-;; The block scalar the rows plant their lines in: main's "Identify the runner
-;; image" run block, which check-ci holds to no line. (The versions step's own
-;; block is held line for line, so a planted line there is a problem of its own.)
-(define id-line "          echo \"id=${ID}-${VERSION_ID}-${RUNNER_ARCH}\" >> \"$GITHUB_OUTPUT\"\n")
-;; The text from main's first comment to the end of that block: it holds the
-;; real file's one such text, which the other two jobs' copies of the block do not.
+;; The block scalar the rows plant their lines in: main's "Install the packages"
+;; run block, which check-ci holds to no line. (The runner-image step's block and
+;; the versions step's are held line for line, so a planted line there is a
+;; problem of its own.)
+(define id-line "          sudo apt-get install -y --no-install-recommends $pkgs\n")
+;; The text from the step's comment to the end of that block: it holds the real
+;; file's one such text, which no other job has.
 (define (id-span)
-  (span "      # Every line with a uses key in this directory" id-line))
+  (span "      # The one package list." id-line))
 (define (in-id-block f)
   (let ((old (id-span))) (e old (f old))))
 (define (after-id . ls)
@@ -637,6 +641,22 @@
                               (replace-first (restore-key-line j) (cache-dir j)
                                              (if (string=? j "nothreads") "chez-threads" "chez-nothreads")))
                       (cache-key j (string-append (cache-dir j) "-")))))
+     (row (pfx "the restore's key drops the image id")
+          (list (le j restore (replace-first restore "-${{ steps.image.outputs.id }}" "")))
+          (list (list (hdr-in j (restore-hdr j) (replace-first (restore-key-line j) "-${{ steps.image.outputs.id }}" ""))
+                      (chez-key-exact j))))
+     (row (pfx "the restore's key adds a tail after the image id")
+          (list (le j restore (replace-first restore "outputs.id }}" "outputs.id }}-x")))
+          (list (list (hdr-in j (restore-hdr j) (replace-first (restore-key-line j) "outputs.id }}" "outputs.id }}-x"))
+                      (chez-key-exact j))))
+     (row (pfx "the restore's key ends in a constant, -ubuntu, not the image id")
+          (list (le j restore (replace-first restore "-${{ steps.image.outputs.id }}" "-ubuntu")))
+          (list (list (hdr-in j (restore-hdr j) (replace-first (restore-key-line j) "-${{ steps.image.outputs.id }}" "-ubuntu"))
+                      (chez-key-exact j))))
+     (row (pfx "the restore's key ends in the compiler's id, not the image id")
+          (list (le j restore (replace-first restore "steps.image.outputs.id" "steps.cc.outputs.id")))
+          (list (list (hdr-in j (restore-hdr j) (replace-first (restore-key-line j) "steps.image.outputs.id" "steps.cc.outputs.id"))
+                      (chez-key-exact j))))
      (row (pfx "the restore moved below the build")
           (list (le j restore "")
                 (le j build (string-append build "\n" restore)))
@@ -692,6 +712,92 @@
                  (list (le j "    steps:\n" (string-append "    " k ": x\n    steps:\n")))
                  (list (list (hdr-in j #f (string-append "    " k ": x")) (job-key j k)))))
           job-keys))))
+
+;; --- the runner-image step and each job's timeout -------------------------------------
+
+(define img-name "Identify the runner image")
+(define img-l1 "          . /etc/os-release")
+(define img-l2 "          echo \"id=${ID}-${VERSION_ID}-${RUNNER_ARCH}\" >> \"$GITHUB_OUTPUT\"")
+(define (img-count j n)
+  (string-append "job " j " has " (number->string n) " steps named \"" img-name "\", not one"))
+(define (img-id j) (string-append "job " j "'s step \"" img-name "\" is not id: image"))
+(define (img-late j)
+  (string-append "job " j " runs step \"" img-name "\" after its first cache restore, and must run it before"))
+(define (img-not-block j)
+  (string-append "job " j "'s step \"" img-name "\" does not run a block: it must be run: |"))
+(define (img-differs j want got)
+  (string-append "job " j "'s step \"" img-name "\" has a run line that differs from the one check-ci holds: expected \""
+                 want "\", found \"" got "\""))
+(define (img-extra j got)
+  (string-append "job " j "'s step \"" img-name "\" has a run line it must not: \"" got "\""))
+(define (img-early j want)
+  (string-append "job " j "'s step \"" img-name "\" has a run block that ends early: expected \"" want "\""))
+(define (timeout-msg j got want)
+  (string-append "job " j " has timeout-minutes " got ", not " want))
+(define (want-timeout j) (if (string=? j "memory") "120" "60"))
+
+(define (image-rows j)
+  (let ((pfx (lambda (t) (string-append j ": the runner-image step: " t)))
+        (hdr (hdr-line img-name)))
+    (list
+     (row (pfx "deleted")
+          (list (del-step j img-name))
+          (list (list (string-append "  " j ":") (img-count j 0))))
+     (row (pfx "its id renamed")
+          (list (se j img-name "        id: image\n" "        id: img\n"))
+          (list (list (A j hdr "        id: img") (img-id j))))
+     (row (pfx "its id deleted")
+          (list (se j img-name "        id: image\n" ""))
+          (list (list (hdr-in j #f hdr) (img-id j))))
+     (row (pfx "its first run line changed")
+          (list (se j img-name img-l1 (string-append img-l1 " || true")))
+          (list (list (A j hdr (string-append img-l1 " || true"))
+                      (img-differs j img-l1 (string-append img-l1 " || true")))))
+     (row (pfx "its echo made echo \"id=fixed\"")
+          (list (se j img-name img-l2 "          echo \"id=fixed\""))
+          (list (list (A j hdr "          echo \"id=fixed\"")
+                      (img-differs j img-l2 "          echo \"id=fixed\""))))
+     (row (pfx "its second run line deleted")
+          (list (se j img-name (string-append "\n" img-l2) ""))
+          (list (list (A j hdr img-l1) (img-early j img-l2))))
+     (row (pfx "a third run line")
+          (list (se j img-name img-l2 (string-append img-l2 "\n          true")))
+          (list (list (A j hdr "          true") (img-extra j "          true"))))
+     (row (pfx "its run is one line, not a block")
+          (list (se j img-name "        run: |\n          . /etc/os-release\n          echo \"id=${ID}-${VERSION_ID}-${RUNNER_ARCH}\" >> \"$GITHUB_OUTPUT\"\n"
+                    "        run: echo \"id=fixed\" >> \"$GITHUB_OUTPUT\"\n"))
+          (list (list (A j hdr "        run: echo \"id=fixed\" >> \"$GITHUB_OUTPUT\"") (img-not-block j))))
+     (row (pfx "moved after the first restore")
+          (list (del-step j img-name)
+                (let ((rs (lane-step j (if (string=? j "nothreads") "Restore Chez without threads" h-restore-chez))))
+                  (le j rs (string-append rs "\n" (lane-step j img-name)))))
+          (list (list (hdr-in j #f hdr) (img-late j))))
+     (row (pfx "written twice")
+          (list (let ((st (lane-step j img-name)))
+                  (le j st (string-append st "\n" st))))
+          (list (list (string-append "  " j ":") (img-count j 2)))))))
+
+;; The image id dropped from every job's Chez key at once.
+(define drop-all-keys-row
+  (row "every job's Chez key drops the image id"
+       (map (lambda (j)
+              (let ((restore (restore-text j)))
+                (le j restore (replace-first restore "-${{ steps.image.outputs.id }}" ""))))
+            job-order)
+       (map (lambda (j)
+              (list (hdr-in j (restore-hdr j) (replace-first (restore-key-line j) "-${{ steps.image.outputs.id }}" ""))
+                    (chez-key-exact j)))
+            job-order)))
+
+(define (timeout-rows j)
+  (let ((good (string-append "    timeout-minutes: " (want-timeout j) "\n"))
+        (pfx (lambda (t) (string-append j ": " t))))
+    (map (lambda (v)
+           (row (pfx (string-append "timeout-minutes " v))
+                (list (le j good (string-append "    timeout-minutes: " v "\n")))
+                (list (list (hdr-in j #f (string-append "    timeout-minutes: " v))
+                            (timeout-msg j v (want-timeout j))))))
+         (if (string=? j "memory") '("60" "5" "600" "0120") '("120" "5" "600" "060")))))
 
 ;; --- the steps that run make, and what each is held to ------------------------------------
 
@@ -797,8 +903,8 @@
         (list (e "main (checks and suites" "main\t(checks and suites"))
         (list (list "    name: main\t(checks and suites, Chez built from source)" tab-msg)))
    (row "a tab in a block scalar's content"
-        (list (in-id-block (lambda (old) (replace-first old "id=$" "id=\t$"))))
-        (list (list "          echo \"id=\t${ID}-${VERSION_ID}-${RUNNER_ARCH}\" >> \"$GITHUB_OUTPUT\"" tab-msg)))
+        (list (in-id-block (lambda (old) (replace-first old "apt-get update" "apt-get\tupdate"))))
+        (list (list "          sudo apt-get\tupdate -qq" tab-msg)))
    (row "a character beyond ASCII in a structural line"
         (list (e "main (checks and suites" "ma\x131;n (checks and suites"))
         (list (list "    name: ma\x131;n (checks and suites, Chez built from source)" odd-msg)))
@@ -806,8 +912,8 @@
         (list (e mem-line (string-append "        \x131;f: false\n" mem-line)))
         (list (list "        \x131;f: false" odd-msg)))
    (row "a character beyond ASCII in a block scalar's content"
-        (list (in-id-block (lambda (old) (replace-first old "id=$" "id=\xe9;$"))))
-        (list (list "          echo \"id=\xe9;${ID}-${VERSION_ID}-${RUNNER_ARCH}\" >> \"$GITHUB_OUTPUT\"" odd-msg)))
+        (list (in-id-block (lambda (old) (replace-first old "apt-get update" "apt-get\xe9;update"))))
+        (list (list "          sudo apt-get\xe9;update -qq" odd-msg)))
    (row "a tab in a comment"
         (list (e "# One workflow, Linux only" "#\tOne workflow, Linux only"))
         (list (list "#\tOne workflow, Linux only, on a pinned runner image (ADR-0010, ADR-0011)." tab-msg)))
@@ -1760,12 +1866,12 @@
    ;; the names on every other line
    (list
     (row (pfx "a run block exports CHEZ_SODIUM_LIBRARY")
-         (list (se j h-image id-line (string-append id-line "          export CHEZ_SODIUM_LIBRARY=x\n")))
-         (list (list (A j (hdr-line h-image) "          export CHEZ_SODIUM_LIBRARY=x") (names-msg "CHEZ_SODIUM_LIBRARY"))))
+         (list (se j h-install-pk id-line (string-append id-line "          export CHEZ_SODIUM_LIBRARY=x\n")))
+         (list (list (A j (hdr-line h-install-pk) "          export CHEZ_SODIUM_LIBRARY=x") (names-msg "CHEZ_SODIUM_LIBRARY"))))
     (row (pfx "C_INCLUDE_PATH is written to GITHUB_ENV")
-         (list (se j h-image id-line (string-append id-line "          echo C_INCLUDE_PATH=/x >> \"$GITHUB_ENV\"\n")))
-         (list (list (A j (hdr-line h-image) "          echo C_INCLUDE_PATH=/x >> \"$GITHUB_ENV\"") (names-msg "GITHUB_ENV"))
-               (list (A j (hdr-line h-image) "          echo C_INCLUDE_PATH=/x >> \"$GITHUB_ENV\"") (names-msg "C_INCLUDE_PATH"))))
+         (list (se j h-install-pk id-line (string-append id-line "          echo C_INCLUDE_PATH=/x >> \"$GITHUB_ENV\"\n")))
+         (list (list (A j (hdr-line h-install-pk) "          echo C_INCLUDE_PATH=/x >> \"$GITHUB_ENV\"") (names-msg "GITHUB_ENV"))
+               (list (A j (hdr-line h-install-pk) "          echo C_INCLUDE_PATH=/x >> \"$GITHUB_ENV\"") (names-msg "C_INCLUDE_PATH"))))
     (row (pfx "a step's name names C_INCLUDE_PATH")
          (list (le j (hdr-line (h-load j)) "      - name: Load C_INCLUDE_PATH"))
          (list (list (A j #f "      - name: Load C_INCLUDE_PATH") (names-msg "C_INCLUDE_PATH"))))
@@ -1904,6 +2010,9 @@
    word-rows
    top-rows
    (apply append (map job-key-rows job-order))
+   (apply append (map image-rows job-order))
+   (apply append (map timeout-rows job-order))
+   (list drop-all-keys-row)
    (apply append (map cache-rows job-order))
    (apply append (map (lambda (s) (make-step-rows s)) make-steps))
    step-key-rows

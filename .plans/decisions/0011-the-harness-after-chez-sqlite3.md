@@ -2,6 +2,8 @@
 
 - **Status:** Accepted (the owner, 2026-11-22), approved with the brief. Amended 2026-11-23 in
   M1's plan, and accepted by the owner that day ([amendment](#amendment-2026-11-23-m1s-plan)).
+  Its "Changing a floor" consequence points at [ADR-0003]'s amendment, "raising the floor",
+  since 2026-11-23, after M1's closing review.
 - **Date:** 2026-11-22
 - **Scope:** development tooling, the suites and CI; no library change
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §7, §8.2, §9's M0, and
@@ -100,7 +102,8 @@ where the text means the library. Only what differs is written here.
   `make deps`. The container has no git and no network but loopback.
 - **Changing a floor** edits the file, README.org's Requirements, the code's check and the
   literal rows that name the old floor. Each place left behind fails by name. A libsodium floor
-  moves only by a new record ([ADR-0003]).
+  moves only by a new record, and [ADR-0003]'s amendment "raising the floor" lists every place it
+  moves and what the raise's record must decide.
 
 ## Amendment, 2026-11-23: M1's plan
 
