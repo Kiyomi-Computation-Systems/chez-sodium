@@ -2,15 +2,16 @@
 
 ## Where the project stands
 
-* Nothing is built yet. The plan is the brief,
-  `.plans/2026-11-22-chez-sodium-project-brief.md`. Read it before any work.
-  - Its §11 holds the owner's decisions; its §10 lists the questions still open.
+* **No verb exists yet.** M0 built the records, the container, the test harness, the
+  memory gate and CI. `.plans/progress.md` says where the project stands and what comes
+  next.
+* The plan is the brief, `.plans/2026-11-22-chez-sodium-project-brief.md`. Read it before
+  any work.
+  - Its §11 holds the owner's decisions; its §10 records that nothing is open.
   - Its adversarial review, every finding with its evidence and probes, is in
     `.plans/research/brief-review/`.
-* M0 comes next. Brief §9 says exactly what it holds: the records, the scaffolding
-  copied from chez-sqlite3 (brief §7), and CI green on an empty suite. M0 brings the
-  Makefile, `scripts/guix-env`, CI, `.plans/progress.md` and
-  `.plans/global-constraints.md`. The rules below that name them apply from then on.
+* The records are `.plans/decisions/`, ADR-0001 to ADR-0011.
+  `.plans/global-constraints.md` holds their hard rules, and binds every task brief.
 * The brief's pattern is chez-sqlite3, at `../chez-sqlite3`. Its FFI rules come from
   chez-sqlite3 and chez-libuv, at `../chez-libuv`. Read the file there before copying
   it, and copy what the brief says to copy.
@@ -39,12 +40,13 @@
 
 ### Secrets
 
-* No condition message, log line or test name holds a secret: a password, a hash
-  string, a key, `constant-time-bytevector=?`'s operands, or an HMAC key (brief §5).
+* No condition message, log line or test name holds a secret. Every string and
+  bytevector parameter is secret: a password, a hash string, `blake2b`'s input and key,
+  `constant-time-bytevector=?`'s operands, and Tier 2's inputs and HMAC key (brief §5).
   - A refusal of a secret parameter names the parameter and its kind only, whatever
     the value's type.
   - `shown-value` shows numbers, symbols, characters and lists of them as they are,
-    so it is for values that are not secret: sizes and limits.
+    so it is for sizes, limits and preset names only.
 * Every block the library frees is wiped first, by one `sodium_memzero` call inside
   `call-with-block`'s critical cleanup, just before the free (brief §6.3).
   - Never in a wrapper: the block is already freed by then.
@@ -65,9 +67,9 @@
 
 * libsodium, found and loaded at runtime, and Chez Scheme, threaded, each at or
   above its floor in `packaging/floors.sexp`, the one place the floors are written
-  (chez-sqlite3 ADR-0008). The proposed floors are libsodium 1.0.18 and Chez 10.4.0.
-  libsodium's floor is read from `sodium_version_string`, never from
-  `sodium_library_version_major` and `_minor`, which are libtool numbers.
+  (ADR-0011, after chez-sqlite3 ADR-0008). libsodium's floor is read from
+  `sodium_version_string`, never from `sodium_library_version_major` and
+  `_minor`, which are libtool numbers.
 * chez-srfi, vendored as a git submodule, for SRFI-64 in the tests only
 * chez-cmark-gfm and the system cmark-gfm library, for the docs site alone, as
   chez-sqlite3 has them
@@ -81,7 +83,8 @@
   `scripts/guix-env sh -c 'make a && make b'`: each call takes a second or
   more to start.
 * Edit, commit and push on the host. The container has no git identity,
-  agents or tokens, and no network but loopback (chez-sqlite3 ADR-0006).
+  agents or tokens, and no network but loopback (ADR-0011, after chez-sqlite3
+  ADR-0006).
 * Verify it with `make check-guix`, run on the host.
 * `CHEZ_SODIUM_LIBRARY` names a libsodium by its absolute path. A floor run sets it
   to the floor's library, and `C_INCLUDE_PATH` to the floor's headers, so a C oracle
@@ -112,6 +115,9 @@
   reach mutable state through procedures.
 * Cite a sibling's record with its repository's name (`chez-sqlite3 ADR-0011`),
   never by its number alone.
+* Name a tag's commit by `git rev-parse <tag>^{commit}`. `git describe` names HEAD,
+  which can be commits past the tag: `v0.11.0-4-g9226698` is not v0.11.0, which is
+  `afe79a5` (review P-F20).
 * Before a global replace, predict how many matches it should hit, and check
   the count afterwards: the sentence that defines a marker contains the
   marker (chez-sqlite3 `.plans/traps.md`).
@@ -217,7 +223,11 @@
   of at least one byte. libsodium's headers mark its pointers `nonnull`, and a NULL
   with a nonzero length aborts the process.
 * libsodium answers an opslimit as `size_t` and takes one as `unsigned long long`.
-  Bind each by the type C names, in the convention table (brief §3.4, §10).
+  Bind each by the type C names, in the convention table (brief §3.4, §11.7).
+* An array size in a C prototype documents a buffer; it binds nothing.
+  `crypto_pwhash_str_verify` declares `const char str[crypto_pwhash_STRBYTES]`, yet
+  verifies hash strings longer than that. Read the source, and probe, before a size in
+  a header becomes a rule (brief §4.1; review L-F7).
 * A decoy or oracle that includes `sodium.h` logs a pointer through a
   `volatile uintptr_t`. Testing a `nonnull` parameter against NULL is an error under
   `-Wall -Werror`, and GCC may delete the test.

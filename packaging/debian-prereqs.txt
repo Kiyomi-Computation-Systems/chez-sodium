@@ -1,0 +1,43 @@
+# Debian/Ubuntu packages to build and test chez-sodium in CI, on
+# ubuntu-24.04.
+#
+# Every job of .github/workflows/ci.yml installs from this file: one step
+# reads every uncommented line, installs them together with
+# `apt-get install -y --no-install-recommends`, and fails when the file
+# yields no package. A package a job needs and this file lacks fails that
+# job: add it here.
+#
+# ONE copy, deliberately: the workflow installs from this file instead of
+# restating the list in a step, so a list in two places cannot drift.
+# Lines starting with # and blank lines are ignored, so the section headers
+# below are labels only: every uncommented line is installed together. Keep
+# each package alone on its line, because a trailing comment would be
+# installed as a package.
+#
+# Not listed: git, which `make check-pins` needs: the runner checks the
+# repository out with its own.
+
+# --- to build Chez Scheme at the floor in packaging/floors.sexp --------------
+# CI builds Chez itself because noble's chezscheme is 9.5.8, below the floor
+# (ADR-0011). With ./configure --disable-x11 --disable-curses, Chez's BUILDING
+# file asks for nothing but a C compiler and make, so there is no libx11-dev
+# and no libncurses-dev. build-essential is the C toolchain: gcc, g++, make
+# and libc6-dev. It also compiles report-sodium.sh's program and the memory
+# gate's C plant.
+build-essential
+
+# --- to fetch the Chez release tarball ------------------------------------------
+# scripts/ci/build-chez.sh downloads Chez's tarball with curl, checks its
+# sha256, and unpacks it with tar. The runner image has curl already; each is
+# listed so that this file is the whole truth about a bare machine. tar and
+# gzip are Essential Debian packages, so they need no line here.
+ca-certificates
+curl
+
+# --- libsodium ------------------------------------------------------------------
+# libsodium-dev gives sodium.h, which scripts/ci/report-sodium.sh compiles
+# against, and pulls in libsodium23, the runner's libsodium, which it reports.
+libsodium-dev
+
+# --- the memory gate (ADR-0011) -------------------------------------------------
+valgrind

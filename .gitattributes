@@ -1,0 +1,4 @@
+# The paths below stay in the repository and out of every release archive,
+# git archive's and GitHub's source tarballs alike.
+/.plans     export-ignore
+/AGENTS.md  export-ignore
