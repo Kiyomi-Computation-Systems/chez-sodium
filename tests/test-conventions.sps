@@ -42,7 +42,8 @@
         (srfi :64)
         (only (chezscheme) directory-list load-shared-object)
         (chez-sodium-testing)
-        (foreign-conventions))
+        (foreign-conventions)
+        (only (library-loading) every-entry))
 
 ;; SRFI-64 sets no exit status. This suite's last line turns the runner's
 ;; counts into one.
@@ -185,6 +186,13 @@
 (test-equal "table: it has a row for each of the five entry points, in ADR-0002's order, and no other"
   expected-names
   (map row-name table))
+
+;; (library-loading)'s every-entry is what test-library-loading-missing makes
+;; a missing-api row for, one build and one row per name. Held whole and in
+;; order: an entry dropped from it would take its build and its row with it.
+(test-equal "table: its names are (library-loading)'s every-entry, the five required entry points, whole and in order"
+  (list (map row-name table) 5)
+  (list every-entry (length every-entry)))
 
 (test-equal "table: every row is (NAME (RESULT (PARAMETER ...)) (ARGUMENT ...) RESULT CONVENTION (RECORD ...)); its argument types are as many as its prototype's parameters"
   '()
