@@ -128,9 +128,9 @@ record it comes from, and where a rule and its record disagree, the record wins.
   ([ADR-0006]).
 - **A secret's refusal may state its bound, and nothing else.** `refuse-secret` takes the bound
   as two exact naturals, LOW and HIGH, never text, and writes the sentence itself; anything
-  else in their place is its own refusal, by kind. R16 reaches every refusal that states one,
-  and finds neither the secret's text, its bytes as written, nor its length ([ADR-0006],
-  amended).
+  else in their place is its own refusal, by kind. R16 holds each such refusal's print the same
+  for three secrets under one rule, of two contents and two lengths: the empty key alone, with
+  one value, is not varied ([ADR-0006], amended).
 - **Tests assert a condition's reason symbol, never its message** ([ADR-0006]).
 
 ## Sections and the cap

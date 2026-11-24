@@ -156,14 +156,18 @@ review of its fixes, M2C-F1 ([research](../research/m2-closing-fix-review/README
   cap, and one of `blake2b`'s key says libsodium's range, read from native.
 - **The bound is two exact naturals, LOW and HIGH, never text.** `refuse-secret` takes them as
   its fifth and sixth arguments and writes the sentence itself: "PARAMETER is LOW to HIGH
-  bytes", or "at most HIGH bytes" when LOW is 0. Anything else in their place, a string
+  bytes", or "PARAMETER is at most HIGH bytes" when LOW is 0. Anything else in their place, a string
   included, is `refuse-secret`'s own refusal, by kind: `(low (kind K))` or `(high (kind K))`.
   The irritants are unchanged, `(RULE PARAMETER (kind K))`.
 - **A free-text detail was rejected.** The first fix took a string, and only a comment kept the
   value out of it. Mutants that wrote the key's text or the input's length there passed every
   suite. M3's secrets are strings, so a swapped argument would have printed a password whole.
-- **R16 reaches every refusal that states a bound,** each with a secret that passes the type
-  check, and finds neither its text, its bytes as written, nor its length.
+- **R16 holds a bound refusal's print independent of the secret.** For every refusal that
+  states a bound but the empty key's, whose one value has no text and whose length is its rule,
+  it prints the condition for three secrets that pass the type check: one, another of the same
+  length with other bytes, and one of another length under the same rule. The three prints are
+  the same, so no spelling of the secret's text, bytes or length can reach them. It also finds
+  none of the first secret's text, its bytes as written, or its length.
 
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md
 [ADR-0007]: 0007-one-critical-section-per-verb.md

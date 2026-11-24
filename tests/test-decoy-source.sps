@@ -9,15 +9,16 @@
 ;;; take, so the compile holds the rule for those alone. This suite holds it
 ;;; for all.
 ;;;
-;;; It reads every tests/*.c that includes sodium.h, as text, with comments
-;;; and string literals stripped, and matches whole identifiers. In each
-;;; definition of a function whose name begins sodium_, randombytes_ or
-;;; crypto_, each pointer parameter, written with a * or as an array
-;;; T NAME[...], occurs in the body exactly once, as (uintptr_t) NAME, the
-;;; value of a volatile uintptr_t declaration, and occurs in no #define's
-;;; replacement list, outside that macro's own parameters. A declaration with
-;;; no body is not read, and neither are the file's other functions, such as
-;;; the decoy's called.
+;;; It reads every tests/*.c that includes sodium.h, as text, in C's first
+;;; phases and in C's order: line ends (CRLF is one), backslash-newline splices,
+;;; each block comment as one space, newlines and all, then the directives and
+;;; literals. It matches whole identifiers. In each definition of a function
+;;; whose name begins sodium_, randombytes_ or crypto_, each pointer parameter,
+;;; written with a * or as an array T NAME[...], occurs in the body exactly once,
+;;; as (uintptr_t) NAME, the value of a volatile uintptr_t declaration, and
+;;; occurs in no #define's replacement list, outside that macro's own
+;;; parameters. A declaration with no body is not read, and neither are the
+;;; file's other functions, such as the decoy's called.
 ;;;
 ;;; A scan answers the functions it read, each with its pointer parameters,
 ;;; and the breaches: (FUNCTION PARAMETER (uses N)) for a parameter that
@@ -42,29 +43,41 @@
 ;;;
 ;;; and, of the file as a whole, FILE being the file's path:
 ;;;
-;;;   (FILE unreadable paste)          a ## in any directive, its backslash
-;;;                                    continuations joined as C joins them,
-;;;                                    with nothing between: a parameter's name
-;;;                                    the preprocessor builds
-;;;   (FILE unreadable splice)         a backslash at the end of a raw line
-;;;                                    outside a directive, in a comment or a
-;;;                                    string too: a name cut in two, or a
-;;;                                    comment or string the splice ends
+;;;   (FILE unreadable paste)          a ## in any directive, its continuations
+;;;                                    and comments read as C reads them: a
+;;;                                    parameter's name the preprocessor builds
+;;;   (FILE unreadable splice)         a backslash at the end of a raw line that
+;;;                                    is no continuation of a directive: one
+;;;                                    outside every directive, or one inside a
+;;;                                    comment or a string, where it cuts a
+;;;                                    name or ends the comment or string
 ;;;   (FILE unreadable include)        an #include of anything but a system
 ;;;                                    header in <...>, "sodium.h" too, which
-;;;                                    reads the file's own directory first: a
-;;;                                    local file may define what the glob never
-;;;                                    reads
-;;;   (FILE unreadable digraph)        a %: outside a comment or a string: the
+;;;                                    reads the file's own directory first, and
+;;;                                    a <...> whose path is absolute or holds
+;;;                                    "..": a local file may define what the
+;;;                                    glob never reads
+;;;   (FILE unreadable digraph)        a %: outside a comment or a string, or
+;;;                                    cut by continuations in a directive: the
 ;;;                                    digraph for #, which hides a directive
+;;;   (FILE unreadable line-end)       a CR no LF follows: C ends a line there,
+;;;                                    and this scanner does not
+;;;   (FILE unreadable literal)        a quote that opens a string or a character
+;;;                                    right after an identifier character: R"",
+;;;                                    u8"", L'' and a digit separator, 1'0, whose
+;;;                                    literal this scanner would read differently
 ;;;
-;;; The include rule runs over every tests/*.c, so that a local header cannot
-;;; hide sodium.h from the glob. A continuation is a line ending in a
-;;; backslash, blanks after it and a CRLF line end tolerated.
+;;; The include rule and every other refusal of the file run over every
+;;; tests/*.c, so that a local header cannot hide sodium.h from the glob. A
+;;; continuation is a line ending in a backslash, blanks after it and a CRLF line
+;;; end tolerated.
 ;;;
-;;; What it does not read: a function whose name a macro builds, or whose
-;;; name is no family name; a macro that builds a name by other means than ##;
-;;; and which arm of an #if holds, since every arm is text to it.
+;;; What it does not read: a function whose name a macro builds, or whose name
+;;; is no family name; a name a macro builds by other means than ##; and which
+;;; arm of an #if holds, since every arm is text to it.
+;;;
+;;; It guards against an honest mistake in a decoy, not against a file written
+;;; to deceive it. Any form it cannot read, it refuses.
 ;;;
 ;;; This process loads no libsodium. Each expected value is one the scanner
 ;;; cannot produce by failing, and none is #f. Whatever can raise is computed
@@ -96,14 +109,18 @@
 
 ;; --- the scanner -------------------------------------------------------------------------
 
-;; strip : String Boolean -> String
+;; strip-with : String Boolean Boolean -> String
 ;; TEXT with every comment replaced by spaces and, unless KEEP-STRINGS?, every
-;; string and character literal too. Newlines stay, so lines keep their numbers.
-(define (strip text keep-strings?)
+;; string and character literal too. A newline stays, so lines keep their
+;; numbers, unless JOINED?, which writes a block comment's newlines as spaces
+;; too: C makes the whole comment one space.
+(define (strip-with text keep-strings? joined?)
   (let ((n (string-length text)))
     (call-with-string-output-port
      (lambda (out)
        (define (blank c) (write-char (if (char=? c #\newline) c #\space) out))
+       (define (blank-comment c)
+         (write-char (if (and (not joined?) (char=? c #\newline)) c #\space) out))
        (define (at i) (if (< i n) (string-ref text i) #\nul))
        (let loop ((i 0))
          (when (< i n)
@@ -115,7 +132,7 @@
                         ((and (char=? (string-ref text j) #\*) (char=? (at (+ j 1)) #\/))
                          (display "  " out)
                          (loop (+ j 2)))
-                        (else (blank (string-ref text j)) (skip (+ j 1))))))
+                        (else (blank-comment (string-ref text j)) (skip (+ j 1))))))
                ((and (char=? c #\/) (char=? (at (+ i 1)) #\/))
                 (let skip ((j i))
                   (if (or (>= j n) (char=? (string-ref text j) #\newline))
@@ -138,6 +155,15 @@
                                   (blank (string-ref text j)))
                               (skip (+ j 1))))))
                (else (write-char c out) (loop (+ i 1)))))))))))
+
+;; strip : String Boolean -> String
+;; STRIP-WITH, a block comment's newlines kept.
+(define (strip text keep-strings?) (strip-with text keep-strings? #f))
+
+;; strip-joined : String Boolean -> String
+;; STRIP-WITH, a block comment's newlines written as spaces: a directive runs on
+;; to the end of its logical line, comment or no comment.
+(define (strip-joined text keep-strings?) (strip-with text keep-strings? #t))
 
 ;; lines-of : String -> (Listof String)
 (define (lines-of text)
@@ -164,25 +190,20 @@
 
 ;; includes-sodium? : String -> (U 'yes 'no)
 ;; Whether TEXT has an #include of <sodium.h> or "sodium.h" that is not in a
-;; comment.
+;; comment, its directive read whole, as C reads it.
 (define (includes-sodium? text)
-  (if (let loop ((lines (lines-of (strip text #t))))
-        (and (pair? lines)
-             (or (let ((d (directive (car lines))))
-                   (and d (>= (string-length d) 7)
-                        (string=? (substring d 0 7) "include")
-                        (member (trim (substring d 7 (string-length d)))
-                                '("<sodium.h>" "\"sodium.h\""))
-                        #t))
-                 (loop (cdr lines)))))
+  (if (exists (lambda (d)
+                (let ((arg (include-argument d)))
+                  (and arg (member arg '("<sodium.h>" "\"sodium.h\"")) #t)))
+              (directives text #t))
       'yes
       'no))
 
 ;; code-text : String -> String
 ;; TEXT stripped, and without its preprocessor lines, backslash continuations
-;; included.
+;; and a directive's wrapped comments included.
 (define (code-text text)
-  (let loop ((lines (lines-of (strip text #f))) (kept '()) (continued? #f))
+  (let loop ((lines (lines-of (strip-joined text #f))) (kept '()) (continued? #f))
     (if (null? lines)
         (apply string-append (reverse kept))
         (let* ((line (car lines))
@@ -337,11 +358,11 @@
           (loop (cdr rest) (if breach (cons breach found) found))))))
 
 ;; directives : String Boolean -> (Listof String)
-;; Every preprocessor directive of TEXT, comments stripped, and strings too
-;; unless KEEP-STRINGS?, the text after its # trimmed, its backslash
-;; continuations joined with nothing between, as C joins them.
+;; Every preprocessor directive of TEXT, comments stripped, each block comment
+;; one space, and strings too unless KEEP-STRINGS?, the text after its # trimmed,
+;; its backslash continuations joined with nothing between, as C joins them.
 (define (directives text keep-strings?)
-  (let loop ((lines (lines-of (strip text keep-strings?))) (current #f) (found '()))
+  (let loop ((lines (lines-of (strip-joined text keep-strings?))) (current #f) (found '()))
     (if (null? lines)
         (reverse (if current (cons current found) found))
         (let* ((line (car lines))
@@ -423,21 +444,69 @@
 (define (pasted? text)
   (exists (lambda (d) (contains? d "##")) (directives text #f)))
 
-;; splice-outside-directive? : String -> Boolean
-;; Whether a line outside every directive, continuations included, ends in a
-;; backslash. The backslash is read from the raw line, since C splices before it
-;; reads a comment or a string; the stripped line only tells a directive apart.
-(define (splice-outside-directive? text)
+;; bad-splice? : String -> Boolean
+;; Whether a raw line ends in a backslash that C does not read as a splice of
+;; code: one outside every directive, or one inside a comment or a string,
+;; which the stripped line does not end in. C splices before it reads a comment
+;; or a string, so the raw line is read; the stripped line tells a directive and
+;; a code backslash apart.
+(define (bad-splice? text)
   (let loop ((raw (lines-of text)) (stripped (lines-of (strip text #f))) (continued? #f))
     (and (pair? raw)
          (let ((in-directive? (or continued? (and (directive (car stripped)) #t))))
-           (or (and (not in-directive?) (spliced? (car raw)))
+           (or (and (spliced? (car raw))
+                    (or (not in-directive?) (not (spliced? (car stripped)))))
                (loop (cdr raw) (cdr stripped) (and in-directive? (spliced? (car stripped)))))))))
 
 ;; digraph? : String -> Boolean
-;; Whether TEXT, comments and strings stripped, has a %:, the digraph for #.
+;; Whether TEXT, comments and strings stripped, has a %:, the digraph for #,
+;; whole or cut by backslash continuations inside a directive.
 (define (digraph? text)
-  (contains? (strip text #f) "%:"))
+  (or (contains? (strip text #f) "%:")
+      (exists (lambda (d) (contains? d "%:")) (directives text #f))))
+
+;; lone-cr? : String -> Boolean
+;; Whether TEXT has a CR that no LF follows: C takes it for a line end, and
+;; lines-of does not. A CRLF is no lone CR.
+(define (lone-cr? text)
+  (let ((n (string-length text)))
+    (let loop ((i 0))
+      (and (< i n)
+           (or (and (char=? (string-ref text i) #\return)
+                    (not (and (< (+ i 1) n) (char=? (string-ref text (+ i 1)) #\newline))))
+               (loop (+ i 1)))))))
+
+;; prefixed-literal? : String -> Boolean
+;; Whether a quote opens a string or a character literal right after an
+;; identifier character: R"(...)", u8"...", L'x' and a digit separator, 1'0.
+;; The text is walked as strip walks it, so a quote in a comment or a literal
+;; is not read.
+(define (prefixed-literal? text)
+  (let ((n (string-length text)))
+    (define (at i) (if (< i n) (string-ref text i) #\nul))
+    (let loop ((i 0))
+      (and (< i n)
+           (let ((c (string-ref text i)))
+             (cond
+               ((and (char=? c #\/) (char=? (at (+ i 1)) #\*))
+                (let skip ((j (+ i 2)))
+                  (cond ((>= j n) #f)
+                        ((and (char=? (string-ref text j) #\*) (char=? (at (+ j 1)) #\/))
+                         (loop (+ j 2)))
+                        (else (skip (+ j 1))))))
+               ((and (char=? c #\/) (char=? (at (+ i 1)) #\/))
+                (let skip ((j i))
+                  (if (or (>= j n) (char=? (string-ref text j) #\newline))
+                      (loop j)
+                      (skip (+ j 1)))))
+               ((or (char=? c #\") (char=? c #\'))
+                (or (and (> i 0) (ident-char? (string-ref text (- i 1))))
+                    (let skip ((j (+ i 1)))
+                      (cond ((>= j n) #f)
+                            ((char=? (string-ref text j) #\\) (skip (+ j 2)))
+                            ((char=? (string-ref text j) c) (loop (+ j 1)))
+                            (else (skip (+ j 1)))))))
+               (else (loop (+ i 1)))))))))
 
 ;; include-argument : String -> (U String #f)
 ;; What follows the word include, include_next or import in directive D, trimmed,
@@ -450,25 +519,30 @@
              (trim (substring d j (string-length d)))))))
 
 ;; foreign-include? : String -> Boolean
-;; Whether TEXT includes anything but a header in <...>.
+;; Whether TEXT includes anything but a header in <...> whose path is neither
+;; absolute nor holds "..": those reach a local file by the search path.
 (define (foreign-include? text)
   (exists (lambda (d)
             (let ((arg (include-argument d)))
               (and arg
-                   (not (and (> (string-length arg) 1)
+                   (not (and (> (string-length arg) 2)
                              (char=? (string-ref arg 0) #\<)
-                             (char=? (string-ref arg (- (string-length arg) 1)) #\>))))))
+                             (char=? (string-ref arg (- (string-length arg) 1)) #\>)
+                             (not (char=? (string-ref arg 1) #\/))
+                             (not (contains? arg "..")))))))
           (directives text #t)))
 
 ;; file-refusals : String String -> (Listof Any)
 ;; (NAME unreadable paste), (NAME unreadable splice), (NAME unreadable
-;; include) and (NAME unreadable digraph), for each that holds of TEXT, in that
-;; order.
+;; include), (NAME unreadable digraph), (NAME unreadable line-end) and
+;; (NAME unreadable literal), for each that holds of TEXT, in that order.
 (define (file-refusals text name)
   (append (if (pasted? text) (list (list name 'unreadable 'paste)) '())
-          (if (splice-outside-directive? text) (list (list name 'unreadable 'splice)) '())
+          (if (bad-splice? text) (list (list name 'unreadable 'splice)) '())
           (if (foreign-include? text) (list (list name 'unreadable 'include)) '())
-          (if (digraph? text) (list (list name 'unreadable 'digraph)) '())))
+          (if (digraph? text) (list (list name 'unreadable 'digraph)) '())
+          (if (lone-cr? text) (list (list name 'unreadable 'line-end)) '())
+          (if (prefixed-literal? text) (list (list name 'unreadable 'literal)) '())))
 
 ;; scan : String [String] -> (List (Listof (List String (Listof String))) (Listof Any))
 ;; The family functions TEXT defines with a body, each with its pointer
@@ -483,7 +557,8 @@
 ;;                                 nor of scalar words
 ;;   (extern unreadable block)     an extern "C" { ... } around definitions
 ;;   (NAME unreadable paste), (NAME unreadable splice), (NAME unreadable include),
-;;   (NAME unreadable digraph)     of the file as a whole, as above, after the rest;
+;;   (NAME unreadable digraph), (NAME unreadable line-end),
+;;   (NAME unreadable literal)     of the file as a whole, as above, after the rest;
 ;;                                 NAME is the optional second argument, "file"
 ;;                                 when none is given
 ;; An unreadable function is not among the functions read.
@@ -616,14 +691,16 @@
     ("tests/libsodium-oracle.c" () ()))
   (scan-real))
 
-;; Every tests/*.c, whether or not it includes sodium.h, is read for a local
-;; include; the paths are the positive control, and none is a refusal.
-(test-equal "every real tests/*.c: the files read, whole, and no include but <...>"
+;; Every tests/*.c, whether or not it includes sodium.h, is read for every
+;; refusal of the whole file; the paths are the positive control, and none is a
+;; refusal.
+(test-equal "every real tests/*.c: the files read, whole, and no file refusal"
   '(("tests/decoy-libsodium.c" "tests/free-watch.c" "tests/libsodium-oracle.c") ())
   (let ((files (read-all)))
     (if (and (pair? files) (eq? (car files) 'unreadable))
         files
-        (list (map car files) (foreign-includers files)))))
+        (list (map car files)
+              (apply append (map (lambda (f) (file-refusals (cdr f) (car f))) files))))))
 
 ;; --- planted sources ---------------------------------------------------------------------
 
@@ -988,7 +1065,8 @@
   '(() ()))
 
 (plant "a name cut by a backslash inside a directive: C joins the lines with nothing between, so the macro names the pointer"
-  (apply lines (append (list "#define DECOY_P b\\" "1") (map (lambda (l) (replace-pasted l "DECOY_P")) memcmp-plain)))
+  (apply lines (append (list "#define DECOY_P b\\" "1")
+                       (map (lambda (l) (replace-pasted l "DECOY_P")) memcmp-plain)))
   `(,memcmp-read (("sodium_memcmp" "b1" macro))))
 
 (plant "a ## cut by a backslash inside a directive is a paste"
@@ -1046,10 +1124,110 @@
   (lines "/* #include \"decoy-extra.h\" */" "// #include \"decoy-extra.h\"")
   '(() ()))
 
-(plant "all four at once, in the order paste, splice, include, digraph"
-  (lines "#define G(n) b##n" "int decoy_y = 1 + \\" "2;" "#include \"x.h\"" "%:define H 1")
+(plant "all six at once, in the order paste, splice, include, digraph, line-end, literal"
+  (lines "#define G(n) b##n" "int decoy_y = 1 + \\" "2;" "#include \"x.h\"" "%:define H 1"
+         "int decoy_cr = 0;\r int decoy_q = 1'0;")
   '(() (("file" unreadable paste) ("file" unreadable splice) ("file" unreadable include)
-        ("file" unreadable digraph))))
+        ("file" unreadable digraph) ("file" unreadable line-end) ("file" unreadable literal))))
+
+(define memcmp-with-p
+  (map (lambda (l) (replace-pasted l "DECOY_P")) memcmp-plain))
+
+(plant "a comment that wraps inside a directive continues it: the macro names the pointer"
+  (apply lines (append (list "#define DECOY_P /* the pointer," "   as the macro names it */ b1")
+                       memcmp-with-p))
+  `(,memcmp-read (("sodium_memcmp" "b1" macro))))
+
+(plant "a comment that closes on its own line inside a directive is read as before"
+  (apply lines (append (list "#define DECOY_P /* the pointer */ b1") memcmp-with-p))
+  `(,memcmp-read (("sodium_memcmp" "b1" macro))))
+
+(plant "a wrapped comment with a directive after it keeps the directive a directive"
+  (lines "/* a comment"
+         "   over lines */"
+         "#define DECOY_A 1"
+         "int crypto_x_thing(const unsigned char *key) { return key[0]; }")
+  '((("crypto_x_thing" ("key"))) (("crypto_x_thing" "key" plain))))
+
+(plant "a comment that wraps inside a directive holds the next line out of the code: a definition after it is in the macro"
+  (lines "#define DECOY_BODY /* the body,"
+         "   as one line */ int crypto_x_thing(const unsigned char *key) { return key[0]; }")
+  '(() ()))
+
+(plant "a splice inside a comment inside a directive ends the comment: the file is unreadable, by splice"
+  (apply lines (append (list "#define DECOY_P /* *\\" "/ b1 /* */") memcmp-with-p))
+  `(,memcmp-read (("file" unreadable splice))))
+
+(plant "a splice inside a comment inside a directive hides a ##: unreadable, by splice"
+  (apply lines (append (list "#define DECOY_PARAM(n) b/* *\\" "/##n /* */") memcmp-plain))
+  `(,memcmp-read (("file" unreadable splice))))
+
+(plant "a splice inside a string inside a directive: unreadable, by splice"
+  (apply lines (append (list "#define DECOY_P ((void) \"\\\\" "\\\", b1) /* \" */") memcmp-with-p))
+  `(,memcmp-read (("file" unreadable splice))))
+
+(plant "a %: cut by splices inside a directive is a digraph: unreadable, by digraph"
+  (apply lines (append (list "#define DECOY_PARAM(n) b%\\" ":%\\" ":n") memcmp-plain))
+  `(,memcmp-read (("file" unreadable digraph))))
+
+(plant "a directive after a lone CR is a directive to C: unreadable, by line-end"
+  (apply lines (append (list "int decoy_cr = 0;\r#define DECOY_P b1") memcmp-with-p))
+  `(,memcmp-read (("file" unreadable line-end))))
+
+(plant "a ## after a lone CR: unreadable, by line-end"
+  (apply lines (append (list "int decoy_cr = 0;\r#define DECOY_PARAM(n) b##n") memcmp-plain))
+  `(,memcmp-read (("file" unreadable line-end))))
+
+(plant "a lone CR at the very end of the text is a lone CR"
+  "int decoy_y = 1;\r"
+  '(() (("file" unreadable line-end))))
+
+(plant "a file with CRLF line ends throughout has no lone CR"
+  (lines "#define DECOY_A 1\r"
+         "void randombytes_buf(void *const buf, const size_t size)\r"
+         "{\r"
+         "  volatile uintptr_t p = (uintptr_t) buf;\r"
+         "}\r")
+  '((("randombytes_buf" ("buf"))) ()))
+
+(plant "a digit separator is no character literal: unreadable, by literal"
+  (lines "int decoy_q = 1'0;")
+  '(() (("file" unreadable literal))))
+
+(plant "a raw string: unreadable, by literal"
+  (lines "const char *decoy_r = R\"(a\")\";")
+  '(() (("file" unreadable literal))))
+
+(plant "a u8 string prefix: unreadable, by literal"
+  (lines "const char *decoy_u = u8\"a\";")
+  '(() (("file" unreadable literal))))
+
+(plant "a wide character prefix: unreadable, by literal"
+  (lines "int decoy_w = L'a';")
+  '(() (("file" unreadable literal))))
+
+(plant "strings and characters after a space, a paren or a comma are no prefixed literal"
+  (lines "const char *decoy_s = \"a\"; char decoy_c = 'b';"
+         "int decoy_f = decoy_g(\"c\", 'd', \"e\" \"f\");"
+         "const char *decoy_t = decoy_h(\"\", ',', '\"');")
+  '(() ()))
+
+(plant "a quote after an identifier character inside a comment or a string is no prefixed literal"
+  (lines "/* don't, u8\"a\" */ // can't"
+         "const char *decoy_s = \"it's 1'0\";")
+  '(() ()))
+
+(plant "an include in <...> by an absolute path is unreadable, by include"
+  (lines "#include </proc/self/cwd/tests/decoy-extra.h>")
+  '(() (("file" unreadable include))))
+
+(plant "an include in <...> with .. in its path is unreadable, by include"
+  (lines "#include <../tests/decoy-extra.h>")
+  '(() (("file" unreadable include))))
+
+(plant "an include of <sodium.h> cut by a splice is still read as that include"
+  (lines "#include <sodium.\\" "h>")
+  '(() ()))
 
 (test-equal "a file's own name is the FILE of its refusals"
   '(() (("tests/x.c" unreadable include)))
@@ -1077,6 +1255,9 @@
   '("tests/d.c")
   (foreign-includers (list (cons "tests/d.c" (lines "#include \"sodium.h\"")))))
 
+(includes "an include of <sodium.h> cut by a splice, or after a wrapped comment, is read" 'yes
+  (lines "#include /* a"
+         "  comment */ <sodium.\\" "h>"))
 (includes "another header, and a use of the name, are not" 'no
   (lines "#include <sodium/utils.h>" "int sodium_h;"))
 

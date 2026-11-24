@@ -459,6 +459,16 @@
         (raised (lambda () (refuse-secret 'w 'r 123456 'x)))
         (raised (lambda () (refuse-secret (list #\p #\w) 'r 'p 'x)))))
 
+;; WHO, RULE and PARAMETER are checked in that order: with several bad, the
+;; first one is the refusal.
+(test-equal "refuse-secret checks who, then rule, then parameter: with all three bad it refuses who, with rule and parameter bad it refuses rule"
+  '((assertion-violation refuse-secret (who (kind string)))
+    (assertion-violation refuse-secret (rule (kind string)))
+    (assertion-violation refuse-secret (who (kind string))))
+  (list (raised (lambda () (refuse-secret "v" "hunter2" 123456 'x)))
+        (raised (lambda () (refuse-secret 'w "hunter2" 123456 'x)))
+        (raised (lambda () (refuse-secret "v" "hunter2" 123456 'x 0 10)))))
+
 ;; A bound that is no exact natural is refused by refuse-secret itself, by its
 ;; kind: a string, a float, a negative, a bytevector holding a secret, and #f,
 ;; which is no "no bound" (the call has six arguments).
@@ -514,13 +524,17 @@
         (raised (lambda () (refuse-secret 'w 'r 'p "v" 16 64)))
         (raised (lambda () (refuse-secret 'w 'r 'p "v" 0 0)))))
 
-;; A call with five arguments matches no clause: what Chez raises names the
-;; count and the procedure, and holds none of the arguments.
-(test-equal "refuse-secret called with five arguments raises Chez's own refusal, whose irritants and printed form hold no part of the arguments"
-  '(raised (clean clean clean clean clean))
-  (let ((outcome (guard (e (#t e))
-                   (refuse-secret 'whoever 'ruling 'param (string->utf8 "hunter2") 4242424)
-                   'no-raise)))
+;; A call with five or seven arguments matches no clause: what Chez raises names
+;; the count and the procedure, and holds none of the arguments. Each call
+;; passes the secret as a string, and again as its bytes, so a needle for its
+;; text and one for its bytes as written can each match, and a value that
+;; reaches the print by a clause of its own shows.
+
+;; arity-leaks : (-> Any) -> (U (List 'raised (Listof Symbol)) (List 'no-raise Any))
+;; THUNK's raise, printed with its irritants as written, searched for each
+;; part of the call that must not appear.
+(define (arity-leaks thunk parts)
+  (let ((outcome (guard (e (#t e)) (thunk) 'no-raise)))
     (if (condition? outcome)
         (let ((text (string-append
                      (describe outcome)
@@ -529,9 +543,27 @@
                           (lambda (port) (write (condition-irritants outcome) port)))
                          ""))))
           (list 'raised
-                (map (lambda (part) (if (contains? text part) 'leaks 'clean))
-                     (list "hunter2" "4242424" "whoever" "ruling" "param"))))
+                (map (lambda (part) (if (contains? text part) 'leaks 'clean)) parts)))
         (list 'no-raise outcome))))
+
+(define arity-parts
+  (list "hunter2" "104 117 110 116 101 114 50" "4242424" "extra7" "whoever" "ruling" "param"))
+
+(test-equal "refuse-secret called with five arguments raises Chez's own refusal, whose irritants and printed form hold no part of the arguments, the secret as text and as bytes included"
+  '((raised (clean clean clean clean clean clean clean))
+    (raised (clean clean clean clean clean clean clean)))
+  (list (arity-leaks (lambda () (refuse-secret 'whoever 'ruling 'param "hunter2" 4242424))
+                     arity-parts)
+        (arity-leaks (lambda () (refuse-secret 'whoever 'ruling 'param (string->utf8 "hunter2") 4242424))
+                     arity-parts)))
+
+(test-equal "refuse-secret called with seven arguments raises Chez's own refusal, whose irritants and printed form hold no part of the arguments, the secret as text and as bytes included"
+  '((raised (clean clean clean clean clean clean clean))
+    (raised (clean clean clean clean clean clean clean)))
+  (list (arity-leaks (lambda () (refuse-secret 'whoever 'ruling 'param "hunter2" 0 4242424 "extra7"))
+                     arity-parts)
+        (arity-leaks (lambda () (refuse-secret 'whoever 'ruling 'param (string->utf8 "hunter2") 0 4242424 "extra7"))
+                     arity-parts)))
 
 ;; --- &sodium-failed ------------------------------------------------------------------
 

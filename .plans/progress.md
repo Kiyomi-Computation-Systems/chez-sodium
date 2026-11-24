@@ -43,7 +43,8 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
     names, since `blake2b` raises it for any answer of `crypto_generichash` but 0.
   - **Thirteen entry points** bound, and `crypto_generichash`'s five sizes read once, at the load.
   - **The harness:** `make test` runs 31 suites; the decoy has four switches for the verbs, and
-    `test-decoy-source` holds its pointer rule; row 24 reaches each verb's blocks through it.
+    `test-decoy-source` holds its pointer rule against an honest mistake, and refuses by name
+    each form it cannot read; row 24 reaches each verb's blocks through it.
 - **Next: M3,** the password verbs, collect-safe, with brief §4.2's rules (brief §9). Its plan
   starts from "Owed to M3" below.
 
@@ -116,10 +117,10 @@ its questions on 2026-11-23:
   blocks through the weak `watch_set`, through its pointers' `volatile uintptr_t` copies, and
   `test-decoy-source`'s list and `(library-loading)`'s `every-entry` gain the new entries
   (ADR-0011, amended; M2-F5).
-- **R16 for the password verbs reaches every refusal that states a bound,** each with a secret
-  that passes the type check, and finds neither its text, its bytes as written, nor its length.
-  A password is a string, so one passed where a bound goes must be refused by its kind
-  (M2C-F1).
+- **R16 for the password verbs holds each refusal that states a bound to one print** for three
+  secrets under its rule: two strings of one UTF-8 length and one of another, non-ASCII among
+  them, as the byte verbs' differential rows do. A password is a string, so one passed where a
+  bound goes must be refused by its kind (M2C-F1; M2C3-F1).
 - **A new `tests/*.c` joins `test-decoy-source`'s every-file row,** and includes no local file
   (M2C-F5).
 
@@ -173,18 +174,42 @@ its questions on 2026-11-23:
     suite, since R16 reached only the type refusals. The owner chose, on 2026-11-24, bounds as
     numbers: `refuse-secret` takes LOW and HIGH, two exact naturals, and writes the sentence
     itself; anything else there is its own refusal, by kind (which settles M2C-F6). R16 now
-    reaches every refusal that states a bound, with secrets of `hunter2` that pass the type
+    reaches the refusals that state a bound, with secrets of `hunter2` that pass the type
     check, and finds neither their text, their bytes as written, nor their length.
   - **M2C-F2:** `test-decoy-source` joined a directive's continuation with a space, where C
     joins with nothing, and missed a CRLF continuation. A name or a `##` cut inside a `#define`
-    passed it. It now joins as C does.
-  - **The minors:** a splice that ends a comment or a string is refused, read from the raw line
-    (M2C-F3); a `%:` digraph is refused (M2C-F4); `"sodium.h"` in quotes is a local include,
+    passed it. It joins with nothing now, and reads a CRLF continuation.
+  - **The minors:** a splice that ends a comment or a string outside a directive is refused,
+    read from the raw line (M2C-F3); a `%:` digraph is refused (M2C-F4); `"sodium.h"` in quotes is a local include,
     and the include rule reads every `tests/*.c` (M2C-F5); this close-out's dates (M2C-F7); and
     wording (M2C-F8).
   - **Fixed** by two Sonnet fixers on disjoint files, the scanner and the bound, and the caller
     on the records and R16's bytes needle. The caller rebuilt seven of their mutants by hand,
     and each failed.
+- **The third review,** on Opus, read-only, over the second round alone, found no blocker,
+  2 majors and 7 minors
+  ([research/m2-closing-third-review/](research/m2-closing-third-review/README.md)). No code
+  showed a secret. Each is fixed.
+  - **M2C3-F1:** R16 searched for three spellings of a secret, and mutants that printed a
+    prefix, the excess over the cap, or a byte as the bound passed every suite. R16 now holds
+    each bound refusal's print the same for three secrets under one rule: two contents of one
+    length, and another length.
+  - **M2C3-F2:** `test-decoy-source` stripped comments before it joined lines, the reverse of
+    C's order, so a comment that wraps inside a `#define`, a splice inside a comment or a
+    string in a directive, a split `%:` or a lone CR hid a name. It now reads line ends,
+    splices, comments and literals in C's order, and refuses a lone CR.
+  - **The minors:** a literal prefix or a digit separator is refused (M2C3-F3); a `<...>`
+    include by an absolute path or `..` (M2C3-F4); every file refusal runs over every
+    `tests/*.c` (M2C3-F5); the records (M2C3-F6); the arity rows pass a string secret, and
+    call with 7 (M2C3-F7); a row holds WHO before RULE before PARAMETER (M2C3-F8); and R16's
+    control reads the whole message, not its words (M2C3-F9).
+  - **Fixed** by two Sonnet fixers on disjoint files, and the caller on the records.
+- **The review loop stops here, by the owner's choice of 2026-11-24.** The plan has each round
+  of rule-changing fixes reviewed again on Opus. Each round cost about 300k tokens, and the
+  scanner kept yielding new forms written to deceive it. So there is no fourth review: the
+  caller rebuilt all 17 of the third review's mutants by hand, and each failed. The scanner's
+  header says what it guards against: an honest mistake in a decoy, not a file written to
+  deceive it.
 
 ### 2026-11-23 — M2 slice 2: the verbs (PR #12)
 
