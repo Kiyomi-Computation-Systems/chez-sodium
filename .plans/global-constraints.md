@@ -228,9 +228,10 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **One memory job, with no shards** ([ADR-0011]).
 - **A child that reaches native code starts through `gated-command`,** under the gate's own
   Valgrind, with its own log. A child started any other way runs outside Valgrind, unseen. A
-  child that runs only Scheme is outside the rule. The wipe row's
-  child is the exception: it runs outside Valgrind, whose allocator bypasses its `free()`
-  interposer ([ADR-0011], [ADR-0008]; chez-sqlite3 ADR-0005, amended).
+  child that runs only Scheme is outside the rule. There are two exceptions: the wipe row's
+  child, since Valgrind's allocator bypasses its `free()` interposer ([ADR-0011], [ADR-0008];
+  chez-sqlite3 ADR-0005, amended); and `test-constants`' prototype check, a C program that calls
+  no libsodium function ([ADR-0011], amended). Any other C program a suite runs is gated.
 - **The C oracle is a program named `libsodium-oracle`.** The gate's rule for child logs names
   it ([ADR-0011]).
 - **The wipe row's child sets `LD_PRELOAD` to the interposer alone,** never appended: under the

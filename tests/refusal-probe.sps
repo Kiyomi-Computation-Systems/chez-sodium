@@ -7,6 +7,8 @@
 ;;;
 ;;;   refusal-probe.sps [--then-override PATH] [--marker NAME] [--message yes]
 ;;;                     [--init-before yes] [--init-after yes] [--wipe N]
+;;;                     [--sizes yes]
+;;;   refusal-probe.sps --drive yes [--overflow yes]
 ;;;
 ;;; It references loaded-libsodium three times, each inside its guard. The
 ;;; first reference prints what happened:
@@ -28,6 +30,12 @@
 ;;;             condition types it is, in a fixed order: serious, error,
 ;;;             violation, assertion, warning, who, message, irritants,
 ;;;             library-unavailable. Never its text (ADR-0006)
+;;;
+;;; With --sizes, a load prints one more field, right after (init . N):
+;;; (sizes B BMIN BMAX KMIN KMAX), the five sizes (chez-sodium private
+;;; native) exports, in the order its load reads them: generichash-bytes,
+;;; -bytes-min, -bytes-max, -keybytes-min, -keybytes-max. Without it the
+;;; output is as it was.
 ;;;
 ;;; With --then-override, CHEZ_SODIUM_LIBRARY is set to PATH after the
 ;;; first reference, and (then-override . VALUE) shows what getenv then
@@ -72,6 +80,30 @@
 ;;; read byte by byte from the address the call returns, never through
 ;;; Chez's string type (ADR-0001).
 ;;;
+;;; With --drive, none of the above runs, and nothing of chez-sodium's loads.
+;;; The probe loads CHEZ_SODIUM_LIBRARY itself, which is a decoy, binds the
+;;; eight entry points of the verbs on its own with foreign-procedure, calls
+;;; each on blocks it makes with foreign-alloc, and prints, one datum a line:
+;;;
+;;;   (sizes B BMIN BMAX KMIN KMAX)  the five size functions' answers
+;;;   (randombytes . BYTES)          a 9-byte request on a block of 10, the
+;;;                                  block as it is after the call
+;;;   (generichash ANSWER BYTES)     outlen 7, a 3-byte input and a 2-byte key,
+;;;                                  on an output block of 8, as it is after
+;;;   (memcmp EQUAL DIFFER LEN0 NULL-FIRST NULL-SECOND)
+;;;                                  sodium_memcmp's answers: equal blocks of
+;;;                                  4 bytes, blocks that differ, length 0 on
+;;;                                  blocks that differ, then a NULL operand
+;;;                                  at length 4, first and second
+;;;   (calls . LOG)                  the decoy's call log so far
+;;;
+;;; With --overflow also, it then binds sodium_init, calls it a thousand
+;;; times and once more, and prints (head . S) (tail . S) (unmoved . yes|no)
+;;; (overflows . N) (fits . yes|no): the log's first 14 characters and last
+;;; 36 once full, whether one more call moved it, how many overflow entries
+;;; it holds, and whether it is under its 4096 bytes. Then (counts . ...) and
+;;; (valgrind . ...), as below.
+;;;
 ;;; Why eval, and no import of (chez-sodium private native): Chez runs the
 ;;; libraries a program imports before the program's body, so a guard in the
 ;;; body never sees a raise from an imported library's body.
@@ -80,8 +112,8 @@
 ;;; The libraries it imports load nothing: conditions define types and
 ;;; procedures, and the counters count.
 (import (rnrs)
-        (only (chezscheme) eval environment foreign-entry? foreign-procedure foreign-ref
-              load-shared-object putenv getenv)
+        (only (chezscheme) eval environment foreign-alloc foreign-entry? foreign-free
+              foreign-procedure foreign-ref foreign-set! load-shared-object putenv getenv)
         (chez-sodium private conditions)
         (chez-sodium private counters))
 
@@ -184,6 +216,103 @@
           (load-shared-object (getenv "CHEZ_SODIUM_LIBRARY"))
           (direct-init))))
 
+;; --- --drive: the decoy's entry points, called directly -----------------------------------
+
+;; bind : String Any -> Procedure
+;; The foreign procedure NAME of the loaded library, written as C names it.
+(define (bind name signature)
+  (eval `(foreign-procedure ,name ,@signature) (environment '(chezscheme))))
+
+;; block-of : Bytevector -> Natural
+;; A fresh block holding BYTES, and one byte at least.
+(define (block-of bytes)
+  (let ((address (foreign-alloc (max 1 (bytevector-length bytes)))))
+    (let fill ((i 0))
+      (when (< i (bytevector-length bytes))
+        (foreign-set! 'unsigned-8 address i (bytevector-u8-ref bytes i))
+        (fill (+ i 1))))
+    address))
+
+;; block-bytes : Natural Natural -> Bytevector
+;; The N bytes at ADDRESS.
+(define (block-bytes address n)
+  (let ((bytes (make-bytevector n)))
+    (let fill ((i 0))
+      (when (< i n)
+        (bytevector-u8-set! bytes i (foreign-ref 'unsigned-8 address i))
+        (fill (+ i 1))))
+    bytes))
+
+;; occurrences-of : String String -> Natural
+(define (occurrences-of text word)
+  (let ((n (string-length text)) (m (string-length word)))
+    (let loop ((i 0) (found 0))
+      (cond ((> (+ i m) n) found)
+            ((string=? (substring text i (+ i m)) word) (loop (+ i m) (+ found 1)))
+            (else (loop (+ i 1) found))))))
+
+;; drive-calls : -> String
+(define (drive-calls)
+  (read-c-string ((bind "decoy_calls" '(() uptr)))))
+
+;; drive-overflow : -> Void
+;; A thousand sodium_init calls fill the log; one more must change nothing.
+(define (drive-overflow)
+  (let ((init (bind "sodium_init" '(() int))))
+    (let loop ((i 0))
+      (when (< i 1000) (init) (loop (+ i 1))))
+    (let* ((kept (string-copy (drive-calls)))
+           (length (string-length kept))
+           (ignored (init))
+           (after (drive-calls)))
+      (show 'head (substring kept 0 14))
+      (show 'tail (substring kept (- length 36) length))
+      (show 'unmoved (if (string=? kept after) 'yes 'no))
+      (show 'overflows (occurrences-of after "overflow"))
+      (show 'fits (if (< length 4096) 'yes 'no)))))
+
+;; drive : -> Void
+(define (drive)
+  (load-shared-object (getenv "CHEZ_SODIUM_LIBRARY"))
+  (let* ((sizes (let loop ((names '("crypto_generichash_bytes" "crypto_generichash_bytes_min"
+                                    "crypto_generichash_bytes_max"
+                                    "crypto_generichash_keybytes_min"
+                                    "crypto_generichash_keybytes_max"))
+                           (found '()))
+                  (if (null? names)
+                      (reverse found)
+                      (loop (cdr names) (cons ((bind (car names) '(() size_t))) found)))))
+         (randombytes-buf (bind "randombytes_buf" '((uptr size_t) void)))
+         (generichash (bind "crypto_generichash" '((uptr size_t uptr unsigned-64 uptr size_t) int)))
+         (memcmp (bind "sodium_memcmp" '((uptr uptr size_t) int)))
+         (random-block (block-of (make-bytevector 10 #x11)))
+         (out-block (block-of (make-bytevector 8 #x11)))
+         (in-block (block-of (u8-list->bytevector (list 1 2 3))))
+         (key-block (block-of (u8-list->bytevector (list 4 5))))
+         (a (block-of (u8-list->bytevector (list 1 2 3 4))))
+         (same (block-of (u8-list->bytevector (list 1 2 3 4))))
+         (other (block-of (u8-list->bytevector (list 1 2 3 5)))))
+    (show 'sizes sizes)
+    (randombytes-buf random-block 9)
+    (show 'randombytes (block-bytes random-block 10))
+    (let ((answer (generichash out-block 7 in-block 3 key-block 2)))
+      (show 'generichash (list answer (block-bytes out-block 8))))
+    (let* ((equal-answer (memcmp a same 4))
+           (differ-answer (memcmp a other 4))
+           (len0-answer (memcmp a other 0))
+           (null-first (memcmp 0 other 4))
+           (null-second (memcmp a 0 4)))
+      (show 'memcmp (list equal-answer differ-answer len0-answer null-first null-second)))
+    (show 'calls (drive-calls))
+    (when (option "--overflow") (drive-overflow))
+    (for-each foreign-free (list random-block out-block in-block key-block a same other))))
+
+(when (option "--drive")
+  (drive)
+  (show 'counts (native-counts))
+  (show 'valgrind (if (under-valgrind?) 'yes 'no))
+  (exit 0))
+
 (define first (reference))
 
 (define status
@@ -193,6 +322,12 @@
        (for-each (lambda (key)
                    (show (if (eq? key 'path) 'loaded key) (cdr (assq key info))))
                  '(path source version major minor init))
+       (when (option "--sizes")
+         (show 'sizes
+               (guard (e (#t (cons 'raised (raised-facts e))))
+                 (map (lambda (name) (eval name native))
+                      '(generichash-bytes generichash-bytes-min generichash-bytes-max
+                        generichash-keybytes-min generichash-keybytes-max)))))
        0))
     ((refused)
      (let ((e (cdr first)))

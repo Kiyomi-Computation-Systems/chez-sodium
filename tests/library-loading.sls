@@ -1,16 +1,19 @@
 #!r6rs
-;;; (library-loading): what the six suites that load libsodium end to end
+;;; (library-loading): what the seven suites that load libsodium end to end
 ;;; share, tests/test-library-loading-*.sps (ADR-0002, ADR-0003, ADR-0006,
 ;;; ADR-0011). Their cost is their children, each under a Valgrind of its
-;;; own under the memory gate, so the rows are split among six suites, each
+;;; own under the memory gate, so the rows are split among seven suites, each
 ;;; running at most 14 children, to keep each well under MEMORY_TIMEOUT
 ;;; (ADR-0011):
 ;;;
 ;;;   -decoys      the control build under each switch, one a row
-;;;   -missing     each entry point left out, a build with no sodium_*
-;;;                function, and the load's order
+;;;   -missing     each of the first five entry points left out, a build
+;;;                with no sodium_* function, and the load's order
+;;;   -missing-verbs  each of the other eight entry points left out
 ;;;   -combined    the kept refusal and the kept load, the marker, values
-;;;                that are no switch, and the wipe, seen in the decoy's log
+;;;                that are no switch, the wipe, seen in the decoy's log, what
+;;;                each switch answers through eight bindings of the probe's
+;;;                own, and the log's overflow
 ;;;   -real        the real libsodium, the refusals no decoy reaches, and
 ;;;                sodium_init called before and after the load
 ;;;   -discovery   the override unset: what discovery chooses, and not-found
@@ -24,7 +27,8 @@
 ;;;   the entries       every entry point (chez-sodium private native)
 ;;;                     requires, in native's order: held to the convention
 ;;;                     table by tests/test-conventions.sps and by
-;;;                     test-library-loading-missing
+;;;                     test-library-loading-missing; first-entries and
+;;;                     verb-entries are its two parts
 ;;;   the decoys        each build of tests/decoy-libsodium.c, compiled in
 ;;;                     a suite's scratch directory, and a row on one
 ;;;   the world         the world and the empty profiles that discovery's
@@ -44,11 +48,12 @@
   (export chez set? string-prefix? string-suffix? absolute? join
           spawn-in probe-with probe override switch-args as-data
           once no-native-objects gated? valgrind-line
-          outcome report loaded-lines refused-lines loaded refused
+          outcome report with-sizes control-sizes other-sizes
+          loaded-lines refused-lines loaded refused
           read-floor-values
-          every-entry
+          every-entry first-entries verb-entries size-calls
           lacks-build decoy-builds compile-decoys decoy-status decoy-row-in
-          read-switch version-calls init-call log-of loaded-calls
+          read-switch version-calls init-call log-of init-calls loaded-calls
           missing-api-rows
           field make-directory process-world unset-override
           no-profiles-env guix-candidates-in
@@ -58,7 +63,7 @@
           (chez-sodium-testing)
           (libsodium-oracle)
           (floors)
-          (only (chezscheme) getenv directory-list file-directory?)
+          (only (chezscheme) getenv directory-list file-directory? list-head)
           (chez-sodium private discovery))
 
   ;; --- strings ---------------------------------------------------------------
@@ -196,6 +201,18 @@
     (list (cons 'version version) (cons 'major major) (cons 'minor minor)
           (cons 'init init)))
 
+  ;; with-sizes : Report (Listof Natural) -> Report
+  ;; REPORT with the probe's --sizes field after it: (sizes B BMIN BMAX KMIN
+  ;; KMAX), native's five.
+  (define (with-sizes report sizes)
+    (append report (list (cons 'sizes sizes))))
+
+  ;; control-sizes, other-sizes : (Listof Natural)
+  ;; What the decoy's five size functions answer: by default, and under
+  ;; sizes-other, where all five differ from each other and from a release's.
+  (define control-sizes '(32 16 64 16 64))
+  (define other-sizes '(33 8 80 9 81))
+
   ;; loaded-lines : String Symbol Report -> (Listof Pair)
   (define (loaded-lines path source report)
     (append (list (cons 'loaded path) (cons 'source source)) report))
@@ -246,13 +263,34 @@
   ;; every-entry : (Listof String)
   ;; The entry points (chez-sodium private native) requires, in its order
   ;; (ADR-0002): the three version entries, sodium_init, then the rest,
-  ;; sodium_memzero. An entry that native requires and the decoy lacks
+  ;; sodium_memzero, randombytes_buf, crypto_generichash, its five size
+  ;; functions and sodium_memcmp. An entry that native requires and the decoy lacks
   ;; refuses the control, and the control's row fails. A row holds this list
   ;; to the convention table's names, whole and in order, so an entry dropped
   ;; from it takes its row with it only by failing that one.
   (define every-entry
     '("sodium_version_string" "sodium_library_version_major" "sodium_library_version_minor"
-      "sodium_init" "sodium_memzero"))
+      "sodium_init" "sodium_memzero"
+      "randombytes_buf" "crypto_generichash"
+      "crypto_generichash_bytes" "crypto_generichash_bytes_min" "crypto_generichash_bytes_max"
+      "crypto_generichash_keybytes_min" "crypto_generichash_keybytes_max"
+      "sodium_memcmp"))
+
+  ;; first-entries : (Listof String)
+  ;; every-entry's first five: the load's own.
+  (define first-entries (list-head every-entry 5))
+
+  ;; verb-entries : (Listof String)
+  ;; every-entry's other eight, bound after sodium_memzero.
+  (define verb-entries (list-tail every-entry 5))
+
+  ;; size-calls : (Listof String)
+  ;; The load's step 7: each size function called once, in this order, after
+  ;; every entry point is bound.
+  (define size-calls
+    '("crypto_generichash_bytes()" "crypto_generichash_bytes_min()"
+      "crypto_generichash_bytes_max()" "crypto_generichash_keybytes_min()"
+      "crypto_generichash_keybytes_max()"))
 
   ;; --- decoys --------------------------------------------------------------------------
 
@@ -331,11 +369,15 @@
     '("sodium_version_string()" "sodium_library_version_major()" "sodium_library_version_minor()"))
   (define init-call "sodium_init()")
   (define (log-of switch . calls) (cons (read-switch switch) calls))
-  ;; loaded-calls : String -> (Listof String)
-  ;; A successful load's calls: the three version entries, then sodium_init.
-  ;; sodium_memzero is bound and never called.
-  (define (loaded-calls switch)
+  ;; init-calls : String -> (Listof String)
+  ;; The calls up to sodium_init: a refusal at sodium_init's answer has no more.
+  (define (init-calls switch)
     (append (list (read-switch switch)) version-calls (list init-call)))
+  ;; loaded-calls : String -> (Listof String)
+  ;; A successful load's calls: the three version entries, sodium_init, then
+  ;; the five size calls. Every other entry point is bound and never called.
+  (define (loaded-calls switch)
+    (append (init-calls switch) size-calls))
 
   ;; missing-api-rows : (String (U String #f) (Listof String) String (String -> Expected) -> Void)
   ;;                    (Listof String) -> Void
@@ -343,7 +385,8 @@
   ;; DECOY-ROW: refused by name before anything calls it, never Chez's "no
   ;; entry for". The three version entries are each bound before any is
   ;; called, so a library lacking one has had no call; sodium_init is bound
-  ;; after the three have answered; sodium_memzero after sodium_init has.
+  ;; after the three have answered; each later entry after sodium_init has,
+  ;; and before any size is read, so its refusal's log has no size call.
   (define (missing-api-rows decoy-row entries)
     (for-each
      (lambda (entry)
@@ -353,8 +396,8 @@
            (refused 'missing-api so 'override entry '()
                     (cond ((string=? entry "sodium_init")
                            (cons (read-switch "control") version-calls))
-                          ((string=? entry "sodium_memzero")
-                           (append (list (read-switch "control")) version-calls (list init-call)))
+                          ((member entry (list-tail every-entry 4))
+                           (init-calls "control"))
                           (else (log-of "control")))))))
      entries))
 

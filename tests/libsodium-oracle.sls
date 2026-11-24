@@ -5,6 +5,8 @@
 ;;;
 ;;;   libsodium-oracle  the fields, read from the library at a path
 ;;;   oracle-fields     their names, in the order the program prints them
+;;;   oracle-size-fields  the five size lines' names, each (NAME F M), printed
+;;;                     after the fields and before (valgrind . ...)
 ;;;   c-compiler        $CC as a command's words, for every compile
 ;;;   split-words       a string cut at whitespace
 ;;;
@@ -18,7 +20,7 @@
 ;;; Test-only: it lives in tests/, which make test puts on Chez's library
 ;;; path, not in src/.
 (library (libsodium-oracle)
-  (export libsodium-oracle oracle-fields c-compiler split-words)
+  (export libsodium-oracle oracle-fields oracle-size-fields c-compiler split-words)
   (import (rnrs)
           (chez-sodium-testing))
 
@@ -30,6 +32,14 @@
   ;; never among them, so that a suite comparing each field with another
   ;; source leaves it out.
   (define oracle-fields '(version major minor init))
+
+  ;; oracle-size-fields : (Listof Symbol)
+  ;; The size lines, in the order the oracle prints them, after sodium_init's
+  ;; and before valgrind's: each (NAME F M), F the size function's answer
+  ;; through the library and M the header's macro, in step 7's order.
+  (define oracle-size-fields
+    '(generichash-bytes generichash-bytes-min generichash-bytes-max
+      generichash-keybytes-min generichash-keybytes-max))
 
   ;; split-words : String -> (Listof String)
   ;; TEXT cut at each run of spaces, tabs and newlines, empty pieces
@@ -56,7 +66,8 @@
   ;; -Werror into a fresh directory from call-with-temp-directory, runs it on
   ;; PATH through (gated-command GETENV ...), and answers what it printed,
   ;; read as data: (FIELD . VALUE), or (init FIRST SECOND), for each of
-  ;; oracle-fields, in order, then (valgrind . yes) or (valgrind . no).
+  ;; oracle-fields, in order, then (NAME F M) for each of oracle-size-fields,
+  ;; then (valgrind . yes) or (valgrind . no).
   ;; Anything else is (no-oracle STEP EVIDENCE), naming the step that went
   ;; wrong: compile, run, output (that is not the fields), or raised, with the
   ;; text of a raise, which includes mktemp's answer being refused. It never
@@ -80,10 +91,11 @@
                 (list 'no-oracle 'run ran)
                 (let ((data (read-all (cadr ran))))
                   (if (and (list? data)
-                           (= (length data) (+ (length oracle-fields) 1))
+                           (= (length data)
+                              (+ (length oracle-fields) (length oracle-size-fields) 1))
                            (for-all (lambda (datum field)
                                       (and (pair? datum) (eq? (car datum) field)))
-                                    data (append oracle-fields '(valgrind))))
+                                    data (append oracle-fields oracle-size-fields '(valgrind))))
                       data
                       (list 'no-oracle 'output (cadr ran)))))))))
 

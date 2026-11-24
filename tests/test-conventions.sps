@@ -14,7 +14,7 @@
 ;;;                  __collect_safe alone as collect-safe; anything else, a
 ;;;                  __varargs_after count among it, as other, which no row
 ;;;                  holds
-;;;   src/           no violation, and the five forms are all native's
+;;;   src/           no violation, and the thirteen forms are all native's
 ;;;   fixtures       tests/fixtures/conventions/<case>/, each the one fault it
 ;;;                  names, and the whole list of violations asserted: a form
 ;;;                  outside native, an entry that is no string literal, type
@@ -66,11 +66,15 @@
 ;; --- what the table must say, written out ---------------------------------------------
 
 ;; expected-names : (Listof String)
-;; ADR-0002's order: the version string, major and minor, sodium_init, then
-;; sodium_memzero.
+;; ADR-0002's order: the version string, major and minor, sodium_init,
+;; sodium_memzero, then the verbs' eight, as native binds them in step 6.
 (define expected-names
   '("sodium_version_string" "sodium_library_version_major"
-    "sodium_library_version_minor" "sodium_init" "sodium_memzero"))
+    "sodium_library_version_minor" "sodium_init" "sodium_memzero"
+    "randombytes_buf" "crypto_generichash" "crypto_generichash_bytes"
+    "crypto_generichash_bytes_min" "crypto_generichash_bytes_max"
+    "crypto_generichash_keybytes_min" "crypto_generichash_keybytes_max"
+    "sodium_memcmp"))
 
 ;; collect-safe-names : (Listof String)
 ;; The calls that can block (ADR-0001, decision 7). None is bound yet; the
@@ -83,7 +87,7 @@
 (define accepted-types
   '(integer-8 integer-16 unsigned-16 integer-24 unsigned-24
     integer-32 unsigned-32 integer-40 unsigned-40 integer-48 unsigned-48
-    integer-56 unsigned-56 integer-64 unsigned-64 unsigned-int double
+    integer-56 unsigned-56 integer-64 unsigned-int double
     unsigned-8 double-float single-float short
     unsigned-short unsigned long unsigned-long long-long
     unsigned-long-long float char wchar fixnum boolean iptr void*
@@ -94,7 +98,7 @@
 ;; argument-only-types : (Listof Symbol)
 ;; The types the table writes as an argument and never as a result: the
 ;; result allowlist must refuse each.
-(define argument-only-types '(size_t))
+(define argument-only-types '(unsigned-64))
 
 ;; refused-by-chez-types : (Listof Any)
 ;; Types Chez itself refuses, and an ftype's bare name: the allowlist refuses
@@ -177,21 +181,25 @@
 ;; plain.
 (define (flipped c) (if (eq? c 'plain) 'collect-safe 'plain))
 
+(define size-names
+  '("crypto_generichash_bytes" "crypto_generichash_bytes_min" "crypto_generichash_bytes_max"
+    "crypto_generichash_keybytes_min" "crypto_generichash_keybytes_max"))
+
 (define native-file "chez-sodium/private/native.sls")
 
 (test-begin "conventions")
 
 ;; --- the table ---------------------------------------------------------------------------
 
-(test-equal "table: it has a row for each of the five entry points, in ADR-0002's order, and no other"
+(test-equal "table: it has a row for each of the thirteen entry points, in ADR-0002's order, and no other"
   expected-names
   (map row-name table))
 
 ;; (library-loading)'s every-entry is what test-library-loading-missing makes
 ;; a missing-api row for, one build and one row per name. Held whole and in
 ;; order: an entry dropped from it would take its build and its row with it.
-(test-equal "table: its names are (library-loading)'s every-entry, the five required entry points, whole and in order"
-  (list (map row-name table) 5)
+(test-equal "table: its names are (library-loading)'s every-entry, the thirteen required entry points, whole and in order"
+  (list (map row-name table) 13)
   (list every-entry (length every-entry)))
 
 (test-equal "table: every row is (NAME (RESULT (PARAMETER ...)) (ARGUMENT ...) RESULT CONVENTION (RECORD ...)); its argument types are as many as its prototype's parameters"
@@ -214,7 +222,7 @@
        expected-names)
   (map row-convention table))
 
-;; The five rows, written out, so that a table loosened together with the
+;; The thirteen rows, written out, so that a table loosened together with the
 ;; binding it holds still fails: the table's own arguments, results and
 ;; conventions are compared with these, never with each other.
 (define the-bound-rows
@@ -222,17 +230,25 @@
     ("sodium_library_version_major" () int plain)
     ("sodium_library_version_minor" () int plain)
     ("sodium_init" () int plain)
-    ("sodium_memzero" (uptr size_t) void plain)))
+    ("sodium_memzero" (uptr size_t) void plain)
+    ("randombytes_buf" (uptr size_t) void plain)
+    ("crypto_generichash" (uptr size_t uptr unsigned-64 uptr size_t) int plain)
+    ("crypto_generichash_bytes" () size_t plain)
+    ("crypto_generichash_bytes_min" () size_t plain)
+    ("crypto_generichash_bytes_max" () size_t plain)
+    ("crypto_generichash_keybytes_min" () size_t plain)
+    ("crypto_generichash_keybytes_max" () size_t plain)
+    ("sodium_memcmp" (uptr uptr size_t) int plain)))
 
-(test-equal "table: the five rows are written out: the version string an address, major and minor and sodium_init an int, sodium_memzero a uptr and a size_t answering void; all plain (ADR-0001, decisions 3 and 7)"
+(test-equal "table: the thirteen rows are written out: the version string an address, major, minor and sodium_init an int, sodium_memzero and randombytes_buf a uptr and a size_t answering void, crypto_generichash its uptr, size_t, uptr, unsigned-64, uptr, size_t answering int, the five sizes a size_t, sodium_memcmp two addresses and a size_t answering int; all plain (ADR-0001, decisions 3, 4 and 7)"
   the-bound-rows
   (map (lambda (name)
          (let ((row (car (rows-named (list name)))))
            (list name (row-arguments row) (row-result row) (row-convention row))))
        (map car the-bound-rows)))
 
-(test-equal "table: the allowlists are int, uptr and size_t as arguments, and int, uptr and void as results"
-  '((int uptr size_t) (int uptr void))
+(test-equal "table: the allowlists are int, uptr, size_t and unsigned-64 as arguments, and int, uptr, size_t and void as results"
+  '((int uptr size_t unsigned-64) (int uptr size_t void))
   (list allowed-argument-types allowed-result-types))
 
 (test-equal "table: the types its rows use are exactly the allowlists': every type an argument or a non-void result is the argument allowlist, and every result, and void, the result allowlist; no type is allowed that no row uses"
@@ -243,7 +259,7 @@
                                                 (map row-result table)))))
         (sorted-symbols (unique (cons 'void (map row-result table))))))
 
-(test-equal "table: the type only an argument uses is size_t, which the result allowlist refuses"
+(test-equal "table: the type only an argument uses is unsigned-64, which the result allowlist refuses"
   (list (sorted-symbols argument-only-types) '())
   (list (sorted-symbols (filter (lambda (t) (not (memq t (map row-result table))))
                                 (unique (apply append (map row-arguments table)))))
@@ -312,7 +328,7 @@
   (let ((r (reverse (cdr form))))
     (if (>= (length r) 3) (caddr r) 'no-entry)))
 
-(test-equal "src: every foreign-procedure form under src/ is one of the five bindings of (chez-sodium private native), in its one file and its one library, once each"
+(test-equal "src: every foreign-procedure form under src/ is one of the thirteen bindings of (chez-sodium private native), in its one file and its one library, once each"
   (list (list native-file) '((chez-sodium private native)) (sorted-strings expected-names))
   (if (and (list? src-items) (for-all (lambda (i) (eq? (car i) 'binding)) src-items))
       (list (unique (map cadr src-items))
@@ -443,7 +459,7 @@
   `((unreadable ,native-file))
   (found-in "unreadable" '()))
 
-(test-equal "fixture positions: a refused type fails at each position: first, middle and last argument, the result, void as an argument; void as a result, and int, uptr and size_t in every position, are allowed"
+(test-equal "fixture positions: a refused type fails at each position: first, middle and last argument, the result, void as an argument; void as a result, a size_t result, and int, uptr, size_t and unsigned-64 as arguments, are allowed"
   '((type-refused "p_first" argument 0 string)
     (type-refused "p_middle" argument 1 string)
     (type-refused "p_last" argument 2 string)
@@ -456,11 +472,12 @@
                   (synthetic "p_result" '(int int int) 'string)
                   (synthetic "p_void_argument" '(void) 'int)
                   (synthetic "p_void_result" '(int) 'void)
-                  (synthetic "p_allowed" '(size_t int uptr) 'int))))
+                  (synthetic "p_allowed" '(size_t int uptr unsigned-64) 'int)
+                  (synthetic "p_size_result" '() 'size_t))))
 
 ;; --- rows against the real src/, changed in turn ---------------------------------------------
 
-(test-equal "sweep: a row removed fails, by name, for each of the five rows"
+(test-equal "sweep: a row removed fails, by name, for each of the thirteen rows"
   (map (lambda (name) (list (list 'no-row name))) expected-names)
   (map (lambda (name)
          (checked (lambda ()
@@ -473,8 +490,8 @@
   (checked (lambda ()
              (violations "src" (append table (list (synthetic "sodium_extra" '() 'int)))))))
 
-(test-equal "sweep: a row's convention flipped fails, by name, for each of the five rows: plain to collect-safe"
-  (list 5
+(test-equal "sweep: a row's convention flipped fails, by name, for each of the thirteen rows: plain to collect-safe"
+  (list 13
         (map (lambda (row)
                (list (list 'mismatch (row-name row) 'convention (flipped (row-convention row))
                            (row-convention row))))
@@ -487,8 +504,8 @@
                                                                      (flipped (row-convention row))))))))
              table)))
 
-(test-equal "sweep: a row's result type changed fails, by name, for each of the five rows: int to uptr, and uptr and void to int"
-  (list 5
+(test-equal "sweep: a row's result type changed fails, by name, for each of the thirteen rows: int to uptr, and uptr, size_t and void to int"
+  (list 13
         (map (lambda (row)
                (list (list 'mismatch (row-name row) 'result (other-type (row-result row)) (row-result row))))
              table))
@@ -515,8 +532,8 @@
                                   found)))))
               table)))
 
-(test-equal "sweep: a row's argument type changed at each position fails, by name, for each of the two arguments"
-  (list 2
+(test-equal "sweep: a row's argument type changed at each position fails, by name, for each of the thirteen arguments of the rows"
+  (list 13
         (map (lambda (c)
                (list (list 'mismatch (row-name (car c)) 'arguments (caddr c) (row-arguments (car c)))))
              argument-cases))
@@ -541,6 +558,45 @@
                                                    (with-field (car (rows-named '("sodium_memzero")))
                                                                'arguments (list 'uptr type)))))))
        '(uptr unsigned-64 int)))
+
+;; crypto_generichash's lengths: outlen and keylen are size_t, and inlen is
+;; unsigned long long, so unsigned-64. A row that swaps them is not what native
+;; binds, though both types are allowed as arguments: only the row catches it.
+(test-equal "sweep: crypto_generichash's inlen written size_t, its outlen written unsigned-64, its keylen written unsigned-64, and its inlen written uptr in its row each fails, by name, against the real src/"
+  '(((mismatch "crypto_generichash" arguments (uptr size_t uptr size_t uptr size_t)
+               (uptr size_t uptr unsigned-64 uptr size_t)))
+    ((mismatch "crypto_generichash" arguments (uptr unsigned-64 uptr unsigned-64 uptr size_t)
+               (uptr size_t uptr unsigned-64 uptr size_t)))
+    ((mismatch "crypto_generichash" arguments (uptr size_t uptr unsigned-64 uptr unsigned-64)
+               (uptr size_t uptr unsigned-64 uptr size_t)))
+    ((mismatch "crypto_generichash" arguments (uptr size_t uptr uptr uptr size_t)
+               (uptr size_t uptr unsigned-64 uptr size_t))))
+  (map (lambda (arguments)
+         (checked (lambda ()
+                    (violations "src" (replace-row table "crypto_generichash"
+                                                   (with-field (car (rows-named '("crypto_generichash")))
+                                                               'arguments arguments))))))
+       '((uptr size_t uptr size_t uptr size_t)
+         (uptr unsigned-64 uptr unsigned-64 uptr size_t)
+         (uptr size_t uptr unsigned-64 uptr unsigned-64)
+         (uptr size_t uptr uptr uptr size_t))))
+
+;; A size function answers size_t. Written uptr, unsigned-64 or int in its row,
+;; it fails by name.
+(test-equal "sweep: each size function's size_t result written uptr, unsigned-64 and int in its row fails, by name, against the real src/"
+  (map (lambda (name)
+         (map (lambda (type)
+                (list (list 'mismatch name 'result type 'size_t)))
+              '(uptr unsigned-64 int)))
+       size-names)
+  (map (lambda (name)
+         (map (lambda (type)
+                (checked (lambda ()
+                           (violations "src" (replace-row table name
+                                                          (with-field (car (rows-named (list name)))
+                                                                      'result type))))))
+              '(uptr unsigned-64 int)))
+       size-names))
 
 ;; --- the allowlist, against its whole complement --------------------------------------------
 
@@ -622,7 +678,7 @@
                           found))))))
 
 (test-equal "complement: the fixture binds every type, each row says exactly what its binding says, and the allowlist refuses every one, as an argument and as a result, each type the table uses as an argument alone as a result, and void as an argument"
-  (list 122 complement-refusals)
+  (list 120 complement-refusals)
   (list (length complement-refusals) (found-in "types" complement-rows)))
 
 (test-end "conventions")

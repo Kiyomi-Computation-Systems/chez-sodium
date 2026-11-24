@@ -1,5 +1,5 @@
 #!r6rs
-;;; One of the six suites that load libsodium end to end, through
+;;; One of the seven suites that load libsodium end to end, through
 ;;; (chez-sodium private native), tests/refusal-probe.sps and a decoy
 ;;; (ADR-0002, ADR-0003, ADR-0006, ADR-0011): this one holds the decoy's
 ;;; behaviours, one switch a row, on the control build.
@@ -7,9 +7,9 @@
 ;;; switch, and tests/test-library-loading-combined.sps the kept refusal.
 ;;;
 ;;; Under the memory gate each child runs under a Valgrind of its own, so
-;;; the rows are split among six suites, each running at most 14 children,
+;;; the rows are split among seven suites, each running at most 14 children,
 ;;; to keep each well under MEMORY_TIMEOUT (ADR-0011); (library-loading)
-;;; holds what all six use.
+;;; holds what all seven use.
 ;;;
 ;;; Native loads libsodium in its library body, once per process, and Chez
 ;;; runs that body before a program's own, so a refusal cannot be caught in
@@ -137,9 +137,9 @@
   (lambda (so)
     (refused 'below-floor so 'override detail '() (apply log-of switch version-calls))))
 
-(decoy-row "control" #f '()
-  "the floor itself is accepted: the report's four fields, and the load's calls in order"
-  (lambda (so) (loaded so 'override control-report (control-calls))))
+(decoy-row "control" #f '("--sizes" "yes")
+  "the floor itself is accepted: the report's four fields, native's five sizes, and the load's calls in order"
+  (lambda (so) (loaded so 'override (with-sizes control-report control-sizes) (control-calls))))
 
 (decoy-row "control" "below-floor" '()
   "one patch below the floor is below-floor, detail its version, and sodium_init never runs"
@@ -169,16 +169,35 @@
 
 (decoy-row "control" "init-fails" '()
   "sodium_init answering -1 is init-failed, detail -1, after the version entries"
-  (lambda (so) (refused 'init-failed so 'override -1 '() (loaded-calls "init-fails"))))
+  (lambda (so) (refused 'init-failed so 'override -1 '() (init-calls "init-fails"))))
 
 ;; A second code, so that no one value passes for "refused".
 (decoy-row "control" "init-other" '()
   "sodium_init answering 2 is init-failed too, detail 2, not -1's"
-  (lambda (so) (refused 'init-failed so 'override 2 '() (loaded-calls "init-other"))))
+  (lambda (so) (refused 'init-failed so 'override 2 '() (init-calls "init-other"))))
 
 (decoy-row "control" "init-already" '()
   "sodium_init answering 1 is no failure: it loads, and the load records 1"
   (lambda (so) (loaded so 'override (report floor-version 10 3 1) (loaded-calls "init-already"))))
+
+;; sizes-other loads, and native's five sizes are the decoy's other five: the
+;; sizes line shows each one under its own name, so a size recorded under
+;; another's key shows.
+(decoy-row "control" "sizes-other" '("--sizes" "yes")
+  "sizes-other loads, and native records its five sizes: 33, 8, 80, 9 and 81"
+  (lambda (so)
+    (loaded so 'override (with-sizes control-report other-sizes) (loaded-calls "sizes-other"))))
+
+;; The three other switches of the verbs' entry points do nothing at the load
+;; but show in the log: only the five size calls run there. What each answers
+;; is held in test-library-loading-combined, through bindings of the probe's
+;; own.
+(for-each
+ (lambda (switch)
+   (decoy-row "control" switch '()
+     (string-append switch " loads as the control does, its log the control's with decoy(" switch ") first")
+     (lambda (so) (loaded so 'override control-report (loaded-calls switch)))))
+ '("generichash-fails" "generichash-other" "memcmp-other"))
 
 ;; --- this process ----------------------------------------------------------------------------
 

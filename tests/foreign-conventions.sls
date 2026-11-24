@@ -89,9 +89,54 @@
       ("sodium_memzero" ("void" ("void *const" "const size_t")) (uptr size_t) void plain
        ("ADR-0001 decisions 3 and 4: the block is an address, the length is size_t"
         "ADR-0001 decision 7: plain"
-        "ADR-0002 amendment: bound last, for the block helper"
+        "ADR-0002 amendment: bound first in step 6, for the block helper"
         "ADR-0005 decision 4: used inside, to wipe"
-        "ADR-0008 decision 1: one plain call over the block's size"))))
+        "ADR-0008 decision 1: one plain call over the block's size"))
+      ("randombytes_buf" ("void" ("void * const" "const size_t")) (uptr size_t) void plain
+       ("ADR-0001 decisions 3 and 4: the buffer is an address, the length is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0002, amended: bound in step 6, after sodium_memzero"
+        "ADR-0005: in the subset, for random-bytes"))
+      ("crypto_generichash"
+       ("int" ("unsigned char *" "size_t" "const unsigned char *" "unsigned long long"
+               "const unsigned char *" "size_t"))
+       (uptr size_t uptr unsigned-64 uptr size_t) int plain
+       ("ADR-0001 decisions 3 and 4: every pointer is an address, outlen and keylen are size_t"
+        "ADR-0001 decision 3: inlen is unsigned long long, bound unsigned-64"
+        "ADR-0001 decision 7: plain"
+        "ADR-0002, amended: bound in step 6, after randombytes_buf"
+        "ADR-0005: in the subset, for blake2b"))
+      ("crypto_generichash_bytes" ("size_t" ()) () size_t plain
+       ("ADR-0001 decision 3: a size is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, the first of the five sizes"))
+      ("crypto_generichash_bytes_min" ("size_t" ()) () size_t plain
+       ("ADR-0001 decision 3: a size is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, the second of the five sizes"))
+      ("crypto_generichash_bytes_max" ("size_t" ()) () size_t plain
+       ("ADR-0001 decision 3: a size is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, the third of the five sizes"))
+      ("crypto_generichash_keybytes_min" ("size_t" ()) () size_t plain
+       ("ADR-0001 decision 3: a size is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, the fourth of the five sizes"))
+      ("crypto_generichash_keybytes_max" ("size_t" ()) () size_t plain
+       ("ADR-0001 decision 3: a size is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, the last of the five sizes"))
+      ("sodium_memcmp" ("int" ("const void *const" "const void *const" "size_t"))
+       (uptr uptr size_t) int plain
+       ("ADR-0001 decisions 3 and 4: both operands are addresses, the length is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0002, amended: bound in step 6, after the sizes' entries"
+        "ADR-0005: in the subset, by decision, for constant-time-bytevector=?"))))
 
   (define (row-name row) (car row))
   (define (row-prototype row) (cadr row))
@@ -104,10 +149,10 @@
   ;; Written here, not read from the table: a table loosened together with the
   ;; binding it holds would otherwise pass. The argument list is every type a
   ;; row uses as an argument or as a non-void result, and the result list every
-  ;; result type, and void: size_t is an argument only, and void a result only
-  ;; (ADR-0001, amended).
-  (define allowed-argument-types '(int uptr size_t))
-  (define allowed-result-types '(int uptr void))
+  ;; result type, and void: unsigned-64 is an argument only, and void a result
+  ;; only (ADR-0001, amended).
+  (define allowed-argument-types '(int uptr size_t unsigned-64))
+  (define allowed-result-types '(int uptr size_t void))
 
   ;; --- the reader ----------------------------------------------------------------
 

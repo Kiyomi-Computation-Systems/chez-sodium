@@ -35,7 +35,7 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
     suites against them.
 - **M2 is under way:** `random-bytes`, `blake2b` and `constant-time-bytevector=?`, built on M1's
   helper (brief §9; [the M2 plan](2026-11-23-m2-plan.md)). Slice 0, the plan and the records, is
-  on `m2-plan`. Then slice 1, the bindings, and slice 2, the verbs.
+  PR #10; slice 1, the bindings, is on `m2-slice-1`, stacked on it; then slice 2, the verbs.
 
 ## Answered for M1
 
@@ -111,6 +111,34 @@ its questions on 2026-11-23:
   install lines.
 
 ## Close-outs
+
+### 2026-11-23 — M2 slice 0: the plan and the records (PR #10)
+
+- **Measured first,** by a Sonnet agent, rerun by the caller, at 1.0.18 and 1.0.22: the
+  prototypes and their `nonnull`, the sizes, the return codes, the RFC 7693 self-test, the BLAKE2
+  reference's known answers, and the costs ([research/m2-plan/](research/m2-plan/README.md)).
+  - `nonnull` covers two of the verbs' six pointers, at both releases.
+  - Every -1 from `crypto_generichash` leaves `out` as it was.
+  - At the cap, the copy into the block costs 36 times the hash.
+- **Written** on `m2-plan` by the caller: [the M2 plan](2026-11-23-m2-plan.md); ADR-0001, ADR-0002,
+  ADR-0005, ADR-0006, ADR-0007, ADR-0011 and ADR-0012 amended; the brief, the constraints,
+  AGENTS.md and this ledger to match.
+- **The owner decided, on 2026-11-23,** each with the plan's recommendation:
+  - `&sodium-failed` for `crypto_generichash`'s answers other than 0, so its first raise and its
+    names move to M2;
+  - `crypto_generichash_keybytes` unbound;
+  - the verbs in `(chez-sodium private byte-verbs)`, and the cap in `(chez-sodium private cap)`,
+    beside native;
+  - the sizes read once, at the load, confirmed with the records.
+- **Reviewed:** one Opus review found no blocker, 5 majors and 15 minors, each fixed
+  ([research/m2-slice-0-review/](research/m2-slice-0-review/README.md); plan §4.5). The majors:
+  - a decoy-source rule that refused the decoy's own helper;
+  - a row 24 that could pass with a block unnamed or all zero;
+  - two mutants no row could kill, since `call-in-section` raises again after the section, so
+    the verbs' bodies are read as data instead;
+  - one failure code where two are needed;
+  - an item owed from M1-F6 dropped from this ledger.
+- **CI's run** 45282952407 passed all five jobs.
 
 ### 2026-11-23 — M1's closing review and its fixes (PR #9)
 
