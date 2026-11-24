@@ -38,7 +38,10 @@
 ;;;                                    definition a macro makes
 ;;;   (FUNCTION unreadable parameter)  a parameter with an attribute, or a type
 ;;;                                    of any word but the scalar ones: a
-;;;                                    typedef that may be a pointer
+;;;                                    typedef that may be a pointer; or one
+;;;                                    identifier alone that is no scalar
+;;;                                    word, which a parameter macro would be
+;;;                                    and which would pass for a scalar
 ;;;   (extern unreadable block)        an extern "C" { around definitions
 ;;;
 ;;; and, of the file as a whole, FILE being the file's path:
@@ -304,7 +307,9 @@
 ;; as an array T NAME[...], or as a pointer to a function; no pointer, when
 ;; its type is made of scalar words alone; else unreadable. An attribute on
 ;; it, or a type this scanner has no word for, such as a typedef that may be
-;; a pointer, is unreadable: it cannot be told from a pointer.
+;; a pointer, is unreadable: it cannot be told from a pointer. So is one
+;; identifier alone that is no scalar word, such as a macro that expands to
+;; a whole parameter.
 (define (classify-parameter param)
   (cond ((member "(" param)
          (let ((name (function-pointer-name param)))
@@ -318,7 +323,12 @@
         (else
          (let* ((idents (filter ident-token? param))
                 (types (if (null? idents) '() (reverse (cdr (reverse idents))))))
-           (if (for-all (lambda (word) (member word scalar-words)) types) 'none 'unreadable)))))
+           (cond ((not (for-all (lambda (word) (member word scalar-words)) types)) 'unreadable)
+                 ;; One identifier and no type word: a macro that stands for
+                 ;; a whole parameter, pointer or not.
+                 ((and (pair? idents) (null? (cdr idents)) (not (member (car idents) scalar-words)))
+                  'unreadable)
+                 (else 'none))))))
 
 ;; skip-attributes : (Vectorof String) Natural -> Natural
 ;; The index after any __attribute__((...)) from INDEX on.
@@ -667,8 +677,11 @@
 
 ;; --- the real files ----------------------------------------------------------------------
 
-;; Whole, in order: the decoy defines the thirteen entries the load binds, and
-;; every pointer parameter of them is read through its copy. libsodium-oracle.c
+;; Whole, in order: the decoy defines the thirty entries the load binds, two of
+;; them twice (the header spells their str as an array in 1.0.18 and as a
+;; pointer in 1.0.22, the two releases measured; those between are not
+;; tested), and every pointer parameter of them is read through its
+;; copy. libsodium-oracle.c
 ;; includes sodium.h and defines none of their names. A function missing from
 ;; this list, or a breach, is the row's failure; the list is the standing
 ;; positive control of every row below.
@@ -686,7 +699,26 @@
       ("crypto_generichash_bytes_max" ())
       ("crypto_generichash_keybytes_min" ())
       ("crypto_generichash_keybytes_max" ())
-      ("sodium_memcmp" ("b1" "b2")))
+      ("sodium_memcmp" ("b1" "b2"))
+      ("crypto_pwhash_str" ("out" "passwd"))
+      ("crypto_pwhash_str_verify" ("str" "passwd"))
+      ("crypto_pwhash_str_verify" ("str" "passwd"))
+      ("crypto_pwhash_str_needs_rehash" ("str"))
+      ("crypto_pwhash_str_needs_rehash" ("str"))
+      ("crypto_pwhash_strbytes" ())
+      ("crypto_pwhash_strprefix" ())
+      ("crypto_pwhash_opslimit_min" ())
+      ("crypto_pwhash_opslimit_max" ())
+      ("crypto_pwhash_opslimit_interactive" ())
+      ("crypto_pwhash_opslimit_moderate" ())
+      ("crypto_pwhash_opslimit_sensitive" ())
+      ("crypto_pwhash_memlimit_min" ())
+      ("crypto_pwhash_memlimit_max" ())
+      ("crypto_pwhash_memlimit_interactive" ())
+      ("crypto_pwhash_memlimit_moderate" ())
+      ("crypto_pwhash_memlimit_sensitive" ())
+      ("crypto_pwhash_passwd_min" ())
+      ("crypto_pwhash_passwd_max" ()))
      ())
     ("tests/libsodium-oracle.c" () ()))
   (scan-real))
@@ -956,6 +988,33 @@
          "  return 0;"
          "}")
   '(() (("crypto_x_thing" unreadable parameter))))
+
+(plant "a parameter that is one identifier alone, a macro for a whole parameter, is unreadable, though a scalar word alone is not"
+  (lines "int crypto_x_thing(PASSWD_PARAM, size_t n)"
+         "{"
+         "  return 0;"
+         "}"
+         "int crypto_y_thing(size_t, int)"
+         "{"
+         "  return 0;"
+         "}")
+  '((("crypto_y_thing" ())) (("crypto_x_thing" unreadable parameter))))
+
+(plant "one function defined twice, an array parameter under one arm of an #if and a pointer under the other, is read twice, each with its pointer once"
+  (lines "#if SODIUM_LIBRARY_VERSION_MAJOR < 26"
+         "int crypto_pwhash_str_verify(const char str[crypto_pwhash_STRBYTES], size_t n)"
+         "{"
+         "  volatile uintptr_t s = (uintptr_t) str;"
+         "  return (int) n;"
+         "}"
+         "#else"
+         "int crypto_pwhash_str_verify(const char *str, size_t n)"
+         "{"
+         "  volatile uintptr_t s = (uintptr_t) str;"
+         "  return (int) n;"
+         "}"
+         "#endif")
+  '((("crypto_pwhash_str_verify" ("str")) ("crypto_pwhash_str_verify" ("str"))) ()))
 
 (plant "a struct parameter is unreadable too, and the function after it is still read"
   (lines "int crypto_x_thing(struct crypto_x_state state)"

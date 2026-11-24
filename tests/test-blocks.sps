@@ -6,9 +6,11 @@
 ;;; other address raises before free runs, and before the wipe does.
 ;;;
 ;;; Memory never loads libsodium, so this suite imports it, as it imports the
-;;; counters. The wipe is a procedure memory is given: every row here hands it
-;;; the suite's own stub, which logs its calls, so what memory passes it, when
-;;; it calls it and what it does when the stub raises are all read directly.
+;;; counters. The writers' rows at the end reach native through eval, under a
+;;; guard, so a native that will not load fails them by name. The wipe is a
+;;; procedure memory is given: every row here hands it the suite's own stub,
+;;; which logs its calls, so what memory passes it, when it calls it and what
+;;; it does when the stub raises are all read directly.
 ;;; A refusal names a size or an address by shown-value: a number as itself,
 ;;; never a secret (ADR-0006).
 ;;;
@@ -40,6 +42,7 @@
 ;;; so none is #f, and each refusal is compared, who and irritants,
 ;;; against a no-raise sentinel.
 (import (rnrs)
+        (rnrs eval)
         (srfi :64)
         (only (chezscheme) foreign-ref foreign-set! getenv library-exports disable-interrupts
               enable-interrupts)
@@ -463,6 +466,273 @@
               (list (car r) (cadr r) (cadr (caddr r)))
               r)
           (native-counts))))
+
+;; --- the writers: call-with-c-string, call-with-utf8 and foreign-ascii-string ---------------------
+;;
+;; Reached through eval, under a guard, as test-native reaches native: a
+;; native that will not load fails these rows by name. Each row reads what the
+;; writer wrote from inside PROC, with foreign-ref, and compares it with a
+;; list written here from string->utf8, which only a test may use. A byte
+;; written past the block, and a block whose terminating 0 was never written,
+;; are seen by the memory gate's Valgrind, as an invalid write and as a read
+;; of an uninitialised byte: a plain run reuses a wiped chunk that reads 0.
+
+(define (native-procedure name)
+  (guard (e (#t (lambda args
+                  (error name "(chez-sodium private native) could not be reached" (describe e)))))
+    (eval name (environment '(chez-sodium private native)))))
+
+(define call-with-c-string (native-procedure 'call-with-c-string))
+(define call-with-utf8 (native-procedure 'call-with-utf8))
+(define foreign-ascii-string (native-procedure 'foreign-ascii-string))
+
+;; make-list-of : Natural Any -> (Listof Any)
+(define (make-list-of n x) (if (= n 0) '() (cons x (make-list-of (- n 1) x))))
+
+;; guarded : (-> Any) -> Any
+(define (guarded thunk)
+  (guard (e (#t (list 'raised (describe e))))
+    (thunk)))
+
+;; raised-shape : (-> Any) -> Any
+;; (refused WHO IRRITANTS) for an assertion violation, (other TEXT) for any
+;; other raise, (no-raise VALUE) when THUNK answers.
+(define (raised-shape thunk)
+  (guard (e ((and (assertion-violation? e) (who-condition? e) (irritants-condition? e))
+             (list 'refused (condition-who e) (condition-irritants e)))
+            (#t (list 'other (describe e))))
+    (list 'no-raise (thunk))))
+
+;; utf8-written : String Natural -> Any
+;; call-with-utf8's (ran ADDRESS-POSITIVE BYTES BLOCKS-LIVE) for STRING counted
+;; as N: BYTES being max(1,N) bytes read back inside PROC; or
+;; (changed PROC-CALLS) when CHANGED answered.
+(define (utf8-written string n)
+  (let ((proc-calls 0))
+    (let ((answer (call-with-utf8 'writer string n
+                    (lambda (address)
+                      (set! proc-calls (+ proc-calls 1))
+                      (list 'ran (positive? address) (peek address (max 1 n))
+                            (cdr (assq 'block (native-counts)))))
+                    (lambda () (list 'changed proc-calls)))))
+      answer)))
+
+(define widths-string "a\x7F;\x80;\x7FF;\x800;\xFFFF;\x10000;\x10FFFF;")
+
+(test-equal "call-with-utf8 writes the UTF-8 of each string into a block of (max 1 N), read back inside PROC with the block's address above 0 and one block live: \"\" as the one byte 0, \"a\", \"a\" NUL \"b\", \"pässwörd€\" and a string of each width's edges 7F, 80, 7FF, 800, FFFF, 10000 and 10FFFF"
+  (map (lambda (s)
+         (list 'ran #t (let ((b (bytevector->u8-list (string->utf8 s)))) (if (null? b) '(0) b)) 1))
+       (list "" "a" "a\x0;b" "p\x00E4;ssw\x00F6;rd\x20AC;" widths-string))
+  (guarded (lambda ()
+             (map (lambda (s) (utf8-written s (bytevector-length (string->utf8 s))))
+                  (list "" "a" "a\x0;b" "p\x00E4;ssw\x00F6;rd\x20AC;" widths-string)))))
+
+(test-equal "call-with-utf8 frees its block after PROC: none counted once it returns, and the same for a string answered as changed"
+  (list zero-counts zero-counts)
+  (guarded (lambda ()
+             (call-with-utf8 'writer "p\x00E4;ssw\x00F6;rd\x20AC;" 13 (lambda (a) #f) (lambda () #f))
+             (let ((after-ran (native-counts)))
+               (call-with-utf8 'writer "p\x00E4;ssw\x00F6;rd\x20AC;" 12 (lambda (a) #f) (lambda () #f))
+               (list after-ran (native-counts))))))
+
+(test-equal "call-with-utf8 answers CHANGED's value, and never calls PROC, when N is one more or one less than the string's UTF-8 count: \"pässwörd€\" (13 bytes) at 14 and 12, each width's string at its count +1 and -1, \"a\" at 0, and \"\" at 1"
+  (append (make-list-of 14 '(changed 0)) '((changed 0) (changed 0)))
+  (guarded (lambda ()
+             (let ((strings (list "p\x00E4;ssw\x00F6;rd\x20AC;" "a" "\x7FF;" "\x800;" "\xFFFF;" "\x10000;" "\x10FFFF;")))
+               (append
+                (apply append
+                       (map (lambda (s)
+                              (let ((n (bytevector-length (string->utf8 s))))
+                                (list (utf8-written s (+ n 1)) (utf8-written s (- n 1)))))
+                            strings))
+                (list (utf8-written "a" 0) (utf8-written "" 1)))))))
+
+(test-equal "call-with-utf8 never writes past N: a four-byte character that does not fit the last 3 of N bytes answers CHANGED, a three-byte one the last 2, and a two-byte one the last 1, with PROC never called"
+  '((changed 0) (changed 0) (changed 0))
+  (guarded (lambda ()
+             (list (utf8-written "a\x10000;" 4) (utf8-written "a\x800;" 3) (utf8-written "a\x7FF;" 2)))))
+
+(test-equal "call-with-utf8 answers PROC's value whatever it is: #f, 0, '() and a string are each the answer, and CHANGED's answer is its own value, unwrapped"
+  '(#f 0 () "text" changed-value)
+  (guarded (lambda ()
+             (list (call-with-utf8 'writer "a" 1 (lambda (a) #f) (lambda () 'no))
+                   (call-with-utf8 'writer "a" 1 (lambda (a) 0) (lambda () 'no))
+                   (call-with-utf8 'writer "a" 1 (lambda (a) '()) (lambda () 'no))
+                   (call-with-utf8 'writer "a" 1 (lambda (a) "text") (lambda () 'no))
+                   (call-with-utf8 'writer "a" 2 (lambda (a) 'ran) (lambda () 'changed-value))))))
+
+;; c-string-written : String -> Any
+;; call-with-c-string's (ran ADDRESS-POSITIVE BYTES BLOCKS-LIVE), BYTES the
+;; N+1 bytes read back inside PROC; or (changed PROC-CALLS).
+(define (c-string-written string)
+  (let ((proc-calls 0))
+    (call-with-c-string 'writer string
+      (lambda (address)
+        (set! proc-calls (+ proc-calls 1))
+        (list 'ran (positive? address) (peek address (+ (string-length string) 1))
+              (cdr (assq 'block (native-counts)))))
+      (lambda () (list 'changed proc-calls)))))
+
+(define hash-text "$argon2id$v=19$m=8,t=1,p=1$YNFZTNc7WUJq/v9Atwru5g$OTen/d9lhPgaQexgFJCgC9qQeduKiC0KIvPZlLCNRDE")
+
+(test-equal "call-with-c-string writes each character as one byte and then a 0, in a block of N+1 read back inside PROC with one block live: \"\" as the one byte 0, \"!~\" at the range's edges, \"pw\", and a 93-character hash string whole, its 0 the 94th byte"
+  (map (lambda (s) (list 'ran #t (append (bytevector->u8-list (string->utf8 s)) '(0)) 1))
+       (list "" "!~" "pw" hash-text))
+  (guarded (lambda () (map c-string-written (list "" "!~" "pw" hash-text)))))
+
+(test-equal "call-with-c-string answers CHANGED's value and never calls PROC for a character outside U+0021 to U+007E, first, in the middle or last: a space, U+007F, U+00E9, U+0000 and U+20AC"
+  (make-list-of 15 '(changed 0))
+  (guarded (lambda ()
+             (apply append
+                    (map (lambda (c)
+                           (let ((c (string c)))
+                             (list (c-string-written (string-append c "ab"))
+                                   (c-string-written (string-append "a" c "b"))
+                                   (c-string-written (string-append "ab" c)))))
+                         (list #\space #\x7F #\xE9 #\x0 #\x20AC))))))
+
+(test-equal "call-with-c-string frees its block, and answers PROC's value or CHANGED's: none counted after a run and after a changed string; #f from PROC is the answer"
+  (list zero-counts zero-counts #f 'changed-value)
+  (guarded (lambda ()
+             (let* ((ran (call-with-c-string 'writer "pw" (lambda (a) #f) (lambda () 'no)))
+                    (after-ran (native-counts))
+                    (changed (call-with-c-string 'writer "p w" (lambda (a) 'no) (lambda () 'changed-value)))
+                    (after-changed (native-counts)))
+               (list after-ran after-changed ran changed)))))
+
+;; The writers' own refusals, each before any block: who and irritants whole,
+;; and no block counted after. A string is a secret: a refusal of one names
+;; its kind alone.
+
+(define (refused-writers)
+  (let ((proc (lambda (a) 'ran)) (changed (lambda () 'changed)))
+    (list
+     (raised-shape (lambda () (call-with-c-string 42 "pw" proc changed)))
+     (raised-shape (lambda () (call-with-c-string 'w #vu8(1 2) proc changed)))
+     (raised-shape (lambda () (call-with-c-string 'w 'secret-symbol proc changed)))
+     (raised-shape (lambda () (call-with-c-string 'w '(#\a #\b) proc changed)))
+     (raised-shape (lambda () (call-with-c-string 'w "pw" 42 changed)))
+     (raised-shape (lambda () (call-with-c-string 'w "pw" proc 'no)))
+     (raised-shape (lambda () (call-with-utf8 42 "pw" 2 proc changed)))
+     (raised-shape (lambda () (call-with-utf8 'w #vu8(1 2) 2 proc changed)))
+     (raised-shape (lambda () (call-with-utf8 'w 12345 2 proc changed)))
+     (raised-shape (lambda () (call-with-utf8 'w "pw" -1 proc changed)))
+     (raised-shape (lambda () (call-with-utf8 'w "pw" 1.5 proc changed)))
+     (raised-shape (lambda () (call-with-utf8 'w "pw" "2" proc changed)))
+     (raised-shape (lambda () (call-with-utf8 'w "pw" 2 'no changed)))
+     (raised-shape (lambda () (call-with-utf8 'w "pw" 2 proc 7))))))
+
+(test-equal "the writers refuse before any block: a who that is no symbol, from the helper; a string that is no string by its kind alone; an N that is no exact natural, a PROC and a CHANGED that are no procedure, from WHO by shown-value; no block counted after"
+  (list '((refused call-with-c-string (42))
+          (refused w (not-a-string string (kind bytevector)))
+          (refused w (not-a-string string (kind symbol)))
+          (refused w (not-a-string string (kind list)))
+          (refused w (42))
+          (refused w (no))
+          (refused call-with-utf8 (42))
+          (refused w (not-a-string string (kind bytevector)))
+          (refused w (not-a-string string (kind number)))
+          (refused w (-1))
+          (refused w (1.5))
+          (refused w ((kind string)))
+          (refused w (no))
+          (refused w (7)))
+        zero-counts)
+  (guarded (lambda () (let ((r (refused-writers))) (list r (native-counts))))))
+
+;; holds-part? : Any -> Boolean
+;; Whether X holds, at any depth, a piece of the secrets the row below hands the
+;; writers: the symbol topsecret, the characters t, o and p, the numbers 116,
+;; 111 and 112, or a string with one of those characters. It looks in every
+;; pair, every vector, and every string's characters.
+(define (holds-part? x)
+  (cond ((pair? x) (or (holds-part? (car x)) (holds-part? (cdr x))))
+        ((vector? x) (holds-part? (vector->list x)))
+        ((string? x) (holds-part? (string->list x)))
+        ((symbol? x) (eq? x 'topsecret))
+        ((char? x) (and (memv x '(#\t #\o #\p)) #t))
+        ((number? x) (and (memv x '(116 111 112)) #t))
+        (else #f)))
+
+(test-equal "a refusal of a secret string holds no part of it, at any depth: the irritants of a symbol, a list of characters and a bytevector hold their kind alone, whatever they contain"
+  'clean
+  (guarded (lambda ()
+             (let ((shown (map (lambda (r) (if (and (pair? r) (eq? (car r) 'refused)) (caddr r) r))
+                               (list (raised-shape (lambda () (call-with-utf8 'w 'topsecret 1 (lambda (a) 1) (lambda () 2))))
+                                     (raised-shape (lambda () (call-with-c-string 'w 'topsecret (lambda (a) 1) (lambda () 2))))
+                                     (raised-shape (lambda () (call-with-c-string 'w '(#\t #\o #\p) (lambda (a) 1) (lambda () 2))))
+                                     (raised-shape (lambda () (call-with-c-string 'w #vu8(116 111 112) (lambda (a) 1) (lambda () 2))))))))
+               (if (exists holds-part? shown) shown 'clean)))))
+
+;; The order of the writers' checks: the who first, then the string, the N, PROC and CHANGED
+;; (call-with-c-string has no N: who, string, PROC, CHANGED).
+(test-equal "the writers check in order: a bad who before a bad string, a bad string before a bad N, a bad N before a bad PROC, a bad PROC before a bad CHANGED"
+  '((refused call-with-utf8 (42))
+    (refused w (not-a-string string (kind number)))
+    (refused w (-1))
+    (refused w (no-proc)))
+  (guarded (lambda ()
+             (list (raised-shape (lambda () (call-with-utf8 42 7 -1 'p 'c)))
+                   (raised-shape (lambda () (call-with-utf8 'w 7 -1 'p 'c)))
+                   (raised-shape (lambda () (call-with-utf8 'w "x" -1 'no-proc 'c)))
+                   (raised-shape (lambda () (call-with-utf8 'w "x" 1 'no-proc 'c)))))))
+
+(test-equal "call-with-c-string checks in order: a bad who before a bad string, a bad string before a bad PROC, a bad PROC before a bad CHANGED"
+  '((refused call-with-c-string (42))
+    (refused w (not-a-string string (kind number)))
+    (refused w (no-proc))
+    (refused w (no-changed)))
+  (guarded (lambda ()
+             (list (raised-shape (lambda () (call-with-c-string 42 7 'p 'c)))
+                   (raised-shape (lambda () (call-with-c-string 'w 7 'no-proc 'c)))
+                   (raised-shape (lambda () (call-with-c-string 'w "x" 'no-proc 'no-changed)))
+                   (raised-shape (lambda () (call-with-c-string 'w "x" (lambda (a) 1) 'no-changed)))))))
+
+;; foreign-ascii-string.
+
+;; with-bytes-block : (Listof Natural) (Natural -> Any) -> Any
+;; PROC's answer, given a block holding BYTES, freed after.
+(define (with-bytes-block bytes proc)
+  (with-block (max 1 (length bytes))
+    (lambda (block) (poke! block bytes) (proc block))))
+
+(test-equal "foreign-ascii-string reads the bytes before the first 0 within N as characters: \"abc\" from 61 62 63 00 with N 4 and with N 8 over bytes after the 0; \"\" from a 0 first; the byte 7F as U+007F"
+  '("abc" "abc" "" "a\x7F;")
+  (guarded (lambda ()
+             (list (with-bytes-block '(#x61 #x62 #x63 0) (lambda (b) (foreign-ascii-string b 4)))
+                   (with-bytes-block '(#x61 #x62 #x63 0 #x78 #x79 #x7A #x7B)
+                     (lambda (b) (foreign-ascii-string b 8)))
+                   (with-bytes-block '(0 #x61) (lambda (b) (foreign-ascii-string b 2)))
+                   (with-bytes-block '(#x61 #x7F 0) (lambda (b) (foreign-ascii-string b 3)))))))
+
+(test-equal "foreign-ascii-string answers #f, compared as the symbol false, when no 0 lies within N: 61 62 63 with N 3, a 0 at index 3 with N 3, and N 0; and when a byte before the 0 is 0x80 or more: 80, and 61 C3 A9 00"
+  '(false false false false false)
+  (guarded (lambda ()
+             (let ((f (lambda (v) (if (eq? v #f) 'false v))))
+               (list (f (with-bytes-block '(#x61 #x62 #x63 #x64) (lambda (b) (foreign-ascii-string b 3))))
+                     (f (with-bytes-block '(#x61 #x62 #x63 0) (lambda (b) (foreign-ascii-string b 3))))
+                     (f (with-bytes-block '(0) (lambda (b) (foreign-ascii-string b 0))))
+                     (f (with-bytes-block '(#x80 0) (lambda (b) (foreign-ascii-string b 2))))
+                     (f (with-bytes-block '(#x61 #xC3 #xA9 0) (lambda (b) (foreign-ascii-string b 4)))))))))
+
+(test-equal "foreign-ascii-string reads a 93-character hash string out of a 128-byte block that holds A5 after its 0, whole"
+  (list hash-text)
+  (guarded (lambda ()
+             (list (with-block 128
+                     (lambda (b)
+                       (poke! b (append (bytevector->u8-list (string->utf8 hash-text))
+                                        (list 0)
+                                        (make-list-of (- 128 (string-length hash-text) 1) #xA5)))
+                       (foreign-ascii-string b 128)))))))
+
+(test-equal "foreign-ascii-string refuses an address and a count that are no exact naturals, and NULL with bytes to read, from itself"
+  '((refused foreign-ascii-string (address (kind string)))
+    (refused foreign-ascii-string (count -1))
+    (refused foreign-ascii-string (null-address 3)))
+  (guarded (lambda ()
+             (list (raised-shape (lambda () (foreign-ascii-string "x" 1)))
+                   (raised-shape (lambda () (foreign-ascii-string 8 -1)))
+                   (raised-shape (lambda () (foreign-ascii-string 0 3)))))))
 
 (test-equal "every count is zero at the end"
   zero-counts

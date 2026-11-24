@@ -25,13 +25,18 @@
 ;;;                  other answer is init-failed, and the answer is recorded
 ;;;   6. the rest    every other entry point, bound eagerly: sodium_memzero,
 ;;;                  then randombytes_buf, crypto_generichash, its five size
-;;;                  functions and sodium_memcmp. Each later verb's entry
-;;;                  points are appended here. Each binding a verb calls has
-;;;                  one pair in the answers; a size function has none, and
-;;;                  its value has one, from step 7
-;;;   7. the sizes   crypto_generichash's five size functions, each called
-;;;                  once, its answer recorded: the verbs check against these
-;;;                  numbers, and no size is written in Scheme (ADR-0001)
+;;;                  functions and sodium_memcmp; then crypto_pwhash_str,
+;;;                  crypto_pwhash_str_verify, crypto_pwhash_str_needs_rehash
+;;;                  and the fourteen constant functions of the password
+;;;                  hash. Each binding a verb calls has one pair in the
+;;;                  answers; a size or constant function has none, and its
+;;;                  value has one, from step 7
+;;;   7. the sizes   crypto_generichash's five size functions, then the
+;;;      and the     password hash's fourteen constants, each called once,
+;;;      constants   its answer recorded: the verbs check against these
+;;;                  numbers, and no size, limit or prefix is written in
+;;;                  Scheme (ADR-0001). The prefix is a C string, read with
+;;;                  c-string->string, so NULL is recorded as #f
 ;;;
 ;;; Steps 1 to 7 are the let* of one definition, load-answers, run inside one
 ;;; call-in-section: dlopen, every bind, sodium_init and the size calls happen
@@ -69,15 +74,23 @@
 ;;; No binding takes a Scheme object: every argument is an integer or the
 ;;; address of a counted block, and every pointer is a uptr, never Chez's
 ;;; string, utf-8, u8* or scheme-object types, nor a bytevector (ADR-0001).
-;;; Every binding here is plain: none is known to wait, and none is
-;;; __collect_safe.
+;;; crypto_pwhash_str and crypto_pwhash_str_verify run as long as their
+;;; limits ask, so each is __collect_safe: another thread's collection goes
+;;; on while they run, even inside a verb's critical section. Every other
+;;; binding is plain, its work bounded by the input cap.
 ;;;
 ;;; Strings and bytes cross in counted blocks (ADR-0001). call-with-bytes
 ;;; hands C a copy of a bytevector's bytes in a counted block of at least one
 ;;; byte, so an empty value is never NULL, read in place and written straight
 ;;; into the block, with no Scheme copy of it (ADR-0008); foreign-bytes copies
 ;;; a counted run out of a pointer; c-string->bytevector copies the bytes up to
-;;; a NUL, undecoded; and c-string->string decodes what it reads. No other
+;;; a NUL, undecoded; and c-string->string decodes what it reads. Two writers
+;;; take a string, read in place: call-with-c-string writes a printable-ASCII
+;;; string's characters as bytes, then a 0, and call-with-utf8 writes a
+;;; string's UTF-8 from char->integer, with no string->utf8, into a block of
+;;; the byte count its caller took. A string that changed since its check is
+;;; answered as data, by the CHANGED thunk, and PROC is not called.
+;;; foreign-ascii-string reads a hash string back out of a block. No other
 ;;; library may read or write foreign memory (check-seam).
 ;;;
 ;;; Each block is freed when PROC returns, raises or escapes, and a PROC
@@ -114,13 +127,22 @@
           randombytes-buf crypto-generichash sodium-memcmp
           generichash-bytes generichash-bytes-min generichash-bytes-max
           generichash-keybytes-min generichash-keybytes-max
+          crypto-pwhash-str crypto-pwhash-str-verify crypto-pwhash-str-needs-rehash
+          pwhash-strbytes pwhash-strprefix
+          pwhash-opslimit-min pwhash-opslimit-max pwhash-opslimit-interactive
+          pwhash-opslimit-moderate pwhash-opslimit-sensitive
+          pwhash-memlimit-min pwhash-memlimit-max pwhash-memlimit-interactive
+          pwhash-memlimit-moderate pwhash-memlimit-sensitive
+          pwhash-passwd-min pwhash-passwd-max
           call-in-section call-with-block call-with-bytes foreign-bytes
+          call-with-c-string call-with-utf8 foreign-ascii-string
           c-string->bytevector c-string->string)
   (import (chez-sodium private require-threaded)
           (except (rnrs) dynamic-wind)
+          (rnrs mutable-strings)
           (only (chezscheme) critical-section display-condition dynamic-wind foreign-entry?
                 foreign-procedure foreign-ref foreign-set! format format-condition? getenv
-                load-shared-object machine-type)
+                load-shared-object machine-type string->immutable-string)
           (chez-sodium private load-state)
           (chez-sodium private conditions)
           (chez-sodium private memory)
@@ -374,12 +396,144 @@
                   (loop (+ i 1))))))
         proc)))
 
+  ;; call-with-c-string : Symbol String (Positive-Integer -> A) (-> A) -> A
+  ;; PROC's answer, PROC given the address of a counted block of N+1 bytes,
+  ;; N being STRING's length: each character written as one byte, then a 0.
+  ;; Each character is checked as it is written. One outside U+0021 to U+007E,
+  ;; the range a verb's pre-check allows, means STRING changed after that
+  ;; check: PROC is not called, and CHANGED's answer is the helper's. Nothing
+  ;; raises for it, so the helper is safe inside a verb's critical section.
+  ;; The block is wiped and freed by call-with-block. STRING is read in place,
+  ;; never copied. A WHO that is no symbol is an assertion violation from
+  ;; call-with-c-string; a STRING that is no string is refused through
+  ;; refuse-secret from WHO, irritants (not-a-string string (kind K)); a PROC
+  ;; or CHANGED that is no procedure, from WHO, by shown-value; each before
+  ;; anything is allocated.
+  (define (call-with-c-string who string proc changed)
+    (check-who 'call-with-c-string who)
+    (unless (string? string)
+      (refuse-secret who 'not-a-string 'string string))
+    (unless (procedure? proc)
+      (assertion-violation who "not a procedure" (shown-value proc)))
+    (unless (procedure? changed)
+      (assertion-violation who "not a procedure" (shown-value changed)))
+    (let ((n (string-length string))
+          (intact #t))
+      (call-with-block who (+ n 1)
+        (lambda (block)
+          (let loop ((i 0))
+            (if (< i n)
+                (let ((c (char->integer (string-ref string i))))
+                  (if (and (>= c #x21) (<= c #x7E))
+                      (begin
+                        (foreign-set! 'unsigned-8 block i c)
+                        (loop (+ i 1)))
+                      (set! intact #f)))
+                (foreign-set! 'unsigned-8 block n 0))))
+        (lambda (block)
+          (if intact (proc block) (changed))))))
+
+  ;; call-with-utf8 : Symbol String Natural (Positive-Integer -> A) (-> A) -> A
+  ;; PROC's answer, PROC given the address of a counted block of (max 1 N)
+  ;; bytes holding STRING's UTF-8, N being the count the caller took before its
+  ;; section. Each character is encoded from char->integer, one to four bytes,
+  ;; and its bytes are written only if they fit what is left of N. The write
+  ;; must end with exactly N bytes: otherwise STRING changed after the count,
+  ;; PROC is not called, and CHANGED's answer is the helper's. Nothing raises
+  ;; for it. An empty STRING with N of 0 gets a block of one byte, written 0,
+  ;; never NULL. STRING is never copied: no bytevector or string holds the
+  ;; password's bytes (ADR-0008). Chez holds no surrogate in a string, so every
+  ;; character has an encoding. A WHO that is no symbol is an assertion
+  ;; violation from call-with-utf8; a STRING that is no string is refused
+  ;; through refuse-secret from WHO, irritants (not-a-string string (kind K));
+  ;; an N that is no exact natural, and a PROC or CHANGED that is no procedure,
+  ;; from WHO, by shown-value; each before anything is allocated.
+  (define (call-with-utf8 who string n proc changed)
+    (check-who 'call-with-utf8 who)
+    (unless (string? string)
+      (refuse-secret who 'not-a-string 'string string))
+    (unless (exact-natural? n)
+      (assertion-violation who "not an exact natural" (shown-value n)))
+    (unless (procedure? proc)
+      (assertion-violation who "not a procedure" (shown-value proc)))
+    (unless (procedure? changed)
+      (assertion-violation who "not a procedure" (shown-value changed)))
+    (let ((len (string-length string))
+          (intact #t))
+      (call-with-block who (max 1 n)
+        (lambda (block)
+          (let loop ((i 0) (at 0))
+            (if (< i len)
+                (let* ((c (char->integer (string-ref string i)))
+                       (width (cond ((< c #x80) 1) ((< c #x800) 2) ((< c #x10000) 3) (else 4))))
+                  (if (> (+ at width) n)
+                      (set! intact #f)
+                      (begin
+                        (case width
+                          ((1) (foreign-set! 'unsigned-8 block at c))
+                          ((2) (foreign-set! 'unsigned-8 block at
+                                             (bitwise-ior #xC0 (bitwise-arithmetic-shift-right c 6)))
+                               (foreign-set! 'unsigned-8 block (+ at 1)
+                                             (bitwise-ior #x80 (bitwise-and c #x3F))))
+                          ((3) (foreign-set! 'unsigned-8 block at
+                                             (bitwise-ior #xE0 (bitwise-arithmetic-shift-right c 12)))
+                               (foreign-set! 'unsigned-8 block (+ at 1)
+                                             (bitwise-ior #x80 (bitwise-and (bitwise-arithmetic-shift-right c 6) #x3F)))
+                               (foreign-set! 'unsigned-8 block (+ at 2)
+                                             (bitwise-ior #x80 (bitwise-and c #x3F))))
+                          (else (foreign-set! 'unsigned-8 block at
+                                              (bitwise-ior #xF0 (bitwise-arithmetic-shift-right c 18)))
+                                (foreign-set! 'unsigned-8 block (+ at 1)
+                                              (bitwise-ior #x80 (bitwise-and (bitwise-arithmetic-shift-right c 12) #x3F)))
+                                (foreign-set! 'unsigned-8 block (+ at 2)
+                                              (bitwise-ior #x80 (bitwise-and (bitwise-arithmetic-shift-right c 6) #x3F)))
+                                (foreign-set! 'unsigned-8 block (+ at 3)
+                                              (bitwise-ior #x80 (bitwise-and c #x3F)))))
+                        (loop (+ i 1) (+ at width)))))
+                (if (= n 0)
+                    (foreign-set! 'unsigned-8 block 0 0)
+                    (unless (= at n) (set! intact #f))))))
+        (lambda (block)
+          (if intact (proc block) (changed))))))
+
+  ;; foreign-ascii-string : Natural Natural -> (U String #f)
+  ;; The bytes at ADDRESS before the first 0 within N bytes, each a character
+  ;; of its own, in a fresh string filled in place, with no list or other
+  ;; Scheme copy of a hash on the way; #f when no byte within N is 0, or a
+  ;; byte before that 0 is 0x80 or more. An ADDRESS or an N that is no exact
+  ;; natural, and NULL with N above 0, are assertion violations from
+  ;; foreign-ascii-string, as foreign-bytes' are.
+  (define (foreign-ascii-string address n)
+    (unless (exact-natural? address)
+      (assertion-violation 'foreign-ascii-string "an address is an exact non-negative integer"
+                           'address (shown-value address)))
+    (unless (exact-natural? n)
+      (assertion-violation 'foreign-ascii-string "a count of bytes is an exact non-negative integer"
+                           'count (shown-value n)))
+    (when (and (eqv? address 0) (> n 0))
+      (assertion-violation 'foreign-ascii-string "NULL holds no bytes to read" 'null-address n))
+    (let ((end (let scan ((i 0))
+                 (cond ((= i n) #f)
+                       ((eqv? (foreign-ref 'unsigned-8 address i) 0) i)
+                       (else (scan (+ i 1)))))))
+      (and end
+           (let ((text (make-string end)))
+             (let fill ((i 0))
+               (if (= i end)
+                   text
+                   (let ((byte (foreign-ref 'unsigned-8 address i)))
+                     (and (< byte #x80)
+                          (begin
+                            (string-set! text i (integer->char byte))
+                            (fill (+ i 1)))))))))))
+
   ;; --- 1 to 7. the load, in one section ------------------------------------------
 
   ;; The load's answers, as an alist: the record of the load, each raw
-  ;; binding, and the sizes. The let* is the order of the steps above. A later
-  ;; verb's entry points are bound by inits appended after raw-memcmp, before
-  ;; the sizes are read, with one pair each added to the answers.
+  ;; binding, the sizes and the constants. The let* is the order of the steps
+  ;; above. A later verb's entry points are bound by inits appended after the
+  ;; password hash's, before the sizes are read, with one pair each added to
+  ;; the answers.
   (define load-answers
     (load-step
      (call-in-section
@@ -458,11 +612,102 @@
                (raw-memcmp
                 (bind-required chosen
                   (foreign-procedure "sodium_memcmp" (uptr uptr size_t) int)))
+               ;; int crypto_pwhash_str(char out[crypto_pwhash_STRBYTES],
+               ;;                       const char * const passwd,
+               ;;                       unsigned long long passwdlen,
+               ;;                       unsigned long long opslimit, size_t memlimit)
+               (raw-pwhash-str
+                (bind-required chosen
+                  (foreign-procedure __collect_safe "crypto_pwhash_str"
+                                     (uptr uptr unsigned-64 unsigned-64 size_t) int)))
+               ;; int crypto_pwhash_str_verify(const char *str, const char * const passwd,
+               ;;                              unsigned long long passwdlen)
+               (raw-pwhash-str-verify
+                (bind-required chosen
+                  (foreign-procedure __collect_safe "crypto_pwhash_str_verify"
+                                     (uptr uptr unsigned-64) int)))
+               ;; int crypto_pwhash_str_needs_rehash(const char *str,
+               ;;                                    unsigned long long opslimit,
+               ;;                                    size_t memlimit)
+               (raw-pwhash-str-needs-rehash
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_str_needs_rehash" (uptr unsigned-64 size_t)
+                                     int)))
+               ;; size_t crypto_pwhash_strbytes(void)
+               (raw-pwhash-strbytes
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_strbytes" () size_t)))
+               ;; const char *crypto_pwhash_strprefix(void)
+               (raw-pwhash-strprefix
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_strprefix" () uptr)))
+               ;; size_t crypto_pwhash_opslimit_min(void)
+               (raw-pwhash-opslimit-min
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_opslimit_min" () size_t)))
+               ;; size_t crypto_pwhash_opslimit_max(void)
+               (raw-pwhash-opslimit-max
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_opslimit_max" () size_t)))
+               ;; size_t crypto_pwhash_opslimit_interactive(void)
+               (raw-pwhash-opslimit-interactive
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_opslimit_interactive" () size_t)))
+               ;; size_t crypto_pwhash_opslimit_moderate(void)
+               (raw-pwhash-opslimit-moderate
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_opslimit_moderate" () size_t)))
+               ;; size_t crypto_pwhash_opslimit_sensitive(void)
+               (raw-pwhash-opslimit-sensitive
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_opslimit_sensitive" () size_t)))
+               ;; size_t crypto_pwhash_memlimit_min(void)
+               (raw-pwhash-memlimit-min
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_memlimit_min" () size_t)))
+               ;; size_t crypto_pwhash_memlimit_max(void)
+               (raw-pwhash-memlimit-max
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_memlimit_max" () size_t)))
+               ;; size_t crypto_pwhash_memlimit_interactive(void)
+               (raw-pwhash-memlimit-interactive
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_memlimit_interactive" () size_t)))
+               ;; size_t crypto_pwhash_memlimit_moderate(void)
+               (raw-pwhash-memlimit-moderate
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_memlimit_moderate" () size_t)))
+               ;; size_t crypto_pwhash_memlimit_sensitive(void)
+               (raw-pwhash-memlimit-sensitive
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_memlimit_sensitive" () size_t)))
+               ;; size_t crypto_pwhash_passwd_min(void)
+               (raw-pwhash-passwd-min
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_passwd_min" () size_t)))
+               ;; size_t crypto_pwhash_passwd_max(void)
+               (raw-pwhash-passwd-max
+                (bind-required chosen
+                  (foreign-procedure "crypto_pwhash_passwd_max" () size_t)))
                (bytes (raw-generichash-bytes))
                (bytes-min (raw-generichash-bytes-min))
                (bytes-max (raw-generichash-bytes-max))
                (keybytes-min (raw-generichash-keybytes-min))
-               (keybytes-max (raw-generichash-keybytes-max)))
+               (keybytes-max (raw-generichash-keybytes-max))
+               (strbytes (raw-pwhash-strbytes))
+               (strprefix (c-string->string (raw-pwhash-strprefix)))
+               (opslimit-min (raw-pwhash-opslimit-min))
+               (opslimit-max (raw-pwhash-opslimit-max))
+               (opslimit-interactive (raw-pwhash-opslimit-interactive))
+               (opslimit-moderate (raw-pwhash-opslimit-moderate))
+               (opslimit-sensitive (raw-pwhash-opslimit-sensitive))
+               (memlimit-min (raw-pwhash-memlimit-min))
+               (memlimit-max (raw-pwhash-memlimit-max))
+               (memlimit-interactive (raw-pwhash-memlimit-interactive))
+               (memlimit-moderate (raw-pwhash-memlimit-moderate))
+               (memlimit-sensitive (raw-pwhash-memlimit-sensitive))
+               (passwd-min (raw-pwhash-passwd-min))
+               (passwd-max (raw-pwhash-passwd-max)))
           (list (cons 'path (car chosen)) (cons 'source (cdr chosen))
                 (cons 'version version) (cons 'major major) (cons 'minor minor)
                 (cons 'init init)
@@ -474,11 +719,28 @@
                 (cons 'randombytes-buf raw-randombytes-buf)
                 (cons 'crypto-generichash raw-generichash)
                 (cons 'sodium-memcmp raw-memcmp)
+                (cons 'crypto-pwhash-str raw-pwhash-str)
+                (cons 'crypto-pwhash-str-verify raw-pwhash-str-verify)
+                (cons 'crypto-pwhash-str-needs-rehash raw-pwhash-str-needs-rehash)
                 (cons 'generichash-bytes bytes)
                 (cons 'generichash-bytes-min bytes-min)
                 (cons 'generichash-bytes-max bytes-max)
                 (cons 'generichash-keybytes-min keybytes-min)
-                (cons 'generichash-keybytes-max keybytes-max)))))))
+                (cons 'generichash-keybytes-max keybytes-max)
+                (cons 'pwhash-strbytes strbytes)
+                (cons 'pwhash-strprefix (and strprefix (string->immutable-string strprefix)))
+                (cons 'pwhash-opslimit-min opslimit-min)
+                (cons 'pwhash-opslimit-max opslimit-max)
+                (cons 'pwhash-opslimit-interactive opslimit-interactive)
+                (cons 'pwhash-opslimit-moderate opslimit-moderate)
+                (cons 'pwhash-opslimit-sensitive opslimit-sensitive)
+                (cons 'pwhash-memlimit-min memlimit-min)
+                (cons 'pwhash-memlimit-max memlimit-max)
+                (cons 'pwhash-memlimit-interactive memlimit-interactive)
+                (cons 'pwhash-memlimit-moderate memlimit-moderate)
+                (cons 'pwhash-memlimit-sensitive memlimit-sensitive)
+                (cons 'pwhash-passwd-min passwd-min)
+                (cons 'pwhash-passwd-max passwd-max)))))))
 
   ;; answer : Symbol -> Any
   ;; KEY's value among the load's answers. Every element is a pair, so this
@@ -554,6 +816,88 @@
   ;; generichash-keybytes-max : Natural
   ;; crypto_generichash_keybytes_max(), read once at the load: the longest key.
   (define generichash-keybytes-max (answer 'generichash-keybytes-max))
+
+  ;; crypto-pwhash-str : Positive-Integer Positive-Integer Natural Natural Natural -> Integer
+  ;; int crypto_pwhash_str(out, passwd, passwdlen, opslimit, memlimit),
+  ;; __collect_safe: writes the hash string of PASSWDLEN bytes at PASSWD, at
+  ;; OPSLIMIT passes over MEMLIMIT bytes, NUL-terminated, into the
+  ;; pwhash-strbytes bytes at OUT. 0; or -1 for limits out of range or no
+  ;; memory, with OUT all zeros.
+  (define crypto-pwhash-str (answer 'crypto-pwhash-str))
+
+  ;; crypto-pwhash-str-verify : Positive-Integer Positive-Integer Natural -> Integer
+  ;; int crypto_pwhash_str_verify(str, passwd, passwdlen), __collect_safe: 0
+  ;; when the PASSWDLEN bytes at PASSWD match the hash string STR, read up to
+  ;; its first NUL; -1 for a mismatch, a string it cannot read, or no memory.
+  (define crypto-pwhash-str-verify (answer 'crypto-pwhash-str-verify))
+
+  ;; crypto-pwhash-str-needs-rehash : Positive-Integer Natural Natural -> Integer
+  ;; int crypto_pwhash_str_needs_rehash(str, opslimit, memlimit): 0 when the
+  ;; hash string STR was made at OPSLIMIT and MEMLIMIT, compared in whole
+  ;; KiB; 1 when either differs; -1 when it cannot read STR, and for an
+  ;; OPSLIMIT above 2^32-1.
+  (define crypto-pwhash-str-needs-rehash (answer 'crypto-pwhash-str-needs-rehash))
+
+  ;; pwhash-strbytes : Natural
+  ;; crypto_pwhash_strbytes(), read once at the load: the size of a hash
+  ;; string's output block.
+  (define pwhash-strbytes (answer 'pwhash-strbytes))
+
+  ;; pwhash-strprefix : (U String #f)
+  ;; crypto_pwhash_strprefix(), read once at the load: the prefix of a hash
+  ;; string libsodium makes now, an immutable string, since every importer
+  ;; shares it; #f when libsodium answered NULL.
+  (define pwhash-strprefix (answer 'pwhash-strprefix))
+
+  ;; pwhash-opslimit-min : Natural
+  ;; crypto_pwhash_opslimit_min(), read once at the load.
+  (define pwhash-opslimit-min (answer 'pwhash-opslimit-min))
+
+  ;; pwhash-opslimit-max : Natural
+  ;; crypto_pwhash_opslimit_max(), read once at the load.
+  (define pwhash-opslimit-max (answer 'pwhash-opslimit-max))
+
+  ;; pwhash-opslimit-interactive : Natural
+  ;; crypto_pwhash_opslimit_interactive(), read once at the load.
+  (define pwhash-opslimit-interactive (answer 'pwhash-opslimit-interactive))
+
+  ;; pwhash-opslimit-moderate : Natural
+  ;; crypto_pwhash_opslimit_moderate(), read once at the load.
+  (define pwhash-opslimit-moderate (answer 'pwhash-opslimit-moderate))
+
+  ;; pwhash-opslimit-sensitive : Natural
+  ;; crypto_pwhash_opslimit_sensitive(), read once at the load.
+  (define pwhash-opslimit-sensitive (answer 'pwhash-opslimit-sensitive))
+
+  ;; pwhash-memlimit-min : Natural
+  ;; crypto_pwhash_memlimit_min(), read once at the load, in bytes.
+  (define pwhash-memlimit-min (answer 'pwhash-memlimit-min))
+
+  ;; pwhash-memlimit-max : Natural
+  ;; crypto_pwhash_memlimit_max(), read once at the load, in bytes.
+  (define pwhash-memlimit-max (answer 'pwhash-memlimit-max))
+
+  ;; pwhash-memlimit-interactive : Natural
+  ;; crypto_pwhash_memlimit_interactive(), read once at the load, in bytes.
+  (define pwhash-memlimit-interactive (answer 'pwhash-memlimit-interactive))
+
+  ;; pwhash-memlimit-moderate : Natural
+  ;; crypto_pwhash_memlimit_moderate(), read once at the load, in bytes.
+  (define pwhash-memlimit-moderate (answer 'pwhash-memlimit-moderate))
+
+  ;; pwhash-memlimit-sensitive : Natural
+  ;; crypto_pwhash_memlimit_sensitive(), read once at the load, in bytes.
+  (define pwhash-memlimit-sensitive (answer 'pwhash-memlimit-sensitive))
+
+  ;; pwhash-passwd-min : Natural
+  ;; crypto_pwhash_passwd_min(), read once at the load: the fewest bytes a
+  ;; password may hold.
+  (define pwhash-passwd-min (answer 'pwhash-passwd-min))
+
+  ;; pwhash-passwd-max : Natural
+  ;; crypto_pwhash_passwd_max(), read once at the load: the most bytes a
+  ;; password may hold.
+  (define pwhash-passwd-max (answer 'pwhash-passwd-max))
 
   ;; --- the load's record -----------------------------------------------------------
 

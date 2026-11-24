@@ -203,6 +203,11 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
     of 8 (M3S0-F1).
   - The child starts the watchdog once the marker appears; it releases the FIFO after 10 s. The
     rendezvous must end within 5 s.
+  - Every writer, the collector and the watchdog, opens the FIFO read-write, `: 1<>"$FIFO"`. A
+    write-only open blocks until a reader comes, and the decoy reads once, so the second writer
+    would block for ever (slice 1's review, M3S1-F4, probed). The child kills the watchdog
+    before it exits, and each call has a FIFO and a marker of its own, since a marker outlives
+    its call.
   - Its standing control, a test-side plain binding of the decoy's verify called the same way,
     is released by the watchdog.
   - The FIFO's writer and the watchdog are shells, which run no Scheme and no libsodium. They run

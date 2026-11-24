@@ -1,5 +1,5 @@
 #!r6rs
-;;; One of the eight suites that load libsodium end to end, through
+;;; One of the suites that load libsodium end to end, through
 ;;; (chez-sodium private native), tests/refusal-probe.sps and a decoy
 ;;; (ADR-0002, ADR-0003, ADR-0006, ADR-0011): this one holds the decoy's
 ;;; builds combined with its behaviours: the kept refusal and the kept load,
@@ -13,9 +13,9 @@
 ;;; (ADR-0008).
 ;;;
 ;;; Under the memory gate each child runs under a Valgrind of its own, so
-;;; the rows are split among eight suites, each running at most 14 children,
+;;; the rows are split among the suites, each running at most 14 children,
 ;;; to keep each well under MEMORY_TIMEOUT (ADR-0011); (library-loading)
-;;; holds what all eight use.
+;;; holds what they all use.
 ;;;
 ;;; Native loads libsodium in its library body, once per process, and Chez
 ;;; runs that body before a program's own, so a refusal cannot be caught in
@@ -163,7 +163,8 @@
 (define (no-switch value)
   (lambda (so)
     (loaded so 'override control-report
-            (append (list (string-append "decoy(?" value ")")) version-calls (list init-call) size-calls))))
+            (append (list (string-append "decoy(?" value ")")) version-calls (list init-call)
+                    size-calls constant-calls))))
 
 (decoy-row "control" "Below-floor" '()
   "a value that is no switch behaves as the control, and the log names it"

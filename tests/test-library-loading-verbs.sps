@@ -1,5 +1,5 @@
 #!r6rs
-;;; One of the eight suites that load libsodium end to end through a decoy
+;;; One of the suites that load libsodium end to end through a decoy
 ;;; (ADR-0002, ADR-0006, ADR-0007, ADR-0011): this one runs the verbs of
 ;;; (chez-sodium private byte-verbs) against the control build, one child a
 ;;; switch, through tests/verb-probe.sps. The decoy logs each call it gets, and
@@ -31,16 +31,28 @@
 ;;;   memcmp-other     sodium_memcmp answering 1 for equal operands: the compare
 ;;;                    answers #f, since only 0 is a match
 ;;;
-;;; One more child is the C oracle (tests/libsodium-oracle.c), run against the
-;;; control build under sizes-other. Against the real library each size
-;;; function answers what its twins do, so no row there can tell the oracle's
-;;; line for one from another's; here the five answers differ, and each line
-;;; is held to its own function. Its switch is set in this process's
-;;; environment, which is safe in any order: every verb row's child sets or
-;;; unsets its own.
+;;; More children read the load's constants, which no verb call can tell apart
+;;; against the real library, where opslimit_max and passwd_max both answer
+;;; 4294967295 and so do their macros:
+;;;
+;;;   the oracle        the C oracle (tests/libsodium-oracle.c), run against the
+;;;                     control build under sizes-other, under
+;;;                     pwhash-limits-other and with no switch. Against the real
+;;;                     library each size function answers what its twins do, so
+;;;                     no row there can tell the oracle's line for one from
+;;;                     another's; here the five size answers differ, and under
+;;;                     pwhash-limits-other so do the fourteen constants, the
+;;;                     ops maximum 9 and the password maximum 100 apart. Each
+;;;                     line is held to its own function and its own macro
+;;;   the probe         tests/refusal-probe.sps --constants, under
+;;;                     pwhash-limits-other: native's fourteen recorded
+;;;                     constants, each under its own key
+;;;
+;;; The oracle's switch is set in this process's environment, which is safe in
+;;; any order: every verb row's child sets or unsets its own.
 ;;;
 ;;; Under the memory gate each child runs under a Valgrind of its own
-;;; (ADR-0011), so this suite runs 7 children, at most 14. Each child's counts
+;;; (ADR-0011), so this suite runs 10 children, at most 14. Each child's counts
 ;;; are required zero, and each says whether it ran under Valgrind, which a row
 ;;; requires yes exactly when the gate asked.
 ;;;
@@ -119,6 +131,13 @@
 (define compiled (compile-decoys so-of floor-values builds))
 
 (define (compiled-status build) (decoy-status compiled build))
+
+;; decoy-row : String (U String #f) (Listof String) String (String -> Expected) -> Void
+;; (library-loading)'s decoy-row-in, on this suite's one build.
+(define (decoy-row build switch args description expected)
+  (decoy-row-in so-of compiled-status build switch args description expected))
+
+(define control-report (report (car floor-values) 10 3 0))
 
 ;; verb-row : (U String #f) (Listof String) String (Listof Any) -> Void
 ;; (library-loading)'s verb-row-in, on this suite's one build.
@@ -318,26 +337,69 @@
 
 ;; --- the C oracle against the decoy -----------------------------------------------------------
 
-;; oracle-under-sizes-other : -> Any
+;; oracle-under : String -> Any
 ;; libsodium-oracle's answer for the control build with CHEZ_SODIUM_DECOY set
-;; to sizes-other: what the oracle reads in the decoy's five sizes.
-(define oracle-under-sizes-other
+;; to SWITCH: what the oracle reads in the decoy's functions and macros. The
+;; empty value is no switch, and behaves as the control.
+(define (oracle-under switch)
   (guard (e (#t (list 'raised (describe e))))
     (if (eqv? (compiled-status "control") 0)
-        (begin (putenv "CHEZ_SODIUM_DECOY" "sizes-other")
+        (begin (putenv "CHEZ_SODIUM_DECOY" switch)
                (libsodium-oracle getenv (so-of "control")))
         (list 'not-compiled (compiled-status "control")))))
+
+;; oracle-constant-lines : (Listof Any) (Listof Any) -> (Listof Any)
+;; The oracle's fourteen lines, in step 7's order: (NAME F M) for each, F from
+;; FUNCTIONS, the decoy's answers, M from MACROS, the header's. The prefix's
+;; line is (pwhash-strprefix "F" "M").
+(define (oracle-constant-lines functions macros)
+  (map (lambda (name f m) (list name f m)) constants-keys functions macros))
+
+;; the header's macros: the releases' own, which are the control's answers.
+(define header-constants control-constants)
+
+;; The oracle's output whole: the report, the five size lines, the fourteen
+;; constant lines, then Valgrind's line, as the gate asked.
+(define (oracle-answer sizes constants)
+  (append (list (cons 'version (car floor-values)) '(major . 10) '(minor . 3) '(init 0 0))
+          (map (lambda (name f m) (list name f m))
+               '(generichash-bytes generichash-bytes-min generichash-bytes-max
+                 generichash-keybytes-min generichash-keybytes-max)
+               sizes '(32 16 64 16 64))
+          constants
+          (list valgrind-line)))
 
 ;; Each (NAME F M): F the decoy's answer through its function, M the header's
 ;; macro. The decoy answers 33, 8, 80, 9 and 81; the header says 32, 16, 64, 16
 ;; and 64: no two of the ten are alike but in the macros' pairs, so a line read
-;; through another function shows.
-(test-equal "the C oracle on the control build under sizes-other: its output whole, each size line the decoy's answer for its own function and the header's macro for it, and Valgrind's line as the gate asked"
-  (list (cons 'version (car floor-values)) '(major . 10) '(minor . 3) '(init 0 0)
-        '(generichash-bytes 33 32) '(generichash-bytes-min 8 16) '(generichash-bytes-max 80 64)
-        '(generichash-keybytes-min 9 16) '(generichash-keybytes-max 81 64)
-        valgrind-line)
-  oracle-under-sizes-other)
+;; through another function shows. The constants are the control's, F and M
+;; equal.
+(test-equal "the C oracle on the control build under sizes-other: its output whole, each size line the decoy's answer for its own function and the header's macro for it, the fourteen constant lines the control's, and Valgrind's line as the gate asked"
+  (oracle-answer '(33 8 80 9 81)
+                 (oracle-constant-lines control-constants header-constants))
+  (oracle-under "sizes-other"))
+
+;; Under pwhash-limits-other the decoy's fourteen differ from the header's, and
+;; from each other: opslimit_max answers 9 and passwd_max 100, where the header's
+;; macros are both 4294967295, so a line read through its twin's function shows.
+(test-equal "the C oracle on the control build under pwhash-limits-other: its output whole, each constant line the decoy's answer for its own function and the header's macro for it, the twins opslimit_max and passwd_max apart"
+  (oracle-answer '(32 16 64 16 64)
+                 (oracle-constant-lines other-constants header-constants))
+  (oracle-under "pwhash-limits-other"))
+
+(test-equal "the C oracle on the control build with no switch: its output whole, each constant line the control's, F and M alike"
+  (oracle-answer '(32 16 64 16 64)
+                 (oracle-constant-lines control-constants header-constants))
+  (oracle-under ""))
+
+;; --- native's constants against the decoy ---------------------------------------------------
+
+(decoy-row "control" "pwhash-limits-other" '("--sizes" "yes" "--constants" "yes")
+  "native's fourteen recorded constants under pwhash-limits-other, each under its own key: the twins opslimit_max 9 and passwd_max 100 apart, the prefix the decoy's, and the load's calls in order"
+  (lambda (so)
+    (loaded so 'override
+            (with-constants (with-sizes control-report control-sizes) other-constants)
+            (loaded-calls "pwhash-limits-other"))))
 
 ;; --- this process --------------------------------------------------------------------------------
 

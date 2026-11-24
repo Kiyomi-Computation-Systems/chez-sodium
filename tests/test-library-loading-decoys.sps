@@ -1,5 +1,5 @@
 #!r6rs
-;;; One of the eight suites that load libsodium end to end, through
+;;; One of the suites that load libsodium end to end, through
 ;;; (chez-sodium private native), tests/refusal-probe.sps and a decoy
 ;;; (ADR-0002, ADR-0003, ADR-0006, ADR-0011): this one holds the decoy's
 ;;; behaviours, one switch a row, on the control build.
@@ -7,9 +7,9 @@
 ;;; switch, and tests/test-library-loading-combined.sps the kept refusal.
 ;;;
 ;;; Under the memory gate each child runs under a Valgrind of its own, so
-;;; the rows are split among eight suites, each running at most 14 children,
+;;; the rows are split among the suites, each running at most 14 children,
 ;;; to keep each well under MEMORY_TIMEOUT (ADR-0011); (library-loading)
-;;; holds what all eight use.
+;;; holds what they all use.
 ;;;
 ;;; Native loads libsodium in its library body, once per process, and Chez
 ;;; runs that body before a program's own, so a refusal cannot be caught in
@@ -137,9 +137,12 @@
   (lambda (so)
     (refused 'below-floor so 'override detail '() (apply log-of switch version-calls))))
 
-(decoy-row "control" #f '("--sizes" "yes")
-  "the floor itself is accepted: the report's four fields, native's five sizes, and the load's calls in order"
-  (lambda (so) (loaded so 'override (with-sizes control-report control-sizes) (control-calls))))
+(decoy-row "control" #f '("--sizes" "yes" "--constants" "yes")
+  "the floor itself is accepted: the report's four fields, native's five sizes and fourteen constants, and the load's calls in order"
+  (lambda (so)
+    (loaded so 'override
+            (with-constants (with-sizes control-report control-sizes) control-constants)
+            (control-calls))))
 
 (decoy-row "control" "below-floor" '()
   "one patch below the floor is below-floor, detail its version, and sodium_init never runs"
@@ -189,7 +192,7 @@
     (loaded so 'override (with-sizes control-report other-sizes) (loaded-calls "sizes-other"))))
 
 ;; The three other switches of the verbs' entry points do nothing at the load
-;; but show in the log: only the five size calls run there. What each answers
+;; but show in the log: only the size and constant calls run there. What each answers
 ;; is held in test-library-loading-combined, through bindings of the probe's
 ;; own.
 (for-each

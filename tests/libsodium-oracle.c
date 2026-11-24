@@ -26,10 +26,32 @@
  *                             through the library; M is the header's macro
  *                             for it, crypto_generichash_BYTES, _BYTES_MIN,
  *                             _BYTES_MAX, _KEYBYTES_MIN or _KEYBYTES_MAX
+ *   (pwhash-strbytes F M)     then thirteen more lines, one for each of the
+ *                             password hash's fourteen constants, after the
+ *                             five generichash lines, in this order:
+ *                             strbytes, strprefix, the five opslimits (min,
+ *                             max, interactive, moderate, sensitive), the
+ *                             five memlimits likewise, then passwd-min and
+ *                             passwd-max. F is the function's answer and M
+ *                             the header's macro, crypto_pwhash_STRBYTES,
+ *                             _OPSLIMIT_MIN, ... _PASSWD_MAX. The prefix's
+ *                             line is (pwhash-strprefix "F" "M"), F being #f
+ *                             when the function answers NULL
  *   (valgrind . yes)          whether this process runs under Valgrind's
  *                             memcheck: yes when /proc/self/maps maps
  *                             vgpreload_memcheck, else no. Under make
  *                             test-memory the suites require yes (ADR-0011).
+ *
+ * Two more modes take a hex string, the bytes of a password, empty for the
+ * empty password:
+ *
+ *   libsodium-oracle PATH hash HEX
+ *       hashes the password with crypto_pwhash_str at the library's own
+ *       minimum opslimit and memlimit, and prints (hash . "STRING"), then
+ *       (valgrind . yes) or (valgrind . no) as above
+ *   libsodium-oracle PATH verify STRING HEX
+ *       prints (verify . CODE), crypto_pwhash_str_verify's answer for STRING
+ *       and the password, then the (valgrind . ...) line
  *
  * The three version functions are called before the first sodium_init, which
  * libsodium allows. It exits 0, 1 with a message on stderr when PATH will not
@@ -74,6 +96,39 @@ static int under_valgrind(void)
   return found;
 }
 
+/* hex_value: the value of one hex digit, or -1. */
+static int hex_value(int c)
+{
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
+/* decode_hex: HEX's bytes in a fresh block of at least one byte, so the
+ * pointer is never NULL, and *LEN their count; NULL for an odd length or a
+ * character that is no hex digit. */
+static unsigned char *decode_hex(const char *hex, size_t *len)
+{
+  size_t n = strlen(hex);
+  size_t i;
+  unsigned char *bytes;
+  if (n % 2) return NULL;
+  bytes = calloc(n / 2 + 1, 1);
+  if (!bytes) return NULL;
+  for (i = 0; i < n / 2; i++) {
+    int hi = hex_value((unsigned char) hex[2 * i]);
+    int lo = hex_value((unsigned char) hex[2 * i + 1]);
+    if (hi < 0 || lo < 0) {
+      free(bytes);
+      return NULL;
+    }
+    bytes[i] = (unsigned char) (hi * 16 + lo);
+  }
+  *len = n / 2;
+  return bytes;
+}
+
 /* FIND: VAR, NAME's address in the library LIB, typed by the header's
  * prototype, or exit 1 naming the function. */
 #define FIND(var, name)                                                     \
@@ -86,14 +141,58 @@ static int under_valgrind(void)
 int main(int argc, char **argv)
 {
   void *lib;
-  if (argc != 2) {
-    fprintf(stderr, "usage: libsodium-oracle PATH\n");
+  int hash_mode = argc == 4 && !strcmp(argv[2], "hash");
+  int verify_mode = argc == 5 && !strcmp(argv[2], "verify");
+  if (argc != 2 && !hash_mode && !verify_mode) {
+    fprintf(stderr, "usage: libsodium-oracle PATH [hash HEX | verify STRING HEX]\n");
     return 2;
   }
   lib = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
   if (!lib) {
     fprintf(stderr, "libsodium-oracle: %s\n", dlerror());
     return 1;
+  }
+  if (hash_mode || verify_mode) {
+    FIND(init, sodium_init)
+    FIND(str, crypto_pwhash_str)
+    FIND(str_verify, crypto_pwhash_str_verify)
+    FIND(strbytes, crypto_pwhash_strbytes)
+    FIND(opslimit_min, crypto_pwhash_opslimit_min)
+    FIND(memlimit_min, crypto_pwhash_memlimit_min)
+    {
+      size_t len = 0;
+      unsigned char *password = decode_hex(argv[hash_mode ? 3 : 4], &len);
+      if (!password) {
+        fprintf(stderr, "libsodium-oracle: not a hex string\n");
+        return 2;
+      }
+      if (init() < 0) {
+        fprintf(stderr, "libsodium-oracle: sodium_init failed\n");
+        return 1;
+      }
+      if (hash_mode) {
+        size_t out_size = strbytes();
+        char *out = calloc(out_size + 1, 1);
+        size_t ops = opslimit_min();
+        size_t mem = memlimit_min();
+        int code;
+        if (!out) return 1;
+        code = str(out, (const char *) password, len, ops, mem);
+        if (code != 0) {
+          fprintf(stderr, "libsodium-oracle: crypto_pwhash_str answered %d\n", code);
+          return 1;
+        }
+        printf("(hash . ");
+        put_quoted(out);
+        printf(")\n");
+        free(out);
+      } else {
+        printf("(verify . %d)\n", str_verify(argv[3], (const char *) password, len));
+      }
+      printf("(valgrind . %s)\n", under_valgrind() ? "yes" : "no");
+      free(password);
+      return 0;
+    }
   }
   {
     FIND(version, sodium_version_string)
@@ -105,6 +204,20 @@ int main(int argc, char **argv)
     FIND(bytes_max, crypto_generichash_bytes_max)
     FIND(keybytes_min, crypto_generichash_keybytes_min)
     FIND(keybytes_max, crypto_generichash_keybytes_max)
+    FIND(strbytes, crypto_pwhash_strbytes)
+    FIND(strprefix, crypto_pwhash_strprefix)
+    FIND(opslimit_min, crypto_pwhash_opslimit_min)
+    FIND(opslimit_max, crypto_pwhash_opslimit_max)
+    FIND(opslimit_interactive, crypto_pwhash_opslimit_interactive)
+    FIND(opslimit_moderate, crypto_pwhash_opslimit_moderate)
+    FIND(opslimit_sensitive, crypto_pwhash_opslimit_sensitive)
+    FIND(memlimit_min, crypto_pwhash_memlimit_min)
+    FIND(memlimit_max, crypto_pwhash_memlimit_max)
+    FIND(memlimit_interactive, crypto_pwhash_memlimit_interactive)
+    FIND(memlimit_moderate, crypto_pwhash_memlimit_moderate)
+    FIND(memlimit_sensitive, crypto_pwhash_memlimit_sensitive)
+    FIND(passwd_min, crypto_pwhash_passwd_min)
+    FIND(passwd_max, crypto_pwhash_passwd_max)
     /* C leaves the order of a call's arguments open: each answer is read
      * into its own variable first, in the order they are printed. */
     {
@@ -118,6 +231,20 @@ int main(int argc, char **argv)
       size_t bytes_max_answer = bytes_max();
       size_t keybytes_min_answer = keybytes_min();
       size_t keybytes_max_answer = keybytes_max();
+      size_t strbytes_answer = strbytes();
+      const char *strprefix_answer = strprefix();
+      size_t opslimit_min_answer = opslimit_min();
+      size_t opslimit_max_answer = opslimit_max();
+      size_t opslimit_interactive_answer = opslimit_interactive();
+      size_t opslimit_moderate_answer = opslimit_moderate();
+      size_t opslimit_sensitive_answer = opslimit_sensitive();
+      size_t memlimit_min_answer = memlimit_min();
+      size_t memlimit_max_answer = memlimit_max();
+      size_t memlimit_interactive_answer = memlimit_interactive();
+      size_t memlimit_moderate_answer = memlimit_moderate();
+      size_t memlimit_sensitive_answer = memlimit_sensitive();
+      size_t passwd_min_answer = passwd_min();
+      size_t passwd_max_answer = passwd_max();
       printf("(version . ");
       put_quoted(version_answer);
       printf(")\n(major . %d)\n(minor . %d)\n(init %d %d)\n",
@@ -131,6 +258,24 @@ int main(int argc, char **argv)
              (size_t) crypto_generichash_KEYBYTES_MIN);
       printf("(generichash-keybytes-max %zu %zu)\n", keybytes_max_answer,
              (size_t) crypto_generichash_KEYBYTES_MAX);
+      printf("(pwhash-strbytes %zu %zu)\n", strbytes_answer, (size_t) crypto_pwhash_STRBYTES);
+      printf("(pwhash-strprefix ");
+      put_quoted(strprefix_answer);
+      printf(" ");
+      put_quoted(crypto_pwhash_STRPREFIX);
+      printf(")\n");
+      printf("(pwhash-opslimit-min %zu %zu)\n", opslimit_min_answer, (size_t) crypto_pwhash_OPSLIMIT_MIN);
+      printf("(pwhash-opslimit-max %zu %zu)\n", opslimit_max_answer, (size_t) crypto_pwhash_OPSLIMIT_MAX);
+      printf("(pwhash-opslimit-interactive %zu %zu)\n", opslimit_interactive_answer, (size_t) crypto_pwhash_OPSLIMIT_INTERACTIVE);
+      printf("(pwhash-opslimit-moderate %zu %zu)\n", opslimit_moderate_answer, (size_t) crypto_pwhash_OPSLIMIT_MODERATE);
+      printf("(pwhash-opslimit-sensitive %zu %zu)\n", opslimit_sensitive_answer, (size_t) crypto_pwhash_OPSLIMIT_SENSITIVE);
+      printf("(pwhash-memlimit-min %zu %zu)\n", memlimit_min_answer, (size_t) crypto_pwhash_MEMLIMIT_MIN);
+      printf("(pwhash-memlimit-max %zu %zu)\n", memlimit_max_answer, (size_t) crypto_pwhash_MEMLIMIT_MAX);
+      printf("(pwhash-memlimit-interactive %zu %zu)\n", memlimit_interactive_answer, (size_t) crypto_pwhash_MEMLIMIT_INTERACTIVE);
+      printf("(pwhash-memlimit-moderate %zu %zu)\n", memlimit_moderate_answer, (size_t) crypto_pwhash_MEMLIMIT_MODERATE);
+      printf("(pwhash-memlimit-sensitive %zu %zu)\n", memlimit_sensitive_answer, (size_t) crypto_pwhash_MEMLIMIT_SENSITIVE);
+      printf("(pwhash-passwd-min %zu %zu)\n", passwd_min_answer, (size_t) crypto_pwhash_PASSWD_MIN);
+      printf("(pwhash-passwd-max %zu %zu)\n", passwd_max_answer, (size_t) crypto_pwhash_PASSWD_MAX);
       printf("(valgrind . %s)\n", under_valgrind() ? "yes" : "no");
     }
   }
