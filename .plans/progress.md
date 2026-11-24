@@ -212,6 +212,7 @@ its questions on 2026-11-24, accepting every recommendation:
   at 114 s, against a limit of 450 s.
 - **In the container:** `make test` 35 of 35, `check-test-fails` 13 of 13, `test-memory` 35 of
   35, `check-memory-gate` 59 cases, and `make build`.
+- **CI's run** 45470675437 passed all five jobs, `floor` and `current` with the new rows.
 
 ### 2026-11-24 — M3 slice 0: the plan and the records (PR #14)
 
