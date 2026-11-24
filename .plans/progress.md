@@ -204,6 +204,7 @@ its questions on 2026-11-24, accepting every recommendation:
     ADR-0009, decision 3. It answers `#t` instead;
   - **nothing held "no Scheme copy" outside the writers;**
   - **the twins `opslimit_max` and `passwd_max`** passed every real-library row.
+- **CI's run** 45445152423 passed all five jobs.
 
 ### 2026-11-24 — M2's closing review and its fixes (PR #13)
 
