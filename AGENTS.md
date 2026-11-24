@@ -196,8 +196,9 @@
   short (brief §4.4).
 * **Each verb's whole extent is one `critical-section`** (brief §6.2): making the
   blocks, copying in, the C call, copying out, the wipe and the free.
-  `sodium-version`, which makes no block and calls no C, holds none (ADR-0007,
-  decision 8).
+  A path that makes no block and calls no C holds none: `sodium-version` (ADR-0007,
+  decision 8), `random-bytes 0`, and the compare of operands of different lengths
+  (ADR-0007, amended).
   - Arguments are checked before it.
   - It answers data, and the verb raises only after it.
   - Without it, an engine's expiry frees the block, and the resume is refused as a

@@ -147,7 +147,9 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **No claims, positions or sweeps:** a stateless verb shares no state across sections
   ([ADR-0007]).
 - **`call-in-section` is the one section:** THUNK in one `critical-section`, a raise inside
-  caught there and raised again once it ends. `sodium-version` holds none ([ADR-0007]).
+  caught there and raised again once it ends. A path that makes no block and calls no C holds
+  none: `sodium-version`, `random-bytes 0`, and the compare of operands of different lengths
+  ([ADR-0007], amended).
 - **Native's load runs in one critical section,** which answers data, and a refusal is raised
   after it ([ADR-0007]).
 - **Every engine row references the library once before its first engine.** A library first
@@ -229,12 +231,12 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **A child that reaches native code starts through `gated-command`,** under the gate's own
   Valgrind, with its own log. A child started any other way runs outside Valgrind, unseen. A
   child that runs only Scheme is outside the rule. There are two exceptions: the wipe row's
-  child, since Valgrind's allocator bypasses its `free()` interposer ([ADR-0011], [ADR-0008];
+  children, since Valgrind's allocator bypasses their `free()` interposer ([ADR-0011], [ADR-0008];
   chez-sqlite3 ADR-0005, amended); and `test-constants`' prototype check, a C program that calls
   no libsodium function ([ADR-0011], amended). Any other C program a suite runs is gated.
 - **The C oracle is a program named `libsodium-oracle`.** The gate's rule for child logs names
   it ([ADR-0011]).
-- **The wipe row's child sets `LD_PRELOAD` to the interposer alone,** never appended: under the
+- **Each wipe row's child sets `LD_PRELOAD` to the interposer alone,** never appended: under the
   gate a suite's own holds Valgrind's preloads ([ADR-0011]).
 - **No exit checks:** the block count is a suite's one check at its end ([ADR-0011]).
 - **A decoy reads each pointer it logs through a `volatile uintptr_t`,** and tests only that.

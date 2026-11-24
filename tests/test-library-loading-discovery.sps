@@ -1,5 +1,5 @@
 #!r6rs
-;;; One of the seven suites that load libsodium end to end, through
+;;; One of the eight suites that load libsodium end to end, through
 ;;; (chez-sodium private native), tests/refusal-probe.sps and a decoy
 ;;; (ADR-0002, ADR-0003, ADR-0006, ADR-0011): this one holds discovery, with the
 ;;; override unset: what it chooses in each world, and not-found. In a Guix world
@@ -11,9 +11,9 @@
 ;;; holds no libsodium: they run in the development container and on CI.
 ;;;
 ;;; Under the memory gate each child runs under a Valgrind of its own, so
-;;; the rows are split among seven suites, each running at most 14 children,
+;;; the rows are split among eight suites, each running at most 14 children,
 ;;; to keep each well under MEMORY_TIMEOUT (ADR-0011); (library-loading)
-;;; holds what all seven use.
+;;; holds what all eight use.
 ;;;
 ;;; Native loads libsodium in its library body, once per process, and Chez
 ;;; runs that body before a program's own, so a refusal cannot be caught in

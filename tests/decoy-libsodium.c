@@ -67,6 +67,15 @@
  * of their output, under every switch, so that a block they fill is never
  * zero before its wipe.
  *
+ * Naming its blocks. randombytes_buf, crypto_generichash and sodium_memcmp
+ * each hand every pointer they take, with the length they take it with, in
+ * parameter order, to watch_set, when there is one: a weak symbol, which
+ * tests/free-watch.c defines and no libsodium does. It resolves only in a
+ * process that preloads that interposer, as tests/test-wipe.sps' second child
+ * does; everywhere else it is NULL and nothing is named. That is how a block a
+ * verb makes is reached from outside: the real library cannot be wrapped in
+ * front of Chez's binding.
+ *
  * Every pointer it logs is read through a volatile uintptr_t, and only that
  * is tested, logged and written through, whether or not sodium.h marks the
  * parameter nonnull: a plain test of a nonnull parameter fails
@@ -192,6 +201,19 @@ __attribute__((constructor)) static void decoy_load(void)
 
 #ifndef DECOY_NOT_SODIUM
 
+/* watch_set: defined by tests/free-watch.c when it is preloaded, NULL
+   otherwise. */
+extern void watch_set(void *, size_t) __attribute__((weak));
+
+/* name_block: names the block at P, N bytes of it, to the interposer, when
+   there is one. P is a volatile uintptr_t's value: the call goes through
+   the copy, as everything else here does. */
+static void name_block(uintptr_t p, size_t n)
+{
+  if (watch_set != NULL)
+    watch_set((void *) p, n);
+}
+
 #ifndef DECOY_LACKS_sodium_version_string
 const char *sodium_version_string(void)
 {
@@ -263,6 +285,7 @@ void randombytes_buf(void *const buf, const size_t size)
   volatile unsigned char *bytes = (volatile unsigned char *) p;
   size_t i;
   called("randombytes_buf(%s,%zu)", p ? "p" : "NULL", size);
+  name_block(p, size);
   if (p)
     for (i = 0; i < size; i++)
       bytes[i] = 0xA5;
@@ -283,6 +306,9 @@ int crypto_generichash(unsigned char *out, size_t outlen,
   size_t n;
   called("crypto_generichash(%s,%zu,%s,%llu,%s,%zu)",
          o ? "p" : "NULL", outlen, i ? "p" : "NULL", inlen, k ? "p" : "NULL", keylen);
+  name_block(o, outlen);
+  name_block(i, (size_t) inlen);
+  name_block(k, keylen);
   if (o)
     for (n = 0; n < outlen; n++)
       bytes[n] = 0xA5;
@@ -347,6 +373,8 @@ int sodium_memcmp(const void *const b1, const void *const b2, size_t len)
   size_t i;
   int equal = 1;
   called("sodium_memcmp(%s,%s,%zu)", p1 ? "p" : "NULL", p2 ? "p" : "NULL", len);
+  name_block(p1, len);
+  name_block(p2, len);
   if (len == 0)
     return 0;
   if (!p1 || !p2)
