@@ -270,13 +270,30 @@
 
 ;; --- the prototypes, against the header --------------------------------------------------
 
-(test-equal "prototypes: the table has a row for each of the thirteen entry points, asked once each, in one compile"
-  (list 13 '("sodium_version_string" "sodium_library_version_major"
+(test-equal "prototypes: the table has a row for each of the thirty entry points, asked once each, in one compile"
+  (list 30 '("sodium_version_string" "sodium_library_version_major"
              "sodium_library_version_minor" "sodium_init" "sodium_memzero"
              "randombytes_buf" "crypto_generichash" "crypto_generichash_bytes"
              "crypto_generichash_bytes_min" "crypto_generichash_bytes_max"
              "crypto_generichash_keybytes_min" "crypto_generichash_keybytes_max"
-             "sodium_memcmp"))
+             "sodium_memcmp"
+             "crypto_pwhash_str"
+             "crypto_pwhash_str_verify"
+             "crypto_pwhash_str_needs_rehash"
+             "crypto_pwhash_strbytes"
+             "crypto_pwhash_strprefix"
+             "crypto_pwhash_opslimit_min"
+             "crypto_pwhash_opslimit_max"
+             "crypto_pwhash_opslimit_interactive"
+             "crypto_pwhash_opslimit_moderate"
+             "crypto_pwhash_opslimit_sensitive"
+             "crypto_pwhash_memlimit_min"
+             "crypto_pwhash_memlimit_max"
+             "crypto_pwhash_memlimit_interactive"
+             "crypto_pwhash_memlimit_moderate"
+             "crypto_pwhash_memlimit_sensitive"
+             "crypto_pwhash_passwd_min"
+             "crypto_pwhash_passwd_max"))
   (list (length conventions-table) (map car prototype-asks)))
 
 (test-equal "prototypes: the header declares each row's prototype exactly: the rows it does not, each by name"
@@ -399,21 +416,80 @@
     ("sodium_memcmp" "int" ("const void *const" "const void *const" "int") 0)
     ("sodium_memcmp" "void" ("const void *const" "const void *const" "size_t") 0)
     ("sodium_memcmp" "int" ("const void *const" "int" "size_t") 0)
-    ("sodium_memcmp" "int" ("const char *" "const void *const" "size_t") 0)))
+    ("sodium_memcmp" "int" ("const char *" "const void *const" "size_t") 0)
+    ;; crypto_pwhash_str: opslimit as size_t (the header's unsigned long long),
+    ;; memlimit as unsigned long long, a dropped pointee const, a missing
+    ;; parameter, a void result
+    ("crypto_pwhash_str" "int"
+     ("char *" "const char *" "unsigned long long" "size_t" "size_t") 0)
+    ("crypto_pwhash_str" "int"
+     ("char *" "const char *" "unsigned long long" "unsigned long long" "unsigned long long") 0)
+    ("crypto_pwhash_str" "int"
+     ("char *" "char *" "unsigned long long" "unsigned long long" "size_t") 0)
+    ("crypto_pwhash_str" "int"
+     ("char *" "const char *" "size_t" "unsigned long long" "size_t") 0)
+    ("crypto_pwhash_str" "void"
+     ("char *" "const char *" "unsigned long long" "unsigned long long" "size_t") 0)
+    ;; crypto_pwhash_str_verify: passwdlen as size_t, a char * for the const
+    ;; char * str, a missing parameter
+    ("crypto_pwhash_str_verify" "int" ("const char *" "const char *" "size_t") 0)
+    ("crypto_pwhash_str_verify" "int" ("char *" "const char *" "unsigned long long") 0)
+    ("crypto_pwhash_str_verify" "int" ("const char *" "const char *") 0)
+    ;; crypto_pwhash_str_needs_rehash: opslimit as size_t, memlimit as
+    ;; unsigned long long, a result as size_t
+    ("crypto_pwhash_str_needs_rehash" "int" ("const char *" "size_t" "size_t") 0)
+    ("crypto_pwhash_str_needs_rehash" "int" ("const char *" "unsigned long long" "unsigned long long") 0)
+    ("crypto_pwhash_str_needs_rehash" "size_t" ("const char *" "unsigned long long" "size_t") 0)
+    ;; the prefix: char * for const char *, and an argument added
+    ("crypto_pwhash_strprefix" "char *" () 0)
+    ("crypto_pwhash_strprefix" "const char *" ("int") 0)
+    ;; the fourteen constants: int, unsigned long long and void for size_t
+    ("crypto_pwhash_strbytes" "int" () 0)
+    ("crypto_pwhash_opslimit_min" "unsigned long long" () 0)
+    ("crypto_pwhash_opslimit_max" "int" () 0)
+    ("crypto_pwhash_opslimit_interactive" "unsigned int" () 0)
+    ("crypto_pwhash_opslimit_moderate" "void" () 0)
+    ("crypto_pwhash_opslimit_sensitive" "long long" () 0)
+    ("crypto_pwhash_memlimit_min" "unsigned long long" () 0)
+    ("crypto_pwhash_memlimit_max" "int" () 0)
+    ("crypto_pwhash_memlimit_interactive" "unsigned int" () 0)
+    ("crypto_pwhash_memlimit_moderate" "void" () 0)
+    ("crypto_pwhash_memlimit_sensitive" "size_t" ("void *") 0)
+    ("crypto_pwhash_passwd_min" "int" () 0)
+    ("crypto_pwhash_passwd_max" "unsigned long long" () 0)))
 
-(test-equal "the prototype check refuses each kind of wrong row, by name: a dropped pointee const, an extra and a missing parameter, a result int as unsigned int, long or void, a result void as int, size_t as int, unsigned int or unsigned long long (the opslimit trap) and unsigned long long as size_t, in randombytes_buf, crypto_generichash and the five sizes, a pointer as int, a pointee const added, and a pointer to another type, in sodium_memcmp too"
+(test-equal "the prototype check refuses each kind of wrong row, by name, the password hash's among them: a dropped pointee const, an extra and a missing parameter, a result int as unsigned int, long or void, a result void as int, size_t as int, unsigned int or unsigned long long (the opslimit trap) and unsigned long long as size_t, in randombytes_buf, crypto_generichash and the five sizes, a pointer as int, a pointee const added, and a pointer to another type, in sodium_memcmp too"
   (map (lambda (p) (cons (car p) (cadddr p))) plants)
   (verdicts-of (map (lambda (p) (plant (car p) (cadr p) (caddr p))) plants)))
 
-(test-equal "the prototype check answers 1 for each of the thirteen rows written as the header has it, and for each qualifier dropped or added"
+(test-equal "the prototype check answers 1 for each of the thirty rows written as the header has it, and for each qualifier dropped or added"
   '(("sodium_version_string" . 1) ("sodium_library_version_major" . 1)
     ("sodium_library_version_minor" . 1) ("sodium_init" . 1) ("sodium_memzero" . 1)
     ("randombytes_buf" . 1) ("crypto_generichash" . 1) ("crypto_generichash_bytes" . 1)
     ("crypto_generichash_bytes_min" . 1) ("crypto_generichash_bytes_max" . 1)
     ("crypto_generichash_keybytes_min" . 1) ("crypto_generichash_keybytes_max" . 1)
     ("sodium_memcmp" . 1)
+    ("crypto_pwhash_str" . 1)
+    ("crypto_pwhash_str_verify" . 1)
+    ("crypto_pwhash_str_needs_rehash" . 1)
+    ("crypto_pwhash_strbytes" . 1)
+    ("crypto_pwhash_strprefix" . 1)
+    ("crypto_pwhash_opslimit_min" . 1)
+    ("crypto_pwhash_opslimit_max" . 1)
+    ("crypto_pwhash_opslimit_interactive" . 1)
+    ("crypto_pwhash_opslimit_moderate" . 1)
+    ("crypto_pwhash_opslimit_sensitive" . 1)
+    ("crypto_pwhash_memlimit_min" . 1)
+    ("crypto_pwhash_memlimit_max" . 1)
+    ("crypto_pwhash_memlimit_interactive" . 1)
+    ("crypto_pwhash_memlimit_moderate" . 1)
+    ("crypto_pwhash_memlimit_sensitive" . 1)
+    ("crypto_pwhash_passwd_min" . 1)
+    ("crypto_pwhash_passwd_max" . 1)
     ("sodium_memzero" . 1) ("sodium_memzero" . 1) ("randombytes_buf" . 1)
-    ("crypto_generichash" . 1) ("sodium_memcmp" . 1))
+    ("crypto_generichash" . 1) ("sodium_memcmp" . 1)
+    ("crypto_pwhash_str" . 1) ("crypto_pwhash_str_verify" . 1)
+    ("crypto_pwhash_str_needs_rehash" . 1))
   (verdicts-of (append conventions-table
                        (list (plant "sodium_memzero" "void" '("void *" "size_t"))
                              (plant "sodium_memzero" "void" '("void * const" "const size_t"))
@@ -421,7 +497,14 @@
                              (plant "crypto_generichash" "int"
                                     '("unsigned char *const" "size_t" "const unsigned char *"
                                       "unsigned long long" "const unsigned char *" "const size_t"))
-                             (plant "sodium_memcmp" "int" '("const void *" "const void *" "size_t"))))))
+                             (plant "sodium_memcmp" "int" '("const void *" "const void *" "size_t"))
+                             (plant "crypto_pwhash_str" "int"
+                                    '("char *const" "const char *const" "const unsigned long long"
+                                      "const unsigned long long" "const size_t"))
+                             (plant "crypto_pwhash_str_verify" "int"
+                                    '("const char *const" "const char *const" "const unsigned long long"))
+                             (plant "crypto_pwhash_str_needs_rehash" "int"
+                                    '("const char *const" "const unsigned long long" "const size_t"))))))
 
 ;; size_t and unsigned long are one type on LP64 Linux, which the C side
 ;; cannot see; the map below does, and fails the row.
@@ -474,7 +557,7 @@
                      'void 'plain '())))
         (map-problems (list (list "sodium_init" '("int" ()) '() 'void 'plain '())))))
 
-(test-equal "the map check passes each row written right: the thirteen rows, and sodium_memzero in its qualifier-free spelling"
+(test-equal "the map check passes each row written right: the thirty rows, and sodium_memzero in its qualifier-free spelling"
   '(() ())
   (list (map-problems conventions-table)
         (map-problems (list (list "sodium_memzero" '("void" ("void *" "size_t")) '(uptr size_t)
@@ -516,6 +599,35 @@
                                   '(uptr uptr unsigned-64) 'int 'plain '())))
         (map-problems (list (list "sodium_memcmp" '("int" ("const void *const" "const void *const" "size_t"))
                                   '(uptr uptr size_t) 'size_t 'plain '())))))
+
+;; Every row of the table, its Chez result and each of its arguments written
+;; wrong in turn, held to the row's own C types: each is one problem, named.
+(define (other-chez t) (if (eq? t 'int) 'uptr 'int))
+
+(define (row-with-arguments row arguments)
+  (list (row-name row) (row-prototype row) arguments (row-result row) (row-convention row) '()))
+
+(define (row-with-result row result)
+  (list (row-name row) (row-prototype row) (row-arguments row) result (row-convention row) '()))
+
+(test-equal "the map check names, for each of the thirty rows, its result written wrong, and each argument written wrong, one problem each"
+  '()
+  (filter
+   (lambda (row)
+     (let ((arguments (row-arguments row)))
+       (not (and (= 1 (length (map-problems (list (row-with-result row (other-chez (row-result row)))))))
+                 (let loop ((i 0))
+                   (or (= i (length arguments))
+                       (and (= 1 (length
+                                  (map-problems
+                                   (list (row-with-arguments
+                                          row
+                                          (let swap ((rest arguments) (j 0))
+                                            (cond ((null? rest) '())
+                                                  ((= j i) (cons (other-chez (car rest)) (cdr rest)))
+                                                  (else (cons (car rest) (swap (cdr rest) (+ j 1)))))))))))
+                            (loop (+ i 1)))))))))
+   conventions-table))
 
 (test-end "constants")
 

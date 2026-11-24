@@ -18,7 +18,7 @@
  * when it is linked and no switch read at run time can hide an entry point
  * from dlsym:
  *
- *   (none)                   the control: the thirteen entry points
+ *   (none)                   the control: the thirty entry points
  *                            (chez-sodium private native) binds
  *   DECOY_LACKS_<entry>      that one entry point left out
  *   DECOY_NOT_SODIUM         no sodium_*, randombytes_* or crypto_* function
@@ -51,6 +51,29 @@
  *                      different ones (the control's are 0 and -1); at
  *                      length 0 it answers 0, and with a NULL operand, one
  *                      or both, at a nonzero length -1, under every switch
+ *   pwhash-limits-other  crypto_pwhash_strbytes answers 160, the opslimits 2 to
+ *                      9 with the presets 5, 6 and 7, the memlimits 16384 to
+ *                      1048576 with the presets 24576, 32768 and 40960, the
+ *                      passwords 1 to 100, and crypto_pwhash_strprefix
+ *                      "$argon2i$": none is a release's (the control's are
+ *                      128; 1 to 4294967295, 2, 3 and 4; 8192 to 4398046510080,
+ *                      64 MiB, 256 MiB and 1 GiB; 0 to 4294967295;
+ *                      "$argon2id$"). crypto_pwhash_str writes a string of
+ *                      140 characters, longer than the control's 128 bytes
+ *   pwhash-str-fails   crypto_pwhash_str answers -1
+ *   pwhash-str-other   crypto_pwhash_str answers 1, a second code
+ *   pwhash-str-unreadable
+ *                      crypto_pwhash_str answers 0 and leaves its output all
+ *                      A5, with no 0 in it
+ *   verify-other       crypto_pwhash_str_verify answers 1, a second code
+ *   strprefix-null     crypto_pwhash_strprefix answers NULL
+ *   pwhash-blocks      crypto_pwhash_str and crypto_pwhash_str_verify each
+ *                      first create the file named by CHEZ_SODIUM_DECOY_FIFO
+ *                      with ".entered" added, then open the FIFO that
+ *                      variable names, for reading, which blocks until a
+ *                      writer opens it; read it to its end, close it, and
+ *                      answer as the control does. With the variable unset
+ *                      each answers -1 at once, and writes nothing
  *   anything else      the control's behaviour, an empty value included
  *
  * The call log. Loading the library writes its first entry, decoy(SWITCH):
@@ -65,11 +88,17 @@
  *
  * randombytes_buf and crypto_generichash write the byte A5 over every byte
  * of their output, under every switch, so that a block they fill is never
- * zero before its wipe.
+ * zero before its wipe. crypto_pwhash_str writes it over the decoy's own
+ * strbytes of its output, then a fixed hash string and a 0: the control's of
+ * 93 characters, pwhash-limits-other's of 140.
  *
- * Naming its blocks. randombytes_buf, crypto_generichash and sodium_memcmp
- * each hand every pointer they take, with the length they take it with, in
- * parameter order, to watch_set, when there is one: a weak symbol, which
+ * A C string's pointer is logged as p[L], L its strlen, or NULL.
+ *
+ * Naming its blocks. randombytes_buf, crypto_generichash, sodium_memcmp and
+ * the three password calls each hand every pointer they take, with the length
+ * they take it with, in parameter order, to watch_set, when there is one (a
+ * string's length is its strlen + 1, and crypto_pwhash_str's out is the
+ * decoy's own strbytes): a weak symbol, which
  * tests/free-watch.c defines and no libsodium does. It resolves only in a
  * process that preloads that interposer, as tests/test-wipe.sps' second child
  * does; everywhere else it is NULL and nothing is named. That is how a block a
@@ -83,12 +112,22 @@
  * tests/test-decoy-source.sps holds every sodium_*, randombytes_* and
  * crypto_* function here to that; the helpers called and decoy_calls are
  * outside it.
+ *
+ * crypto_pwhash_str_verify and crypto_pwhash_str_needs_rehash are each
+ * defined twice, whole, because the header spells their str parameter as an
+ * array in 1.0.18 (SODIUM_LIBRARY_VERSION_MAJOR 10) and as a pointer in
+ * 1.0.22 (major 26), the two releases measured; releases between them are
+ * not tested. A definition spelled otherwise fails -Werror=array-parameter. Each hands its volatile copy to one helper. Every
+ * pointer of the three password calls is nonnull in the header.
  */
+#include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sodium.h>
 
 #if !defined(DECOY_VERSION) || !defined(DECOY_BELOW)
@@ -155,7 +194,14 @@ enum decoy_switch {
   SIZES_OTHER,
   GENERICHASH_FAILS,
   GENERICHASH_OTHER,
-  MEMCMP_OTHER
+  MEMCMP_OTHER,
+  PWHASH_LIMITS_OTHER,
+  PWHASH_STR_FAILS,
+  PWHASH_STR_OTHER,
+  PWHASH_STR_UNREADABLE,
+  VERIFY_OTHER,
+  STRPREFIX_NULL,
+  PWHASH_BLOCKS
 };
 
 static const struct {
@@ -175,6 +221,13 @@ static const struct {
   {"generichash-fails", GENERICHASH_FAILS},
   {"generichash-other", GENERICHASH_OTHER},
   {"memcmp-other", MEMCMP_OTHER},
+  {"pwhash-limits-other", PWHASH_LIMITS_OTHER},
+  {"pwhash-str-fails", PWHASH_STR_FAILS},
+  {"pwhash-str-other", PWHASH_STR_OTHER},
+  {"pwhash-str-unreadable", PWHASH_STR_UNREADABLE},
+  {"verify-other", VERIFY_OTHER},
+  {"strprefix-null", STRPREFIX_NULL},
+  {"pwhash-blocks", PWHASH_BLOCKS},
 };
 
 static enum decoy_switch mode = CONTROL;
@@ -385,6 +438,311 @@ int sodium_memcmp(const void *const b1, const void *const b2, size_t len)
   if (mode == MEMCMP_OTHER)
     return equal ? 1 : -1;
   return equal ? 0 : -1;
+}
+#endif
+
+/* --- the password hash ------------------------------------------------------- */
+
+/* The fixed hash strings crypto_pwhash_str writes: a prefix, v=19, the
+   parameters, a salt of 22 characters, a $ and a tag. The control's is 93
+   characters, pwhash-limits-other's 140, which is longer than the control's
+   128 bytes. */
+#define CONTROL_HASH \
+  "$argon2id$v=19$m=8,t=1,p=1$" "c2FsdHNhbHRzYWx0c2FsdA" "$" \
+  "dGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGE"
+#define OTHER_HASH \
+  "$argon2i$v=19$m=16,t=2,p=1$" "c2FsdHNhbHRzYWx0c2FsdA" "$" \
+  "dGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndG"
+
+_Static_assert(sizeof CONTROL_HASH - 1 == 93, "the control's hash string is 93 characters");
+_Static_assert(sizeof OTHER_HASH - 1 == 140, "pwhash-limits-other's hash string is 140 characters");
+
+/* limits_other: whether the constants are pwhash-limits-other's. */
+static int limits_other(void)
+{
+  return mode == PWHASH_LIMITS_OTHER;
+}
+
+/* string_length: the strlen of the C string at P, read through a volatile
+   pointer; 0 for NULL. */
+static size_t string_length(uintptr_t p)
+{
+  volatile const char *s = (volatile const char *) p;
+  size_t n = 0;
+  if (!p)
+    return 0;
+  while (s[n] != 0)
+    n++;
+  return n;
+}
+
+/* show_string: writes the log's form of the C string at P into TEXT: p[L], or
+   NULL. */
+static void show_string(char *text, size_t room, uintptr_t p)
+{
+  if (p)
+    snprintf(text, room, "p[%zu]", string_length(p));
+  else
+    snprintf(text, room, "NULL");
+}
+
+/* hold_on_fifo: under pwhash-blocks, creates the marker file, then opens the
+   FIFO for reading, which blocks until a writer opens it (open is retried
+   when a signal interrupts it), reads it to its end and closes it: 1. When
+   the marker cannot be created, or the FIFO cannot be opened: 0, without
+   opening the FIFO if it was the marker. With CHEZ_SODIUM_DECOY_FIFO unset:
+   0, and nothing is done.
+   In every other mode: 1, and nothing is done. */
+static int hold_on_fifo(void)
+{
+  const char *fifo;
+  char marker[4096];
+  char buffer[64];
+  int fd;
+  ssize_t got;
+  if (mode != PWHASH_BLOCKS)
+    return 1;
+  fifo = getenv("CHEZ_SODIUM_DECOY_FIFO");
+  if (!fifo)
+    return 0;
+  if (snprintf(marker, sizeof marker, "%s.entered", fifo) >= (int) sizeof marker)
+    return 0;
+  fd = open(marker, O_WRONLY | O_CREAT, 0600);
+  if (fd < 0)
+    return 0;
+  close(fd);
+  do {
+    fd = open(fifo, O_RDONLY);
+  } while (fd < 0 && errno == EINTR);
+  if (fd < 0)
+    return 0;
+  do {
+    got = read(fd, buffer, sizeof buffer);
+  } while (got > 0 || (got < 0 && errno == EINTR));
+  close(fd);
+  return 1;
+}
+
+#ifndef DECOY_LACKS_crypto_pwhash_str_verify
+/* verify_answer: logs a crypto_pwhash_str_verify call and answers it. */
+static int verify_answer(uintptr_t s, uintptr_t passwd, unsigned long long passwdlen)
+{
+  char shown[32];
+  show_string(shown, sizeof shown, s);
+  called("crypto_pwhash_str_verify(%s,%s,%llu)", shown, passwd ? "p" : "NULL", passwdlen);
+  name_block(s, string_length(s) + 1);
+  name_block(passwd, passwdlen > 1 ? (size_t) passwdlen : 1);
+  if (!hold_on_fifo())
+    return -1;
+  return mode == VERIFY_OTHER ? 1 : 0;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_str_needs_rehash
+/* rehash_answer: logs a crypto_pwhash_str_needs_rehash call and answers it. */
+static int rehash_answer(uintptr_t s, unsigned long long opslimit, size_t memlimit)
+{
+  char shown[32];
+  show_string(shown, sizeof shown, s);
+  called("crypto_pwhash_str_needs_rehash(%s,%llu,%zu)", shown, opslimit, memlimit);
+  name_block(s, string_length(s) + 1);
+  return 0;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_str
+/* Logs its call, writes A5 over the decoy's own strbytes of OUT, then the
+   fixed hash string and a 0, and answers 0, -1 or 1 under the two switches.
+   Under pwhash-str-unreadable it leaves OUT all A5 and answers 0. Under
+   pwhash-blocks it first waits on the FIFO. */
+int crypto_pwhash_str(char out[crypto_pwhash_STRBYTES],
+                      const char *const passwd, unsigned long long passwdlen,
+                      unsigned long long opslimit, size_t memlimit)
+{
+  volatile uintptr_t o = (uintptr_t) out;
+  volatile uintptr_t p = (uintptr_t) passwd;
+  volatile unsigned char *bytes = (volatile unsigned char *) o;
+  const char *hash = limits_other() ? OTHER_HASH : CONTROL_HASH;
+  size_t size = limits_other() ? 160 : 128;
+  size_t length = strlen(hash);
+  size_t n;
+  called("crypto_pwhash_str(%s,%s,%llu,%llu,%zu)", o ? "p" : "NULL", p ? "p" : "NULL",
+         passwdlen, opslimit, memlimit);
+  name_block(o, size);
+  name_block(p, passwdlen > 1 ? (size_t) passwdlen : 1);
+  if (!hold_on_fifo())
+    return -1;
+  if (o) {
+    for (n = 0; n < size; n++)
+      bytes[n] = 0xA5;
+    if (mode != PWHASH_STR_UNREADABLE) {
+      for (n = 0; n < length; n++)
+        bytes[n] = (unsigned char) hash[n];
+      bytes[length] = 0;
+    }
+  }
+  return mode == PWHASH_STR_FAILS ? -1 : mode == PWHASH_STR_OTHER ? 1 : 0;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_str_verify
+/* Logs its call and answers 0, or 1 under verify-other. Defined twice, as the
+   header spells str: an array at 1.0.18, a pointer at 1.0.22 (releases between
+   are not tested). */
+#if SODIUM_LIBRARY_VERSION_MAJOR < 26
+int crypto_pwhash_str_verify(const char str[crypto_pwhash_STRBYTES],
+                             const char *const passwd,
+                             unsigned long long passwdlen)
+{
+  volatile uintptr_t s = (uintptr_t) str;
+  volatile uintptr_t p = (uintptr_t) passwd;
+  return verify_answer(s, p, passwdlen);
+}
+#else
+int crypto_pwhash_str_verify(const char *str,
+                             const char *const passwd,
+                             unsigned long long passwdlen)
+{
+  volatile uintptr_t s = (uintptr_t) str;
+  volatile uintptr_t p = (uintptr_t) passwd;
+  return verify_answer(s, p, passwdlen);
+}
+#endif
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_str_needs_rehash
+/* Logs its call and answers 0. Defined twice, as the header spells str. */
+#if SODIUM_LIBRARY_VERSION_MAJOR < 26
+int crypto_pwhash_str_needs_rehash(const char str[crypto_pwhash_STRBYTES],
+                                   unsigned long long opslimit, size_t memlimit)
+{
+  volatile uintptr_t s = (uintptr_t) str;
+  return rehash_answer(s, opslimit, memlimit);
+}
+#else
+int crypto_pwhash_str_needs_rehash(const char *str,
+                                   unsigned long long opslimit, size_t memlimit)
+{
+  volatile uintptr_t s = (uintptr_t) str;
+  return rehash_answer(s, opslimit, memlimit);
+}
+#endif
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_strbytes
+size_t crypto_pwhash_strbytes(void)
+{
+  called("crypto_pwhash_strbytes()");
+  return limits_other() ? 160 : 128;
+}
+#endif
+
+/* The prefix: "$argon2id$", "$argon2i$" under pwhash-limits-other, and NULL
+   under strprefix-null. */
+#ifndef DECOY_LACKS_crypto_pwhash_strprefix
+const char *crypto_pwhash_strprefix(void)
+{
+  called("crypto_pwhash_strprefix()");
+  if (mode == STRPREFIX_NULL)
+    return NULL;
+  return limits_other() ? "$argon2i$" : "$argon2id$";
+}
+#endif
+
+/* The limits: the control's and pwhash-limits-other's. */
+#ifndef DECOY_LACKS_crypto_pwhash_opslimit_min
+size_t crypto_pwhash_opslimit_min(void)
+{
+  called("crypto_pwhash_opslimit_min()");
+  return limits_other() ? 2 : 1;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_opslimit_max
+size_t crypto_pwhash_opslimit_max(void)
+{
+  called("crypto_pwhash_opslimit_max()");
+  return limits_other() ? 9 : 4294967295U;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_opslimit_interactive
+size_t crypto_pwhash_opslimit_interactive(void)
+{
+  called("crypto_pwhash_opslimit_interactive()");
+  return limits_other() ? 5 : 2;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_opslimit_moderate
+size_t crypto_pwhash_opslimit_moderate(void)
+{
+  called("crypto_pwhash_opslimit_moderate()");
+  return limits_other() ? 6 : 3;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_opslimit_sensitive
+size_t crypto_pwhash_opslimit_sensitive(void)
+{
+  called("crypto_pwhash_opslimit_sensitive()");
+  return limits_other() ? 7 : 4;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_memlimit_min
+size_t crypto_pwhash_memlimit_min(void)
+{
+  called("crypto_pwhash_memlimit_min()");
+  return limits_other() ? 16384 : 8192;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_memlimit_max
+size_t crypto_pwhash_memlimit_max(void)
+{
+  called("crypto_pwhash_memlimit_max()");
+  return limits_other() ? (size_t) 1048576 : (size_t) 4398046510080ULL;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_memlimit_interactive
+size_t crypto_pwhash_memlimit_interactive(void)
+{
+  called("crypto_pwhash_memlimit_interactive()");
+  return limits_other() ? 24576 : 67108864;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_memlimit_moderate
+size_t crypto_pwhash_memlimit_moderate(void)
+{
+  called("crypto_pwhash_memlimit_moderate()");
+  return limits_other() ? 32768 : 268435456;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_memlimit_sensitive
+size_t crypto_pwhash_memlimit_sensitive(void)
+{
+  called("crypto_pwhash_memlimit_sensitive()");
+  return limits_other() ? 40960 : 1073741824;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_passwd_min
+size_t crypto_pwhash_passwd_min(void)
+{
+  called("crypto_pwhash_passwd_min()");
+  return limits_other() ? 1 : 0;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_pwhash_passwd_max
+size_t crypto_pwhash_passwd_max(void)
+{
+  called("crypto_pwhash_passwd_max()");
+  return limits_other() ? 100 : 4294967295U;
 }
 #endif
 

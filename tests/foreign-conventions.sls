@@ -63,9 +63,8 @@
   ;;   RESULT      Symbol: the Chez result type
   ;;   CONVENTION  collect-safe or plain (convention-forms)
   ;;   RECORDS     (Listof String): each begins with the record it cites
-  ;; In ADR-0002's order. Every call is plain: only crypto_pwhash_str and
-  ;; crypto_pwhash_str_verify are collect-safe, and a row for each joins the
-  ;; table with the verb that binds it (ADR-0001, decision 7). No binding takes
+  ;; In ADR-0002's order. Every call is plain but crypto_pwhash_str and
+  ;; crypto_pwhash_str_verify, which are collect-safe (ADR-0001, decision 7). No binding takes
   ;; a Scheme object: every argument is an integer or the address of a block we
   ;; allocated, and a string libsodium returns is an address we read ourselves
   ;; (ADR-0001, decisions 3 and 4).
@@ -136,7 +135,111 @@
        ("ADR-0001 decisions 3 and 4: both operands are addresses, the length is size_t"
         "ADR-0001 decision 7: plain"
         "ADR-0002, amended: bound in step 6, after the sizes' entries"
-        "ADR-0005: in the subset, by decision, for constant-time-bytevector=?"))))
+        "ADR-0005: in the subset, by decision, for constant-time-bytevector=?"))
+      ("crypto_pwhash_str" ("int" ("char *" "const char *" "unsigned long long" "unsigned long long" "size_t"))
+       (uptr uptr unsigned-64 unsigned-64 size_t) int collect-safe
+       ("ADR-0001 decisions 3 and 4: both pointers are addresses, passwdlen and opslimit are unsigned long long, memlimit is size_t"
+        "ADR-0001 decision 7, amended: collect-safe, it runs as long as its limits ask"
+        "ADR-0002, amended: bound in step 6, after sodium_memcmp"
+        "ADR-0005: in the subset, for password-hash"))
+      ("crypto_pwhash_str_verify" ("int" ("const char *" "const char *" "unsigned long long"))
+       (uptr uptr unsigned-64) int collect-safe
+       ("ADR-0001 decisions 3 and 4: both pointers are addresses, passwdlen is unsigned long long"
+        "ADR-0001 decision 7, amended: collect-safe, it costs what the hash's own limits say"
+        "ADR-0002, amended: bound in step 6, after crypto_pwhash_str"
+        "ADR-0005: in the subset, for password-verify"))
+      ("crypto_pwhash_str_needs_rehash" ("int" ("const char *" "unsigned long long" "size_t"))
+       (uptr unsigned-64 size_t) int plain
+       ("ADR-0001 decisions 3 and 4: the hash is an address, opslimit is unsigned long long, memlimit is size_t"
+        "ADR-0001 decision 7: plain, it only parses the string"
+        "ADR-0002, amended: bound in step 6, after crypto_pwhash_str_verify"
+        "ADR-0005: in the subset, for password-needs-rehash?"
+        "ADR-0009: what needs-rehash means"))
+      ("crypto_pwhash_strbytes" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a size is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, the first of the fourteen constants"))
+      ("crypto_pwhash_strprefix" ("const char *" ())
+       () uptr plain
+       ("ADR-0001 decision 3: a returned string is an address, read by our own code"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, after crypto_pwhash_strbytes, the second of the fourteen constants"
+        "ADR-0009: the prefix decides which hashes are current"))
+      ("crypto_pwhash_opslimit_min" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a limit is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, constant 3 of the fourteen"))
+      ("crypto_pwhash_opslimit_max" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a limit is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, constant 4 of the fourteen"))
+      ("crypto_pwhash_opslimit_interactive" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a limit is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, constant 5 of the fourteen"))
+      ("crypto_pwhash_opslimit_moderate" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a limit is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, constant 6 of the fourteen"))
+      ("crypto_pwhash_opslimit_sensitive" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a limit is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, constant 7 of the fourteen"))
+      ("crypto_pwhash_memlimit_min" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a limit is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, constant 8 of the fourteen"))
+      ("crypto_pwhash_memlimit_max" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a limit is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, constant 9 of the fourteen"))
+      ("crypto_pwhash_memlimit_interactive" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a limit is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, constant 10 of the fourteen"))
+      ("crypto_pwhash_memlimit_moderate" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a limit is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, constant 11 of the fourteen"))
+      ("crypto_pwhash_memlimit_sensitive" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a limit is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, constant 12 of the fourteen"))
+      ("crypto_pwhash_passwd_min" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a limit is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, constant 13 of the fourteen"))
+      ("crypto_pwhash_passwd_max" ("size_t" ())
+       () size_t plain
+       ("ADR-0001 decision 3: a limit is size_t"
+        "ADR-0001 decision 7: plain"
+        "ADR-0001, amended: read once at the load, in step 7"
+        "ADR-0002, amended: bound in step 6, constant 14 of the fourteen"))))
 
   (define (row-name row) (car row))
   (define (row-prototype row) (cadr row))

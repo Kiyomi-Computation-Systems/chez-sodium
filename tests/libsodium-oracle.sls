@@ -6,7 +6,12 @@
 ;;;   libsodium-oracle  the fields, read from the library at a path
 ;;;   oracle-fields     their names, in the order the program prints them
 ;;;   oracle-size-fields  the five size lines' names, each (NAME F M), printed
-;;;                     after the fields and before (valgrind . ...)
+;;;                     after the fields
+;;;   oracle-pwhash-fields  the password hash's fourteen lines' names, each
+;;;                     (NAME F M), printed after the sizes and before
+;;;                     (valgrind . ...)
+;;;   libsodium-oracle-hash    the C program's hex mode: hash a password
+;;;   libsodium-oracle-verify  the C program's hex mode: verify a password
 ;;;   c-compiler        $CC as a command's words, for every compile
 ;;;   split-words       a string cut at whitespace
 ;;;
@@ -20,7 +25,8 @@
 ;;; Test-only: it lives in tests/, which make test puts on Chez's library
 ;;; path, not in src/.
 (library (libsodium-oracle)
-  (export libsodium-oracle oracle-fields oracle-size-fields c-compiler split-words)
+  (export libsodium-oracle libsodium-oracle-hash libsodium-oracle-verify
+          oracle-fields oracle-size-fields oracle-pwhash-fields c-compiler split-words)
   (import (rnrs)
           (chez-sodium-testing))
 
@@ -40,6 +46,20 @@
   (define oracle-size-fields
     '(generichash-bytes generichash-bytes-min generichash-bytes-max
       generichash-keybytes-min generichash-keybytes-max))
+
+  ;; oracle-pwhash-fields : (Listof Symbol)
+  ;; The password hash's lines, in the order the oracle prints them, after the
+  ;; sizes and before valgrind's: each (NAME F M), F the function's answer
+  ;; through the library and M the header's macro, in step 7's order. The
+  ;; prefix's line is (pwhash-strprefix F M) with F and M strings, F #f for
+  ;; NULL.
+  (define oracle-pwhash-fields
+    '(pwhash-strbytes pwhash-strprefix
+      pwhash-opslimit-min pwhash-opslimit-max pwhash-opslimit-interactive
+      pwhash-opslimit-moderate pwhash-opslimit-sensitive
+      pwhash-memlimit-min pwhash-memlimit-max pwhash-memlimit-interactive
+      pwhash-memlimit-moderate pwhash-memlimit-sensitive
+      pwhash-passwd-min pwhash-passwd-max))
 
   ;; split-words : String -> (Listof String)
   ;; TEXT cut at each run of spaces, tabs and newlines, empty pieces
@@ -92,12 +112,63 @@
                 (let ((data (read-all (cadr ran))))
                   (if (and (list? data)
                            (= (length data)
-                              (+ (length oracle-fields) (length oracle-size-fields) 1))
+                              (+ (length oracle-fields) (length oracle-size-fields)
+                                 (length oracle-pwhash-fields) 1))
                            (for-all (lambda (datum field)
                                       (and (pair? datum) (eq? (car datum) field)))
-                                    data (append oracle-fields oracle-size-fields '(valgrind))))
+                                    data (append oracle-fields oracle-size-fields oracle-pwhash-fields
+                                                 '(valgrind))))
                       data
                       (list 'no-oracle 'output (cadr ran)))))))))
+
+  ;; compile-and-run : (String -> (U String #f)) (Listof String) Symbol
+  ;;                    (Any -> Boolean) -> Any
+  ;; Compiles the oracle, runs it with ARGUMENTS through gated-command, and
+  ;; answers (KEY VALUE VERDICT): the first datum it printed, (KEY . VALUE),
+  ;; when (OK? VALUE) holds, and the second, VERDICT, which must be
+  ;; (valgrind . yes) or (valgrind . no). Anything else, a missing or
+  ;; malformed verdict included, is (no-oracle STEP EVIDENCE), as for
+  ;; libsodium-oracle, and it never raises.
+  (define (compile-and-run getenv arguments key ok?)
+    (guard (e (#t (list 'no-oracle 'raised (describe e))))
+      (call-with-temp-directory
+       (lambda (dir)
+         (let* ((program (string-append dir "/libsodium-oracle"))
+                (compiled (capture-command
+                           (append (c-compiler getenv)
+                                   (list "-Wall" "-Werror" "-o" program "tests/libsodium-oracle.c"
+                                         "-ldl")))))
+           (if (not (= (car compiled) 0))
+               (list 'no-oracle 'compile compiled)
+               (let ((ran (capture-command (gated-command getenv (cons program arguments)))))
+                 (if (not (= (car ran) 0))
+                     (list 'no-oracle 'run ran)
+                     (let ((data (read-all (cadr ran))))
+                       (if (and (list? data) (= (length data) 2)
+                                (pair? (car data)) (eq? (caar data) key) (ok? (cdar data))
+                                (pair? (cadr data)) (eq? (caadr data) 'valgrind)
+                                (memq (cdadr data) '(yes no)))
+                           (list key (cdar data) (cadr data))
+                           (list 'no-oracle 'output (cadr ran))))))))))))
+
+  ;; libsodium-oracle-hash : (String -> (U String #f)) String String
+  ;;                         -> (U (List 'hash String (Pair 'valgrind Symbol))
+  ;;                               (List 'no-oracle Symbol Any))
+  ;; The oracle's hex mode on the library at PATH: (hash STRING VERDICT),
+  ;; STRING the hash string crypto_pwhash_str wrote for the password whose
+  ;; bytes HEX spells (empty for the empty password), at the library's minimum
+  ;; limits, and VERDICT (valgrind . yes) or (valgrind . no).
+  (define (libsodium-oracle-hash getenv path hex)
+    (compile-and-run getenv (list path "hash" hex) 'hash string?))
+
+  ;; libsodium-oracle-verify : (String -> (U String #f)) String String String
+  ;;                           -> (U (List 'verify Integer (Pair 'valgrind Symbol))
+  ;;                                 (List 'no-oracle Symbol Any))
+  ;; The oracle's hex mode: (verify CODE VERDICT), CODE being
+  ;; crypto_pwhash_str_verify's answer for the hash string STRING and the
+  ;; password whose bytes HEX spells.
+  (define (libsodium-oracle-verify getenv path string hex)
+    (compile-and-run getenv (list path "verify" string hex) 'verify integer?))
 
   ;; read-all : String -> (U (Listof Any) #f)
   ;; TEXT read as a sequence of data, or #f when it does not read.

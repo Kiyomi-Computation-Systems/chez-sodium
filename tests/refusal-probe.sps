@@ -7,8 +7,9 @@
 ;;;
 ;;;   refusal-probe.sps [--then-override PATH] [--marker NAME] [--message yes]
 ;;;                     [--init-before yes] [--init-after yes] [--wipe N]
-;;;                     [--sizes yes]
+;;;                     [--sizes yes] [--constants yes]
 ;;;   refusal-probe.sps --drive yes [--overflow yes]
+;;;   refusal-probe.sps --password-entries yes
 ;;;
 ;;; It references loaded-libsodium three times, each inside its guard. The
 ;;; first reference prints what happened:
@@ -36,6 +37,15 @@
 ;;; native) exports, in the order its load reads them: generichash-bytes,
 ;;; -bytes-min, -bytes-max, -keybytes-min, -keybytes-max. Without it the
 ;;; output is as it was.
+;;;
+;;; With --constants, a load prints one more field, right after --sizes' if
+;;; that is given too: (constants (KEY . VALUE) ...), the password hash's
+;;; fourteen constants (chez-sodium private native) exports, each under its
+;;; own name, in the order its load reads them: pwhash-strbytes,
+;;; pwhash-strprefix (a string, or #f for NULL), pwhash-opslimit-min, -max,
+;;; -interactive, -moderate and -sensitive, pwhash-memlimit- likewise, and
+;;; pwhash-passwd-min and -max. Each pair carries the key the value was read
+;;; under, so a twin read into the other's key shows.
 ;;;
 ;;; With --then-override, CHEZ_SODIUM_LIBRARY is set to PATH after the
 ;;; first reference, and (then-override . VALUE) shows what getenv then
@@ -103,6 +113,23 @@
 ;;; 36 once full, whether one more call moved it, how many overflow entries
 ;;; it holds, and whether it is under its 4096 bytes. Then (counts . ...) and
 ;;; (valgrind . ...), as below.
+;;;
+;;; With --password-entries, none of the above runs but the load: the probe
+;;; references loaded-libsodium once, then calls (chez-sodium private native)'s
+;;; three raw password bindings, crypto-pwhash-str, crypto-pwhash-str-verify
+;;; and crypto-pwhash-str-needs-rehash, in that order, on blocks from native's
+;;; call-with-bytes and call-with-block, and prints, one datum a line:
+;;;
+;;;   (str CODE FIRST-0 A5 FILLER GROWTH)  crypto-pwhash-str on an out block of
+;;;                                  pwhash-strbytes bytes, filled 11 before:
+;;;                                  its answer, the index of the first 0 in
+;;;                                  the block or none, how many of its bytes
+;;;                                  are A5, how many are still 11, and the
+;;;                                  decoy's call log's new entries
+;;;   (verify CODE GROWTH)           on a hash string of 2 characters
+;;;   (rehash CODE GROWTH)           likewise, at opslimit 3 and memlimit 4096
+;;;
+;;; Then (counts . ...) and (valgrind . ...), as below.
 ;;;
 ;;; Why eval, and no import of (chez-sodium private native): Chez runs the
 ;;; libraries a program imports before the program's body, so a guard in the
@@ -313,6 +340,71 @@
   (show 'valgrind (if (under-valgrind?) 'yes 'no))
   (exit 0))
 
+;; --- --password-entries: native's raw password bindings, called ---------------------------
+
+;; password-entries : -> Void
+(define (password-entries)
+  (reference)
+  (let* ((run (eval
+               '(lambda (log poke)
+                  (let* ((hash (u8-list->bytevector '(97 98 0)))
+                         (pw (u8-list->bytevector '(112 119)))
+                         (growth (lambda (before)
+                                   (let ((after (log)))
+                                     (substring after (min (string-length after) (+ (string-length before) 1))
+                                                (string-length after)))))
+                         (count (lambda (bytes value)
+                                  (let loop ((i 0) (n 0))
+                                    (if (= i (bytevector-length bytes))
+                                        n
+                                        (loop (+ i 1) (if (= (bytevector-u8-ref bytes i) value) (+ n 1) n))))))
+                         (first-zero (lambda (bytes)
+                                       (let loop ((i 0))
+                                         (cond ((= i (bytevector-length bytes)) 'none)
+                                               ((= (bytevector-u8-ref bytes i) 0) i)
+                                               (else (loop (+ i 1))))))))
+                    (call-in-section
+                     (lambda ()
+                       (let* ((before-str (log))
+                              (str
+                               (call-with-bytes 'probe pw
+                                 (lambda (passwd)
+                                   (call-with-block 'probe pwhash-strbytes
+                                     (lambda (out)
+                                       (let fill ((i 0))
+                                         (when (< i pwhash-strbytes)
+                                           (poke out i #x11)
+                                           (fill (+ i 1)))))
+                                     (lambda (out)
+                                       (let* ((code (crypto-pwhash-str out passwd 2 1 8192))
+                                              (bytes (foreign-bytes out pwhash-strbytes)))
+                                         (list 'str code (first-zero bytes) (count bytes #xA5)
+                                               (count bytes #x11) (growth before-str))))))))
+                              (before-verify (log))
+                              (verify
+                               (call-with-bytes 'probe hash
+                                 (lambda (str-block)
+                                   (call-with-bytes 'probe pw
+                                     (lambda (passwd)
+                                       (let ((code (crypto-pwhash-str-verify str-block passwd 2)))
+                                         (list 'verify code (growth before-verify))))))))
+                              (before-rehash (log))
+                              (rehash
+                               (call-with-bytes 'probe hash
+                                 (lambda (str-block)
+                                   (let ((code (crypto-pwhash-str-needs-rehash str-block 3 4096)))
+                                     (list 'rehash code (growth before-rehash)))))))
+                         (list str verify rehash))))))
+               native)))
+    (for-each (lambda (line) (write line) (newline))
+              (run drive-calls (lambda (a i v) (foreign-set! 'unsigned-8 a i v))))))
+
+(when (option "--password-entries")
+  (password-entries)
+  (show 'counts (native-counts))
+  (show 'valgrind (if (under-valgrind?) 'yes 'no))
+  (exit 0))
+
 (define first (reference))
 
 (define status
@@ -328,6 +420,16 @@
                  (map (lambda (name) (eval name native))
                       '(generichash-bytes generichash-bytes-min generichash-bytes-max
                         generichash-keybytes-min generichash-keybytes-max)))))
+       (when (option "--constants")
+         (show 'constants
+               (guard (e (#t (cons 'raised (raised-facts e))))
+                 (map (lambda (name) (cons name (eval name native)))
+                      '(pwhash-strbytes pwhash-strprefix
+                        pwhash-opslimit-min pwhash-opslimit-max pwhash-opslimit-interactive
+                        pwhash-opslimit-moderate pwhash-opslimit-sensitive
+                        pwhash-memlimit-min pwhash-memlimit-max pwhash-memlimit-interactive
+                        pwhash-memlimit-moderate pwhash-memlimit-sensitive
+                        pwhash-passwd-min pwhash-passwd-max)))))
        0))
     ((refused)
      (let ((e (cdr first)))

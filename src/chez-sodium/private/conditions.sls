@@ -298,4 +298,4 @@
     (let ((c (make-sodium-failed function code)))
       (raise (condition c (make-who-condition who)
                         (make-message-condition
-                         "libsodium answered a failure for a call that passed its checks"))))))
+                         "libsodium gave no result for a call that passed its checks"))))))

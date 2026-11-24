@@ -14,7 +14,7 @@
 ;;;                  __collect_safe alone as collect-safe; anything else, a
 ;;;                  __varargs_after count among it, as other, which no row
 ;;;                  holds
-;;;   src/           no violation, and the thirteen forms are all native's
+;;;   src/           no violation, and the thirty forms are all native's
 ;;;   fixtures       tests/fixtures/conventions/<case>/, each the one fault it
 ;;;                  names, and the whole list of violations asserted: a form
 ;;;                  outside native, an entry that is no string literal, type
@@ -67,19 +67,37 @@
 
 ;; expected-names : (Listof String)
 ;; ADR-0002's order: the version string, major and minor, sodium_init,
-;; sodium_memzero, then the verbs' eight, as native binds them in step 6.
+;; sodium_memzero, then the verbs' eight and the password hash's seventeen, as
+;; native binds them in step 6.
 (define expected-names
   '("sodium_version_string" "sodium_library_version_major"
     "sodium_library_version_minor" "sodium_init" "sodium_memzero"
     "randombytes_buf" "crypto_generichash" "crypto_generichash_bytes"
     "crypto_generichash_bytes_min" "crypto_generichash_bytes_max"
     "crypto_generichash_keybytes_min" "crypto_generichash_keybytes_max"
-    "sodium_memcmp"))
+    "sodium_memcmp"
+    "crypto_pwhash_str"
+    "crypto_pwhash_str_verify"
+    "crypto_pwhash_str_needs_rehash"
+    "crypto_pwhash_strbytes"
+    "crypto_pwhash_strprefix"
+    "crypto_pwhash_opslimit_min"
+    "crypto_pwhash_opslimit_max"
+    "crypto_pwhash_opslimit_interactive"
+    "crypto_pwhash_opslimit_moderate"
+    "crypto_pwhash_opslimit_sensitive"
+    "crypto_pwhash_memlimit_min"
+    "crypto_pwhash_memlimit_max"
+    "crypto_pwhash_memlimit_interactive"
+    "crypto_pwhash_memlimit_moderate"
+    "crypto_pwhash_memlimit_sensitive"
+    "crypto_pwhash_passwd_min"
+    "crypto_pwhash_passwd_max"))
 
 ;; collect-safe-names : (Listof String)
-;; The calls that can block (ADR-0001, decision 7). None is bound yet; the
-;; two password calls join this list with the rows that bind them.
-(define collect-safe-names '())
+;; The calls that can block (ADR-0001, decision 7): the two that run as long
+;; as a hash's limits ask.
+(define collect-safe-names '("crypto_pwhash_str" "crypto_pwhash_str_verify"))
 
 ;; accepted-types : (Listof Any)
 ;; Every foreign type Chez 10.4 accepts (CSUG 4.2) that the table does not
@@ -191,15 +209,15 @@
 
 ;; --- the table ---------------------------------------------------------------------------
 
-(test-equal "table: it has a row for each of the thirteen entry points, in ADR-0002's order, and no other"
+(test-equal "table: it has a row for each of the thirty entry points, in ADR-0002's order, and no other"
   expected-names
   (map row-name table))
 
 ;; (library-loading)'s every-entry is what test-library-loading-missing makes
 ;; a missing-api row for, one build and one row per name. Held whole and in
 ;; order: an entry dropped from it would take its build and its row with it.
-(test-equal "table: its names are (library-loading)'s every-entry, the thirteen required entry points, whole and in order"
-  (list (map row-name table) 13)
+(test-equal "table: its names are (library-loading)'s every-entry, the thirty required entry points, whole and in order"
+  (list (map row-name table) 30)
   (list every-entry (length every-entry)))
 
 (test-equal "table: every row is (NAME (RESULT (PARAMETER ...)) (ARGUMENT ...) RESULT CONVENTION (RECORD ...)); its argument types are as many as its prototype's parameters"
@@ -217,12 +235,12 @@
                       (pair? (row-records row)) (for-all string? (row-records row)))))
           table))
 
-(test-equal "table: every row is plain: no collect-safe call is bound yet (ADR-0001, decision 7)"
+(test-equal "table: every row is plain but crypto_pwhash_str and crypto_pwhash_str_verify, which are collect-safe (ADR-0001, decision 7)"
   (map (lambda (name) (if (member name collect-safe-names) 'collect-safe 'plain))
        expected-names)
   (map row-convention table))
 
-;; The thirteen rows, written out, so that a table loosened together with the
+;; The thirty rows, written out, so that a table loosened together with the
 ;; binding it holds still fails: the table's own arguments, results and
 ;; conventions are compared with these, never with each other.
 (define the-bound-rows
@@ -238,9 +256,26 @@
     ("crypto_generichash_bytes_max" () size_t plain)
     ("crypto_generichash_keybytes_min" () size_t plain)
     ("crypto_generichash_keybytes_max" () size_t plain)
-    ("sodium_memcmp" (uptr uptr size_t) int plain)))
+    ("sodium_memcmp" (uptr uptr size_t) int plain)
+    ("crypto_pwhash_str" (uptr uptr unsigned-64 unsigned-64 size_t) int collect-safe)
+    ("crypto_pwhash_str_verify" (uptr uptr unsigned-64) int collect-safe)
+    ("crypto_pwhash_str_needs_rehash" (uptr unsigned-64 size_t) int plain)
+    ("crypto_pwhash_strbytes" () size_t plain)
+    ("crypto_pwhash_strprefix" () uptr plain)
+    ("crypto_pwhash_opslimit_min" () size_t plain)
+    ("crypto_pwhash_opslimit_max" () size_t plain)
+    ("crypto_pwhash_opslimit_interactive" () size_t plain)
+    ("crypto_pwhash_opslimit_moderate" () size_t plain)
+    ("crypto_pwhash_opslimit_sensitive" () size_t plain)
+    ("crypto_pwhash_memlimit_min" () size_t plain)
+    ("crypto_pwhash_memlimit_max" () size_t plain)
+    ("crypto_pwhash_memlimit_interactive" () size_t plain)
+    ("crypto_pwhash_memlimit_moderate" () size_t plain)
+    ("crypto_pwhash_memlimit_sensitive" () size_t plain)
+    ("crypto_pwhash_passwd_min" () size_t plain)
+    ("crypto_pwhash_passwd_max" () size_t plain)))
 
-(test-equal "table: the thirteen rows are written out: the version string an address, major, minor and sodium_init an int, sodium_memzero and randombytes_buf a uptr and a size_t answering void, crypto_generichash its uptr, size_t, uptr, unsigned-64, uptr, size_t answering int, the five sizes a size_t, sodium_memcmp two addresses and a size_t answering int; all plain (ADR-0001, decisions 3, 4 and 7)"
+(test-equal "table: the thirty rows are written out: the version string an address, major, minor and sodium_init an int, sodium_memzero and randombytes_buf a uptr and a size_t answering void, crypto_generichash its uptr, size_t, uptr, unsigned-64, uptr, size_t answering int, the five sizes a size_t, sodium_memcmp two addresses and a size_t answering int; crypto_pwhash_str its two addresses, two unsigned-64 and a size_t, and crypto_pwhash_str_verify its two addresses and an unsigned-64, each answering int and collect-safe; crypto_pwhash_str_needs_rehash an address, an unsigned-64 and a size_t answering int; the strbytes, the ten limits and the two password bounds a size_t, and the prefix an address; every other row plain (ADR-0001, decisions 3, 4 and 7)"
   the-bound-rows
   (map (lambda (name)
          (let ((row (car (rows-named (list name)))))
@@ -328,7 +363,7 @@
   (let ((r (reverse (cdr form))))
     (if (>= (length r) 3) (caddr r) 'no-entry)))
 
-(test-equal "src: every foreign-procedure form under src/ is one of the thirteen bindings of (chez-sodium private native), in its one file and its one library, once each"
+(test-equal "src: every foreign-procedure form under src/ is one of the thirty bindings of (chez-sodium private native), in its one file and its one library, once each"
   (list (list native-file) '((chez-sodium private native)) (sorted-strings expected-names))
   (if (and (list? src-items) (for-all (lambda (i) (eq? (car i) 'binding)) src-items))
       (list (unique (map cadr src-items))
@@ -477,7 +512,7 @@
 
 ;; --- rows against the real src/, changed in turn ---------------------------------------------
 
-(test-equal "sweep: a row removed fails, by name, for each of the thirteen rows"
+(test-equal "sweep: a row removed fails, by name, for each of the thirty rows"
   (map (lambda (name) (list (list 'no-row name))) expected-names)
   (map (lambda (name)
          (checked (lambda ()
@@ -490,8 +525,8 @@
   (checked (lambda ()
              (violations "src" (append table (list (synthetic "sodium_extra" '() 'int)))))))
 
-(test-equal "sweep: a row's convention flipped fails, by name, for each of the thirteen rows: plain to collect-safe"
-  (list 13
+(test-equal "sweep: a row's convention flipped fails, by name, for each of the thirty rows: plain to collect-safe, and the two collect-safe rows to plain"
+  (list 30
         (map (lambda (row)
                (list (list 'mismatch (row-name row) 'convention (flipped (row-convention row))
                            (row-convention row))))
@@ -504,8 +539,8 @@
                                                                      (flipped (row-convention row))))))))
              table)))
 
-(test-equal "sweep: a row's result type changed fails, by name, for each of the thirteen rows: int to uptr, and uptr, size_t and void to int"
-  (list 13
+(test-equal "sweep: a row's result type changed fails, by name, for each of the thirty rows: int to uptr, and uptr, size_t and void to int"
+  (list 30
         (map (lambda (row)
                (list (list 'mismatch (row-name row) 'result (other-type (row-result row)) (row-result row))))
              table))
@@ -532,8 +567,8 @@
                                   found)))))
               table)))
 
-(test-equal "sweep: a row's argument type changed at each position fails, by name, for each of the thirteen arguments of the rows"
-  (list 13
+(test-equal "sweep: a row's argument type changed at each position fails, by name, for each of the twenty-four arguments of the rows"
+  (list 24
         (map (lambda (c)
                (list (list 'mismatch (row-name (car c)) 'arguments (caddr c) (row-arguments (car c)))))
              argument-cases))

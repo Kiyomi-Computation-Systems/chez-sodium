@@ -82,7 +82,8 @@
   '(critical-section display-condition dynamic-wind foreign-alloc foreign-entry?
     foreign-free foreign-procedure foreign-ref foreign-set! format
     format-condition? getenv load-shared-object machine-type make-mutex
-    scheme-version scheme-version-number threaded? with-mutex))
+    scheme-version scheme-version-number string->immutable-string threaded?
+    with-mutex))
 
 ;; table-only : (Listof (Pair Symbol (Listof (Listof Symbol))))
 ;; The library-only entries. foreign-entry's library, native, does not import it.

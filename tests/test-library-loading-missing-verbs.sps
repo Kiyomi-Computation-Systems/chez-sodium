@@ -1,5 +1,5 @@
 #!r6rs
-;;; One of the eight suites that load libsodium end to end, through
+;;; One of the suites that load libsodium end to end, through
 ;;; (chez-sodium private native), tests/refusal-probe.sps and a decoy
 ;;; (ADR-0002, ADR-0003, ADR-0006, ADR-0011): this one holds each entry
 ;;; point of the verbs' eight left out, one at a time, and the load's
@@ -7,9 +7,9 @@
 ;;; tests/test-library-loading-missing.sps holds the load's five.
 ;;;
 ;;; Under the memory gate each child runs under a Valgrind of its own, so
-;;; the rows are split among eight suites, each running at most 14 children,
+;;; the rows are split among the suites, each running at most 14 children,
 ;;; to keep each well under MEMORY_TIMEOUT (ADR-0011); (library-loading)
-;;; holds what all eight use.
+;;; holds what they all use.
 ;;;
 ;;; Native loads libsodium in its library body, once per process, and Chez
 ;;; runs that body before a program's own, so a refusal cannot be caught in
@@ -117,9 +117,10 @@
 ;; --- the entries ----------------------------------------------------------------------
 
 ;; The eight are written out here, whole and in order, apart from the list
-;; they are cut from: every-entry's last eight, which (library-loading)'s
-;; first-entries leaves to this suite. test-library-loading-missing holds
-;; every-entry whole to the convention table.
+;; they are cut from: every-entry's sixth to thirteenth, which
+;; (library-loading)'s first-entries leaves to this suite.
+;; test-library-loading-missing holds every-entry whole to the convention
+;; table.
 (test-equal "the entries this suite leaves out are the verbs' eight, in native's order"
   '("randombytes_buf" "crypto_generichash"
     "crypto_generichash_bytes" "crypto_generichash_bytes_min" "crypto_generichash_bytes_max"

@@ -47,10 +47,10 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
     each form it cannot read; row 24 reaches each verb's blocks through it.
 - **M3 is under way** ([the M3 plan](2026-11-24-m3-plan.md)): the password verbs, collect-safe,
   with brief §4.2's rules (brief §9).
-  - **Slice 0, the plan and the records,** is on `m3-plan`. The owner accepted every
+  - **Slice 0, the plan and the records,** merged as #14. The owner accepted every
     recommendation on 2026-11-24.
-  - **Next: slice 1,** the bindings, the writers and the pure core; then slice 2, the verbs; then
-    M3's closing review.
+  - **Slice 1, the bindings, the writers and the pure core,** is on `m3-slice-1`.
+  - **Next: slice 2,** the verbs; then M3's closing review.
 
 ## Answered for M1
 
@@ -163,6 +163,55 @@ its questions on 2026-11-24, accepting every recommendation:
   install lines.
 
 ## Close-outs
+
+### 2026-11-24 — M3 slice 1: the bindings, the writers and the pure core (PR #15)
+
+- **Written first by the caller:** native's step 6, the seventeen bindings, two of them
+  `__collect_safe`; step 7's fourteen constants; the new exports; and stub helpers, present and
+  wrong. Native then loaded and read every constant §5.1 measured, at 1.0.18 and 1.0.22.
+- **Built** on `m3-slice-1` by four Sonnet builders, on disjoint files in one tree:
+  - **the load:**
+    - native's writers, `call-with-c-string` and `call-with-utf8`, and `foreign-ascii-string`;
+    - `raise-sodium-failed`'s message;
+    - `test-native`'s E rows for thirty bindings, and `test-blocks`' writer rows;
+    - row 22 for M3 in `test-native-codes`, 31 rows;
+    - the oracle's constants and its hex mode;
+  - **the conventions:** seventeen rows, the first two collect-safe, and their prototype rows;
+  - **the decoy:**
+    - its seventeen entries, seven switches and two spellings of `str`;
+    - the load log's fourteen reads;
+    - the `missing-api` rows, split into `-missing-passwords` and `-missing-limits`;
+    - the twins held under `pwhash-limits-other`, by an oracle child and
+      `refusal-probe --constants`;
+    - `test-decoy-source`'s new entries;
+  - **the pure core:** `(chez-sodium private password-text)` and `test-password-text`.
+
+  The caller changed `foreign-ascii-string` to build its string in place, with no list. Every
+  mutant is logged, and the caller planted one of each builder's again at the join
+  ([its mutation log](m3-slice-1-mutation-log.md)).
+- **Reviewed:** one Opus review found no blocker, 4 majors and 8 minors
+  ([research/m3-slice-1-review/](research/m3-slice-1-review/README.md)). The caller reproduced
+  the majors. Three Sonnet fix agents fixed each finding, on disjoint files, and the caller reran
+  each review mutant against the fixed suites. The majors:
+  - **the shape rows expected `#f`, so a shape check that raised passed all 60.** Each row now
+    asserts what a guard answered;
+  - **E13's deny-list let a writer copy the password into a Scheme string.** Each writer is now
+    held to an allow-list of its symbols;
+  - **the oracle's hex mode could not show it ran under the gate.** It prints its Valgrind line,
+    and the rows assert it;
+  - **row 19's plan would hang:** a write-only open of the FIFO blocks once the decoy's one read
+    is done. Slice 2's writers open it read-write, kill the watchdog, and use a FIFO and marker per
+    call (plan §4.1, item 4; ADR-0011, amended).
+
+  Among the minors:
+  - the decoy's seven switches, now held in slice 1 by `test-library-loading-password-entries`;
+  - the prefix, recorded immutable;
+  - the pure core held to an allow-list too.
+- **Measured (plan §5.2):** under the gate, the library-loading suites take 36 to 72 s,
+  `-missing-passwords` 63 s and `-password-entries` 45 s. The slowest suite is `test-check-ci`,
+  at 114 s, against a limit of 450 s.
+- **In the container:** `make test` 35 of 35, `check-test-fails` 13 of 13, `test-memory` 35 of
+  35, `check-memory-gate` 59 cases, and `make build`.
 
 ### 2026-11-24 — M3 slice 0: the plan and the records (PR #14)
 

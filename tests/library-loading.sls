@@ -1,19 +1,26 @@
 #!r6rs
-;;; (library-loading): what the eight suites that load libsodium end to end
+;;; (library-loading): what the suites that load libsodium end to end
 ;;; share, tests/test-library-loading-*.sps (ADR-0002, ADR-0003, ADR-0006,
 ;;; ADR-0011). Their cost is their children, each under a Valgrind of its
-;;; own under the memory gate, so the rows are split among eight suites, each
+;;; own under the memory gate, so the rows are split among eleven suites, each
 ;;; running at most 14 children, to keep each well under MEMORY_TIMEOUT
 ;;; (ADR-0011):
 ;;;
 ;;;   -decoys      the control build under each switch, one a row
 ;;;   -missing     each of the first five entry points left out, a build
 ;;;                with no sodium_* function, and the load's order
-;;;   -missing-verbs  each of the other eight entry points left out
+;;;   -missing-verbs  each of the byte verbs' eight entry points left out
+;;;   -missing-passwords  the password calls, strbytes, strprefix and the five
+;;;                opslimits left out
+;;;   -missing-limits  the five memlimits and the two password-length
+;;;                functions left out
 ;;;   -combined    the kept refusal and the kept load, the marker, values
 ;;;                that are no switch, the wipe, seen in the decoy's log, what
 ;;;                each switch answers through eight bindings of the probe's
 ;;;                own, and the log's overflow
+;;;   -password-entries  the password hash's three raw bindings called through the
+;;;                probe, under each switch that changes what they answer, and
+;;;                the constants with a NULL prefix
 ;;;   -real        the real libsodium, the refusals no decoy reaches, and
 ;;;                sodium_init called before and after the load
 ;;;   -discovery   the override unset: what discovery chooses, and not-found
@@ -31,8 +38,9 @@
 ;;;   the entries       every entry point (chez-sodium private native)
 ;;;                     requires, in native's order: held to the convention
 ;;;                     table by tests/test-conventions.sps and by
-;;;                     test-library-loading-missing; first-entries and
-;;;                     verb-entries are its two parts
+;;;                     test-library-loading-missing; first-entries,
+;;;                     verb-entries, password-entries and limit-entries are
+;;;                     its four parts
 ;;;   the decoys        each build of tests/decoy-libsodium.c, compiled in
 ;;;                     a suite's scratch directory, and a row on one
 ;;;   the world         the world and the empty profiles that discovery's
@@ -55,8 +63,10 @@
           once no-native-objects gated? valgrind-line
           outcome report with-sizes control-sizes other-sizes
           loaded-lines refused-lines loaded refused
+          with-constants control-constants other-constants constants-keys
           read-floor-values
-          every-entry first-entries verb-entries size-calls
+          every-entry first-entries verb-entries password-entries limit-entries
+          size-calls constant-calls
           lacks-build decoy-builds compile-decoys decoy-status decoy-row-in
           read-switch version-calls init-call log-of init-calls loaded-calls
           missing-api-rows
@@ -247,6 +257,33 @@
   (define control-sizes '(32 16 64 16 64))
   (define other-sizes '(33 8 80 9 81))
 
+  ;; constants-keys : (Listof Symbol)
+  ;; The fourteen constants' keys, in step 7's order: native's answers' keys.
+  (define constants-keys
+    '(pwhash-strbytes pwhash-strprefix
+      pwhash-opslimit-min pwhash-opslimit-max pwhash-opslimit-interactive
+      pwhash-opslimit-moderate pwhash-opslimit-sensitive
+      pwhash-memlimit-min pwhash-memlimit-max pwhash-memlimit-interactive
+      pwhash-memlimit-moderate pwhash-memlimit-sensitive
+      pwhash-passwd-min pwhash-passwd-max))
+
+  ;; control-constants, other-constants : (Listof (U Natural String #f))
+  ;; What the decoy's fourteen constant functions answer, in constants-keys'
+  ;; order: by default, the releases' own; under pwhash-limits-other, values
+  ;; no release has, the twins opslimit_max (9) and passwd_max (100) apart.
+  (define control-constants
+    '(128 "$argon2id$" 1 4294967295 2 3 4
+      8192 4398046510080 67108864 268435456 1073741824 0 4294967295))
+  (define other-constants
+    '(160 "$argon2i$" 2 9 5 6 7
+      16384 1048576 24576 32768 40960 1 100))
+
+  ;; with-constants : Report (Listof Any) -> Report
+  ;; REPORT with the probe's --constants field after it: (constants (KEY . VALUE)
+  ;; ...), native's fourteen recorded constants by key.
+  (define (with-constants report constants)
+    (append report (list (cons 'constants (map cons constants-keys constants)))))
+
   ;; loaded-lines : String Symbol Report -> (Listof Pair)
   (define (loaded-lines path source report)
     (append (list (cons 'loaded path) (cons 'source source)) report))
@@ -298,7 +335,8 @@
   ;; The entry points (chez-sodium private native) requires, in its order
   ;; (ADR-0002): the three version entries, sodium_init, then the rest,
   ;; sodium_memzero, randombytes_buf, crypto_generichash, its five size
-  ;; functions and sodium_memcmp. An entry that native requires and the decoy lacks
+  ;; functions, sodium_memcmp, crypto_pwhash_str, _str_verify and
+  ;; _str_needs_rehash, then the password hash's fourteen constant functions. An entry that native requires and the decoy lacks
   ;; refuses the control, and the control's row fails. A row holds this list
   ;; to the convention table's names, whole and in order, so an entry dropped
   ;; from it takes its row with it only by failing that one.
@@ -308,23 +346,54 @@
       "randombytes_buf" "crypto_generichash"
       "crypto_generichash_bytes" "crypto_generichash_bytes_min" "crypto_generichash_bytes_max"
       "crypto_generichash_keybytes_min" "crypto_generichash_keybytes_max"
-      "sodium_memcmp"))
+      "sodium_memcmp"
+      "crypto_pwhash_str" "crypto_pwhash_str_verify" "crypto_pwhash_str_needs_rehash"
+      "crypto_pwhash_strbytes" "crypto_pwhash_strprefix"
+      "crypto_pwhash_opslimit_min" "crypto_pwhash_opslimit_max"
+      "crypto_pwhash_opslimit_interactive" "crypto_pwhash_opslimit_moderate"
+      "crypto_pwhash_opslimit_sensitive"
+      "crypto_pwhash_memlimit_min" "crypto_pwhash_memlimit_max"
+      "crypto_pwhash_memlimit_interactive" "crypto_pwhash_memlimit_moderate"
+      "crypto_pwhash_memlimit_sensitive"
+      "crypto_pwhash_passwd_min" "crypto_pwhash_passwd_max"))
 
   ;; first-entries : (Listof String)
   ;; every-entry's first five: the load's own.
   (define first-entries (list-head every-entry 5))
 
   ;; verb-entries : (Listof String)
-  ;; every-entry's other eight, bound after sodium_memzero.
-  (define verb-entries (list-tail every-entry 5))
+  ;; every-entry's next eight, the byte verbs', bound after sodium_memzero.
+  (define verb-entries (list-head (list-tail every-entry 5) 8))
+
+  ;; password-entries : (Listof String)
+  ;; The password hash's three calls, strbytes, strprefix and the five
+  ;; opslimits: ten.
+  (define password-entries (list-head (list-tail every-entry 13) 10))
+
+  ;; limit-entries : (Listof String)
+  ;; The five memlimits and the two password-length functions: seven.
+  (define limit-entries (list-tail every-entry 23))
 
   ;; size-calls : (Listof String)
-  ;; The load's step 7: each size function called once, in this order, after
-  ;; every entry point is bound.
+  ;; The load's step 7, first part: each size function called once, in this
+  ;; order, after every entry point is bound.
   (define size-calls
     '("crypto_generichash_bytes()" "crypto_generichash_bytes_min()"
       "crypto_generichash_bytes_max()" "crypto_generichash_keybytes_min()"
       "crypto_generichash_keybytes_max()"))
+
+  ;; constant-calls : (Listof String)
+  ;; The load's step 7, second part: each of the password hash's fourteen
+  ;; constant functions called once, in this order, after the five sizes.
+  (define constant-calls
+    '("crypto_pwhash_strbytes()" "crypto_pwhash_strprefix()"
+      "crypto_pwhash_opslimit_min()" "crypto_pwhash_opslimit_max()"
+      "crypto_pwhash_opslimit_interactive()" "crypto_pwhash_opslimit_moderate()"
+      "crypto_pwhash_opslimit_sensitive()"
+      "crypto_pwhash_memlimit_min()" "crypto_pwhash_memlimit_max()"
+      "crypto_pwhash_memlimit_interactive()" "crypto_pwhash_memlimit_moderate()"
+      "crypto_pwhash_memlimit_sensitive()"
+      "crypto_pwhash_passwd_min()" "crypto_pwhash_passwd_max()"))
 
   ;; --- decoys --------------------------------------------------------------------------
 
@@ -409,9 +478,10 @@
     (append (list (read-switch switch)) version-calls (list init-call)))
   ;; loaded-calls : String -> (Listof String)
   ;; A successful load's calls: the three version entries, sodium_init, then
-  ;; the five size calls. Every other entry point is bound and never called.
+  ;; the five size calls and the fourteen constant calls. Every other entry
+  ;; point is bound and never called.
   (define (loaded-calls switch)
-    (append (init-calls switch) size-calls))
+    (append (init-calls switch) size-calls constant-calls))
 
   ;; missing-api-rows : (String (U String #f) (Listof String) String (String -> Expected) -> Void)
   ;;                    (Listof String) -> Void
@@ -420,7 +490,7 @@
   ;; entry for". The three version entries are each bound before any is
   ;; called, so a library lacking one has had no call; sodium_init is bound
   ;; after the three have answered; each later entry after sodium_init has,
-  ;; and before any size is read, so its refusal's log has no size call.
+  ;; and before any size or constant is read, so its refusal's log has neither.
   (define (missing-api-rows decoy-row entries)
     (for-each
      (lambda (entry)

@@ -167,6 +167,8 @@
 ;; binding that refuses the critical form: (dynamic-wind #t before thunk
 ;; after) runs native's before and after thunks, a counted block's making and
 ;; freeing, each in one critical section with the record of the extent.
+;; string->immutable-string is native's: the recorded password hash prefix is
+;; handed to every importer, so it must not be a string any of them can alter.
 ;; threaded?, scheme-version and scheme-version-number are require-threaded's
 ;; questions, asked of the Chez running it. The rest are
 ;; library-only-chez-names', each in its one library.
@@ -174,7 +176,8 @@
   '(critical-section display-condition dynamic-wind foreign-alloc foreign-entry?
     foreign-free foreign-procedure foreign-ref foreign-set! format
     format-condition? getenv load-shared-object machine-type make-mutex
-    scheme-version scheme-version-number threaded? with-mutex))
+    scheme-version scheme-version-number string->immutable-string threaded?
+    with-mutex))
 
 ;; library-only-chez-names : (Listof (Pairof Symbol (Listof (Listof Symbol))))
 ;; Rule (f). Each entry is a name, then one or more libraries that alone may

@@ -39,6 +39,11 @@
 ;;;                  undecoded into fresh bytevectors, and c-string->string
 ;;;                  reads through the second: a version string that begins
 ;;;                  with a byte order mark is no version
+;;;   the writers   call-with-c-string, call-with-utf8 and foreign-ascii-string
+;;;                  are test-blocks' rows; here the source rows hold that
+;;;                  neither writer copies its string, and the password hash's
+;;;                  seventeen bindings and fourteen constants are held to the
+;;;                  oracle's lines and to the measured numbers
 ;;;   call-in-section
 ;;;                  its answer, whatever the shape; interrupts off inside;
 ;;;                  a raise of anything reaches a handler at depth 1, as
@@ -60,8 +65,8 @@
 ;;                  size 1". test-blocks' W3 holds the same rule one level down
 ;;   the body       native.sls read as data, every form, define-syntax
 ;;;                  templates included: the load is one definition, its
-;;;                  steps in order; every foreign-procedure form (thirteen)
-;;;                  is bound eagerly, the whole second argument of bind-required and
+;;;                  steps in order; every foreign-procedure form (thirty,
+;;;                  two of them __collect_safe) is bound eagerly, the whole second argument of bind-required and
 ;;;                  the whole init of its let* binding; the load's work is in
 ;;;                  that definition alone; foreign-block and
 ;;;                  free-foreign-block! appear only in call-with-block's
@@ -87,8 +92,8 @@
         (rnrs mutable-pairs)
         (rnrs mutable-strings)
         (srfi :64)
-        (only (chezscheme) foreign-ref foreign-set! getenv machine-type void library-exports
-              disable-interrupts enable-interrupts make-engine)
+        (only (chezscheme) foreign-ref foreign-set! getenv immutable-string? machine-type void
+              library-exports disable-interrupts enable-interrupts make-engine)
         (chez-sodium-testing)
         (libsodium-oracle)
         (chez-sodium private counters)
@@ -318,14 +323,22 @@
 
 ;; No back door: the exports, written out whole. Neither foreign-block nor
 ;; free-foreign-block! is among them (ADR-0012).
-(test-equal "(chez-sodium private native) exports exactly the load's record, the eight raw bindings, the five sizes, call-in-section and the block and byte helpers, and neither foreign-block nor free-foreign-block!"
+(test-equal "(chez-sodium private native) exports exactly the load's record, the eleven raw bindings, the five sizes, the fourteen password constants, call-in-section and the block, byte and string helpers, and neither foreign-block nor free-foreign-block!"
   (sorted-names '(loaded-libsodium sodium-version
                   sodium-version-string sodium-library-version-major sodium-library-version-minor
                   sodium-init sodium-memzero
                   randombytes-buf crypto-generichash sodium-memcmp
                   generichash-bytes generichash-bytes-min generichash-bytes-max
                   generichash-keybytes-min generichash-keybytes-max
+                  crypto-pwhash-str crypto-pwhash-str-verify crypto-pwhash-str-needs-rehash
+                  pwhash-strbytes pwhash-strprefix
+                  pwhash-opslimit-min pwhash-opslimit-max pwhash-opslimit-interactive
+                  pwhash-opslimit-moderate pwhash-opslimit-sensitive
+                  pwhash-memlimit-min pwhash-memlimit-max pwhash-memlimit-interactive
+                  pwhash-memlimit-moderate pwhash-memlimit-sensitive
+                  pwhash-passwd-min pwhash-passwd-max
                   call-in-section call-with-block call-with-bytes foreign-bytes
+                  call-with-c-string call-with-utf8 foreign-ascii-string
                   c-string->bytevector c-string->string))
   (guard (e (#t (list 'raised (describe e))))
     (sorted-names (library-exports '(chez-sodium private native)))))
@@ -431,6 +444,147 @@
               (cons (list (car names) (native-size (car names))
                           (oracle-size (car names) 1) (oracle-size (car names) 2))
                     found)))))
+
+;; The password hash's fourteen constants, native's against the oracle's line
+;; (NAME F M), as the sizes are, and against the numbers measured at 1.0.18
+;; and 1.0.22, written out here. A constant read from another function, called
+;; twice or written in Scheme is not all of F, M and the number. The twins,
+;; opslimit-max and passwd-max, answer the same at every release, so no row
+;; here tells one read into the other's key; the decoy's rows do.
+
+;; native-constant : Symbol -> Any
+;; NAME's constant as native answers it, or (raised TEXT).
+(define (native-constant name)
+  (guard (e (#t (list 'raised (describe e))))
+    (eval name (environment '(chez-sodium private native)))))
+
+(for-each
+ (lambda (name)
+   (test-equal (string-append "native's " (symbol->string name)
+                              " is F of the oracle's line (" (symbol->string name) " F M): the function's answer")
+     (oracle-size name 1)
+     (native-constant name))
+   (test-equal (string-append "native's " (symbol->string name)
+                              " is M of the oracle's line (" (symbol->string name) " F M): the header's macro")
+     (oracle-size name 2)
+     (native-constant name)))
+ oracle-pwhash-fields)
+
+(test-equal "native's pwhash-strprefix is an immutable string, or #f for NULL: every importer shares it, so none can alter it"
+  'ok
+  (let ((prefix (native-constant 'pwhash-strprefix)))
+    (cond ((not prefix) 'ok)
+          ((not (string? prefix)) (list 'not-a-string prefix))
+          ((immutable-string? prefix) 'ok)
+          (else 'mutable))))
+
+(test-equal "the fourteen password constants are the measured ones, written here: native's, and the oracle's F and M of each line"
+  '((pwhash-strbytes 128 128 128)
+    (pwhash-strprefix "$argon2id$" "$argon2id$" "$argon2id$")
+    (pwhash-opslimit-min 1 1 1)
+    (pwhash-opslimit-max 4294967295 4294967295 4294967295)
+    (pwhash-opslimit-interactive 2 2 2)
+    (pwhash-opslimit-moderate 3 3 3)
+    (pwhash-opslimit-sensitive 4 4 4)
+    (pwhash-memlimit-min 8192 8192 8192)
+    (pwhash-memlimit-max 4398046510080 4398046510080 4398046510080)
+    (pwhash-memlimit-interactive 67108864 67108864 67108864)
+    (pwhash-memlimit-moderate 268435456 268435456 268435456)
+    (pwhash-memlimit-sensitive 1073741824 1073741824 1073741824)
+    (pwhash-passwd-min 0 0 0)
+    (pwhash-passwd-max 4294967295 4294967295 4294967295))
+  (let loop ((names oracle-pwhash-fields) (found '()))
+    (if (null? names)
+        (reverse found)
+        (loop (cdr names)
+              (cons (list (car names) (native-constant (car names))
+                          (oracle-size (car names) 1) (oracle-size (car names) 2))
+                    found)))))
+
+;; The oracle's hex mode: C hashes and C verifies the bytes a hex string
+;; spells, at libsodium's minimum limits. A hash that verified for anything,
+;; or a verify that answered 0 for anything, fails the rows against a wrong
+;; password and against each other's empty one.
+
+;; bytes->hex : Bytevector -> String
+(define (bytes->hex bytes)
+  (let loop ((i (- (bytevector-length bytes) 1)) (digits '()))
+    (if (< i 0)
+        (apply string-append digits)
+        (loop (- i 1)
+              (cons (let ((h (number->string (bytevector-u8-ref bytes i) 16)))
+                      (if (< (string-length h) 2) (string-append "0" h) h))
+                    digits)))))
+
+;; hex-verdicts : (Listof Any)
+;; The (valgrind . ...) line of each hex-mode run since the last
+;; take-verdicts, or the (no-oracle ...) answer of one that gave none.
+(define hex-verdicts '())
+
+;; take-verdicts! : -> (Listof Any)
+;; The runs' verdicts, each distinct one once, in the order first seen; the
+;; record is emptied.
+(define (take-verdicts!)
+  (let ((seen (let loop ((rest (reverse hex-verdicts)) (kept '()))
+                (cond ((null? rest) (reverse kept))
+                      ((member (car rest) kept) (loop (cdr rest) kept))
+                      (else (loop (cdr rest) (cons (car rest) kept)))))))
+    (set! hex-verdicts '())
+    seen))
+
+;; hex-answer : Symbol Any -> Any
+;; ANSWER's value when it is (KEY VALUE VERDICT), the verdict recorded; ANSWER
+;; itself otherwise, recorded as the verdict too, so a run that gave none fails
+;; the row that asserts the verdicts.
+(define (hex-answer key answer)
+  (if (and (list? answer) (= (length answer) 3) (eq? (car answer) key))
+      (begin (set! hex-verdicts (cons (caddr answer) hex-verdicts))
+             (cadr answer))
+      (begin (set! hex-verdicts (cons answer hex-verdicts))
+             answer)))
+
+;; oracle-hash : String -> (U String Any)
+;; The hash string the oracle's hex mode made for HEX, or what it answered.
+(define (oracle-hash hex)
+  (guard (e (#t (list 'raised (describe e))))
+    (hex-answer 'hash (libsodium-oracle-hash getenv expected-path hex))))
+
+;; oracle-verify : String String -> Any
+;; The oracle's verify code for STRING and HEX, or what it answered.
+(define (oracle-verify string hex)
+  (guard (e (#t (list 'raised (describe e))))
+    (hex-answer 'verify (libsodium-oracle-verify getenv expected-path string hex))))
+
+;; expected-verdicts : (Listof Pair)
+;; What every hex-mode run must report: under Valgrind exactly when the gate asked.
+(define expected-verdicts
+  (list (if (getenv "CHEZ_SODIUM_GATE_CHILD") '(valgrind . yes) '(valgrind . no))))
+
+(define hex-nonascii (bytes->hex (string->utf8 "p\x00E4;ssw\x00F6;rd\x20AC;")))
+(define hex-nonascii-changed (bytes->hex (string->utf8 "p\x00E4;ssw\x00F6;rd\x20AD;")))
+
+(test-equal "the oracle's hex mode hashes at the minimum limits and verifies its own hash: right 0, wrong -1, for a non-ASCII password, a password with a NUL, and the empty one, every run under Valgrind exactly when the gate asked"
+  (list '("$argon2id$v=19$m=8,t=1,p=1$" 93)
+        '("$argon2id$v=19$m=8,t=1,p=1$" 93)
+        '("$argon2id$v=19$m=8,t=1,p=1$" 93)
+        '(0 -1) '(0 -1) '(0 -1)
+        expected-verdicts)
+  (let* ((h1 (oracle-hash hex-nonascii))
+         (h2 (oracle-hash "610062"))
+         (h3 (oracle-hash ""))
+         (shape (lambda (h) (if (string? h)
+                                (list (substring h 0 (min 27 (string-length h))) (string-length h))
+                                h))))
+    (let* ((v1 (list (oracle-verify h1 hex-nonascii) (oracle-verify h1 hex-nonascii-changed)))
+           (v2 (list (oracle-verify h2 "610062") (oracle-verify h2 "610063")))
+           (v3 (list (oracle-verify h3 "") (oracle-verify h3 "61"))))
+      (list (shape h1) (shape h2) (shape h3) v1 v2 v3 (take-verdicts!)))))
+
+(test-equal "the oracle's hex mode: a hash of \"a\" does not verify the empty password, and the empty hash does not verify \"a\"; two hashes of one password differ"
+  (list -1 -1 #f expected-verdicts)
+  (let* ((ha (oracle-hash "61")) (he (oracle-hash "")) (ha2 (oracle-hash "61"))
+         (a (oracle-verify ha "")) (b (oracle-verify he "61")))
+    (list a b (equal? ha ha2) (take-verdicts!))))
 
 ;; sodium_init's first answer in a process, 0, and its second, 1, written out
 ;; as the oracle reads them in a fresh process, not computed from native.
@@ -1152,7 +1306,7 @@
 ;; and which of step-names the init uses, so a step moved, dropped or swapped
 ;; for another's, or that stopped calling its binding or checking its answer,
 ;; changes the list too.
-(test-equal "E2 the load's let* steps, in order: choose, load, the three version bindings, the version, major and minor read, the floor, sodium_init's binding, call and check, sodium_memzero's binding, the eight bound after it in step 6's order, then the five size reads in step 7's order; each with the head of its init and the load's names it uses"
+(test-equal "E2 the load's let* steps, in order: choose, load, the three version bindings, the version, major and minor read, the floor, sodium_init's binding, call and check, sodium_memzero's binding, the seventeen bound after sodium_memcmp's in step 6's order, then the five size reads and the fourteen constant reads in step 7's order; each with the head of its init and the load's names it uses"
   '((chosen call-with-values)
     (libsodium-loaded guard chosen)
     (raw-version-string bind-required chosen)
@@ -1174,11 +1328,42 @@
     (raw-generichash-keybytes-min bind-required chosen)
     (raw-generichash-keybytes-max bind-required chosen)
     (raw-memcmp bind-required chosen)
+    (raw-pwhash-str bind-required chosen)
+    (raw-pwhash-str-verify bind-required chosen)
+    (raw-pwhash-str-needs-rehash bind-required chosen)
+    (raw-pwhash-strbytes bind-required chosen)
+    (raw-pwhash-strprefix bind-required chosen)
+    (raw-pwhash-opslimit-min bind-required chosen)
+    (raw-pwhash-opslimit-max bind-required chosen)
+    (raw-pwhash-opslimit-interactive bind-required chosen)
+    (raw-pwhash-opslimit-moderate bind-required chosen)
+    (raw-pwhash-opslimit-sensitive bind-required chosen)
+    (raw-pwhash-memlimit-min bind-required chosen)
+    (raw-pwhash-memlimit-max bind-required chosen)
+    (raw-pwhash-memlimit-interactive bind-required chosen)
+    (raw-pwhash-memlimit-moderate bind-required chosen)
+    (raw-pwhash-memlimit-sensitive bind-required chosen)
+    (raw-pwhash-passwd-min bind-required chosen)
+    (raw-pwhash-passwd-max bind-required chosen)
     (bytes raw-generichash-bytes)
     (bytes-min raw-generichash-bytes-min)
     (bytes-max raw-generichash-bytes-max)
     (keybytes-min raw-generichash-keybytes-min)
-    (keybytes-max raw-generichash-keybytes-max))
+    (keybytes-max raw-generichash-keybytes-max)
+    (strbytes raw-pwhash-strbytes)
+    (strprefix c-string->string)
+    (opslimit-min raw-pwhash-opslimit-min)
+    (opslimit-max raw-pwhash-opslimit-max)
+    (opslimit-interactive raw-pwhash-opslimit-interactive)
+    (opslimit-moderate raw-pwhash-opslimit-moderate)
+    (opslimit-sensitive raw-pwhash-opslimit-sensitive)
+    (memlimit-min raw-pwhash-memlimit-min)
+    (memlimit-max raw-pwhash-memlimit-max)
+    (memlimit-interactive raw-pwhash-memlimit-interactive)
+    (memlimit-moderate raw-pwhash-memlimit-moderate)
+    (memlimit-sensitive raw-pwhash-memlimit-sensitive)
+    (passwd-min raw-pwhash-passwd-min)
+    (passwd-max raw-pwhash-passwd-max))
   (if (and body-read? (the-let*))
       (map (lambda (binding)
              (let ((expr (cadr binding)))
@@ -1188,7 +1373,22 @@
            (bindings-of (the-let*)))
       native-body))
 
-(test-equal "E3 every foreign-procedure form in native.sls binds eagerly: thirteen in all, each the whole second argument of (bind-required chosen ...) and directly the init of its let* binding, none inside a lambda"
+;; collect-safe-bindings : -> (Listof Symbol)
+;; The let* names whose bind-required form's foreign-procedure carries the
+;; __collect_safe convention, in the load's order.
+(define (collect-safe-bindings)
+  (let loop ((bindings (bindings-of (the-let*))) (found '()))
+    (if (null? bindings)
+        (reverse found)
+        (let ((expr (cadr (car bindings))))
+          (loop (cdr bindings)
+                (if (and (list? expr) (= (length expr) 3) (eq? (car expr) 'bind-required)
+                         (pair? (caddr expr)) (eq? (car (caddr expr)) 'foreign-procedure)
+                         (memq '__collect_safe (caddr expr)))
+                    (cons (car (car bindings)) found)
+                    found))))))
+
+(test-equal "E3 every foreign-procedure form in native.sls binds eagerly: thirty in all, exactly crypto_pwhash_str and crypto_pwhash_str_verify __collect_safe, each the whole second argument of (bind-required chosen ...) and directly the init of its let* binding, none inside a lambda"
   (list '((raw-version-string chosen "sodium_version_string")
           (raw-major chosen "sodium_library_version_major")
           (raw-minor chosen "sodium_library_version_minor")
@@ -1201,8 +1401,26 @@
           (raw-generichash-bytes-max chosen "crypto_generichash_bytes_max")
           (raw-generichash-keybytes-min chosen "crypto_generichash_keybytes_min")
           (raw-generichash-keybytes-max chosen "crypto_generichash_keybytes_max")
-          (raw-memcmp chosen "sodium_memcmp"))
-        13)
+          (raw-memcmp chosen "sodium_memcmp")
+          (raw-pwhash-str chosen "crypto_pwhash_str")
+          (raw-pwhash-str-verify chosen "crypto_pwhash_str_verify")
+          (raw-pwhash-str-needs-rehash chosen "crypto_pwhash_str_needs_rehash")
+          (raw-pwhash-strbytes chosen "crypto_pwhash_strbytes")
+          (raw-pwhash-strprefix chosen "crypto_pwhash_strprefix")
+          (raw-pwhash-opslimit-min chosen "crypto_pwhash_opslimit_min")
+          (raw-pwhash-opslimit-max chosen "crypto_pwhash_opslimit_max")
+          (raw-pwhash-opslimit-interactive chosen "crypto_pwhash_opslimit_interactive")
+          (raw-pwhash-opslimit-moderate chosen "crypto_pwhash_opslimit_moderate")
+          (raw-pwhash-opslimit-sensitive chosen "crypto_pwhash_opslimit_sensitive")
+          (raw-pwhash-memlimit-min chosen "crypto_pwhash_memlimit_min")
+          (raw-pwhash-memlimit-max chosen "crypto_pwhash_memlimit_max")
+          (raw-pwhash-memlimit-interactive chosen "crypto_pwhash_memlimit_interactive")
+          (raw-pwhash-memlimit-moderate chosen "crypto_pwhash_memlimit_moderate")
+          (raw-pwhash-memlimit-sensitive chosen "crypto_pwhash_memlimit_sensitive")
+          (raw-pwhash-passwd-min chosen "crypto_pwhash_passwd_min")
+          (raw-pwhash-passwd-max chosen "crypto_pwhash_passwd_max"))
+        30
+        '(raw-pwhash-str raw-pwhash-str-verify))
   (if (and body-read? (the-let*))
       (list (let loop ((bindings (bindings-of (the-let*))) (found '()))
               (if (null? bindings)
@@ -1215,7 +1433,8 @@
                                           (or (find string? (cdr (caddr expr))) 'no-name))
                                     found)
                               found)))))
-            (length (forms-headed 'foreign-procedure native-body)))
+            (length (forms-headed 'foreign-procedure native-body))
+            (collect-safe-bindings))
       native-body))
 
 ;; E4. The load's work is in that one section: the loader, discovery, the floor,
@@ -1247,7 +1466,7 @@
                     '(load-shared-object choose-libsodium check-version check-init bind-required)))
       native-body))
 
-(test-equal "E5 the answers are top-level definitions (define NAME (answer 'KEY)): the record's six, the load's five raw bindings, the verbs' three, then the five sizes, each under its own key"
+(test-equal "E5 the answers are top-level definitions (define NAME (answer 'KEY)): the record's six, the load's five raw bindings, the verbs' three, the five sizes, then the password hash's three bindings and fourteen constants, each under its own key"
   '((libsodium-path path) (libsodium-source source) (libsodium-version version)
     (libsodium-major major) (libsodium-minor minor) (libsodium-init init)
     (sodium-version-string sodium-version-string)
@@ -1262,7 +1481,24 @@
     (generichash-bytes-min generichash-bytes-min)
     (generichash-bytes-max generichash-bytes-max)
     (generichash-keybytes-min generichash-keybytes-min)
-    (generichash-keybytes-max generichash-keybytes-max))
+    (generichash-keybytes-max generichash-keybytes-max)
+    (crypto-pwhash-str crypto-pwhash-str)
+    (crypto-pwhash-str-verify crypto-pwhash-str-verify)
+    (crypto-pwhash-str-needs-rehash crypto-pwhash-str-needs-rehash)
+    (pwhash-strbytes pwhash-strbytes)
+    (pwhash-strprefix pwhash-strprefix)
+    (pwhash-opslimit-min pwhash-opslimit-min)
+    (pwhash-opslimit-max pwhash-opslimit-max)
+    (pwhash-opslimit-interactive pwhash-opslimit-interactive)
+    (pwhash-opslimit-moderate pwhash-opslimit-moderate)
+    (pwhash-opslimit-sensitive pwhash-opslimit-sensitive)
+    (pwhash-memlimit-min pwhash-memlimit-min)
+    (pwhash-memlimit-max pwhash-memlimit-max)
+    (pwhash-memlimit-interactive pwhash-memlimit-interactive)
+    (pwhash-memlimit-moderate pwhash-memlimit-moderate)
+    (pwhash-memlimit-sensitive pwhash-memlimit-sensitive)
+    (pwhash-passwd-min pwhash-passwd-min)
+    (pwhash-passwd-max pwhash-passwd-max))
   (if body-read?
       (let loop ((forms native-body) (found '()))
         (if (null? forms)
@@ -1379,6 +1615,41 @@
             (filter (lambda (symbol) (occurs? symbol definition))
                     '(bytevector-copy bytevector-copy! bytevector->u8-list make-bytevector
                       utf8->string string->utf8 subbytevector))))
+      native-body))
+
+;; symbols-in : Any -> (Listof Symbol)
+;; Every distinct symbol anywhere in X, sorted by name.
+(define (symbols-in x)
+  (let loop ((todo (list x)) (found '()))
+    (cond ((null? todo)
+           (list-sort (lambda (a b) (string<? (symbol->string a) (symbol->string b))) found))
+          ((symbol? (car todo))
+           (loop (cdr todo) (if (memq (car todo) found) found (cons (car todo) found))))
+          ((pair? (car todo)) (loop (cons (caar todo) (cons (cdar todo) (cdr todo))) found))
+          ((vector? (car todo)) (loop (cons (vector->list (car todo)) (cdr todo)) found))
+          (else (loop (cdr todo) found)))))
+
+;; Each string writer holds an allow-list: every symbol its definition may
+;; mention, compared whole. A deny-list misses what it does not name: a
+;; writer that built a string of its own with make-string and string-set!
+;; would pass one. Adding a symbol to a writer is a change to this list.
+(test-equal "E13 the string writers copy no secret: call-with-c-string's and call-with-utf8's definitions mention exactly the symbols of their allow-lists, whole"
+  '((+ < <= >= and assertion-violation begin block c call-with-block call-with-c-string
+       changed char->integer check-who define foreign-set! i if intact lambda let loop n
+       not-a-string proc procedure? quote refuse-secret set! shown-value string string-length
+       string-ref string? unless unsigned-8 who)
+    (+ < = > assertion-violation at begin bitwise-and bitwise-arithmetic-shift-right
+       bitwise-ior block c call-with-block call-with-utf8 case changed char->integer check-who
+       cond define else exact-natural? foreign-set! i if intact lambda len let let* loop max n
+       not-a-string proc procedure? quote refuse-secret set! shown-value string string-length
+       string-ref string? unless unsigned-8 who width))
+  (if body-read?
+      (map (lambda (name)
+             (let ((definition (definition-form name)))
+               (if (eq? definition 'no-definition)
+                   (list 'no-definition)
+                   (symbols-in definition))))
+           '(call-with-c-string call-with-utf8))
       native-body))
 
 (test-equal "E10 sodium-version's body is (string-copy libsodium-version), and loaded-libsodium builds its two strings with string-copy of the path and the version"
