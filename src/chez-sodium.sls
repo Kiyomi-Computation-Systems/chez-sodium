@@ -8,7 +8,7 @@
 ;;; loads. Every name that reaches libsodium runs the load at its first
 ;;; reference, once per process (ADR-0002).
 ;;;
-;;; It exports predicates and accessors, never a & name or a constructor
+;;; It exports predicates and accessors, never a condition's & name or constructor
 ;;; (ADR-0006, ADR-0012).
 (library (chez-sodium)
   (export
@@ -23,6 +23,17 @@
    blake2b
    ;; constant-time-bytevector=? : Bytevector Bytevector -> Boolean
    constant-time-bytevector=?
+
+   ;; --- the password verbs (chez-sodium private password-verbs) ---
+   ;;   Limits = (U 'interactive 'moderate 'sensitive Password-limits), by default 'interactive
+   ;; password-hash : String [Limits] -> String
+   password-hash
+   ;; password-verify : String String -> Boolean              ; hash, password
+   password-verify
+   ;; password-needs-rehash? : String [Limits] -> Boolean      ; hash
+   password-needs-rehash?
+   ;; make-password-limits : Natural Natural -> Password-limits ; ops, memory in KiB
+   make-password-limits
 
    ;; --- conditions (chez-sodium private conditions) ---
    ;; chez-sodium-error? : Any -> Boolean
@@ -51,6 +62,9 @@
           (only (chez-sodium private native) sodium-version)
           (only (chez-sodium private byte-verbs)
                 random-bytes blake2b constant-time-bytevector=?)
+          (only (chez-sodium private password-verbs)
+                password-hash password-verify password-needs-rehash?
+                make-password-limits)
           (only (chez-sodium private conditions)
                 sodium-failed? sodium-failed-function sodium-failed-code
                 chez-sodium-error?

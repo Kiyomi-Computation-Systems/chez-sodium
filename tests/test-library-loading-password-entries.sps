@@ -7,7 +7,7 @@
 ;;; call-with-bytes and call-with-block, and prints each call's answer, the
 ;;; out block's first 0 and its counts of A5 and 11 bytes, and the log's
 ;;; growth. One child per switch: the control, pwhash-limits-other,
-;;; pwhash-str-fails, -other and -unreadable, verify-other, and pwhash-blocks
+;;; pwhash-str-fails, -other, -unreadable and -empty, verify-other, and pwhash-blocks
 ;;; with no FIFO named. A last child reads the constants under strprefix-null.
 ;;;
 ;;; Under the memory gate each child runs under a Valgrind of its own, so
@@ -162,6 +162,9 @@
 
 (entries-row "crypto_pwhash_str answers 0 and leaves all 128 bytes A5, with no 0 in them"
   "pwhash-str-unreadable" (entries-lines 0 'none 128 0 0 0))
+
+(entries-row "crypto_pwhash_str answers 0 and leaves 127 bytes A5 after a 0 at index 0"
+  "pwhash-str-empty" (entries-lines 0 0 127 0 0 0))
 
 (entries-row "crypto_pwhash_str_verify answers 1; the other two are the control's"
   "verify-other" (entries-lines 0 93 34 0 1 0))

@@ -2,7 +2,7 @@
 ;;; (library-loading): what the suites that load libsodium end to end
 ;;; share, tests/test-library-loading-*.sps (ADR-0002, ADR-0003, ADR-0006,
 ;;; ADR-0011). Their cost is their children, each under a Valgrind of its
-;;; own under the memory gate, so the rows are split among eleven suites, each
+;;; own under the memory gate, so the rows are split among twelve suites, each
 ;;; running at most 14 children, to keep each well under MEMORY_TIMEOUT
 ;;; (ADR-0011):
 ;;;
@@ -25,8 +25,11 @@
 ;;;                sodium_init called before and after the load
 ;;;   -discovery   the override unset: what discovery chooses, and not-found
 ;;;   -preflight   make build's preflight, and a raise that is not a refusal
-;;;   -verbs       the verbs' calls on the control build, one child a switch: what
-;;;                reaches C, and what each verb answers or raises
+;;;   -verbs       the byte verbs' calls on the control build, one child a switch:
+;;;                what reaches C, and what each verb answers or raises
+;;;   -passwords   the password verbs' calls the same way: what reaches C, each
+;;;                refusal's empty growth, the other answers of the password
+;;;                calls, and the constants as the decoy gives them
 ;;;
 ;;;   the probe         spawn a child through env and gated-command, and
 ;;;                     read what tests/refusal-probe.sps printed, as data

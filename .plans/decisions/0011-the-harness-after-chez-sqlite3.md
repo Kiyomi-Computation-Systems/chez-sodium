@@ -188,6 +188,8 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
     oracle child and `refusal-probe --constants` print the fourteen, which tells twins apart;
   - `pwhash-str-fails` and `pwhash-str-other`: `crypto_pwhash_str` answers -1, or 1;
   - `pwhash-str-unreadable`: it answers 0 and leaves `out` all `A5` ([ADR-0006], amended);
+  - `pwhash-str-empty`: it answers 0 with a 0 at `out`'s first byte, an empty string, added after
+    slice 2's review;
   - `verify-other`: verify answers 1 for a match;
   - `strprefix-null`: a NULL prefix;
   - `pwhash-blocks`: row 19's FIFO.

@@ -88,6 +88,10 @@
     (random-bytes chez-sodium private byte-verbs)
     (blake2b chez-sodium private byte-verbs)
     (constant-time-bytevector=? chez-sodium private byte-verbs)
+    (password-hash chez-sodium private password-verbs)
+    (password-verify chez-sodium private password-verbs)
+    (password-needs-rehash? chez-sodium private password-verbs)
+    (make-password-limits chez-sodium private password-verbs)
     (sodium-failed? chez-sodium private conditions)
     (sodium-failed-function chez-sodium private conditions)
     (sodium-failed-code chez-sodium private conditions)
@@ -105,7 +109,7 @@
   'loaded
   public-load)
 
-(test-equal "(chez-sodium) exports exactly the version, the three byte verbs and the condition predicates and accessors, and nothing private"
+(test-equal "(chez-sodium) exports exactly the version, the three byte verbs, the four password verbs and the condition predicates and accessors, and nothing private"
   (sorted-names (map car public-names))
   (guard (e (#t (list 'raised (describe e))))
     (sorted-names (library-exports '(chez-sodium)))))

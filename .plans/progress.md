@@ -49,8 +49,10 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   with brief §4.2's rules (brief §9).
   - **Slice 0, the plan and the records,** merged as #14. The owner accepted every
     recommendation on 2026-11-24.
-  - **Slice 1, the bindings, the writers and the pure core,** is on `m3-slice-1`.
-  - **Next: slice 2,** the verbs; then M3's closing review.
+  - **Slice 1, the bindings, the writers and the pure core,** merged as #15.
+  - **Slice 2, the verbs,** is on `m3-slice-2`.
+  - **Next: M3's closing review,** and its fixes in a PR stacked on slice 2's, as the owner asked
+    on 2026-11-24.
 
 ## Answered for M1
 
@@ -157,12 +159,62 @@ its questions on 2026-11-24, accepting every recommendation:
   - a hash's own limits set what verifying it costs, so hashes come from trusted storage;
   - a container's memory limit can get the process killed;
   - the login pattern: `password-needs-rehash?` only after `password-verify` answers `#t`;
-  - a password changed by another thread during the call is refused.
+  - a password changed by another thread during the call is refused;
+  - a password over the cap is refused by `password-verify`, not answered `#f`, so a login form
+    bounds or catches it first;
+  - a hash string is stored exactly: a stray space or newline verifies `#f` for ever;
+  - the calling thread's interrupts wait while a hash runs: about 55 ms at `'interactive`,
+    seconds at `'sensitive` (M3S2-F4).
 - **The docs rule of `check-floors`** waits for `docs/`.
 - **The install-line checks of `test-manifest`** wait for the first release, which writes the
   install lines.
 
 ## Close-outs
+
+### 2026-11-24 — M3 slice 2: the verbs (PR #16)
+
+- **Written first by the caller:** a stub `password-verbs` that exports the four names, each
+  present and wrong.
+- **Built** on `m3-slice-2` by three Sonnet builders, on disjoint files in one tree:
+  - **the verbs:**
+    - `password-hash`, `password-verify`, `password-needs-rehash?` and `make-password-limits`,
+      in `(chez-sodium private password-verbs)`;
+    - `test-password-verbs`, in process: rows 3, 5 to 9, 11, 12, 15, 16 and 18, R16, a
+      `changed-during-call` sweep under engines, and the shape rows with a whole-library
+      allow-list;
+    - `verb-probe`'s password calls and `--describe`;
+    - `test-library-loading-passwords`, the decoy's halves;
+  - **the public library and the wipe:** `(chez-sodium)`'s four exports; `test-public`;
+    `test-never-loads`, whose loaders row holds `password-text` pure; and `test-wipe`'s password
+    child, with its standing controls;
+  - **collect-safe and the oracle:** row 19's `collect-probe` and `test-collect-safe`, and row 4's
+    `test-password-oracle`, both ways at 1.0.22 and the floor.
+
+  Every mutant is logged, and the caller planted one of each builder's again at the join
+  ([its mutation log](m3-slice-2-mutation-log.md)).
+- **Reviewed:** one Opus review found no blocker, 2 majors and 7 minors
+  ([research/m3-slice-2-review/](research/m3-slice-2-review/README.md)). The caller reproduced
+  both majors, and two Sonnet fix agents fixed each finding. The majors:
+  - **a `password-needs-rehash?` that answered `#f` for a hash changed during its call passed all
+    192 rows.** A child under the decoy now sweeps the change at every fuel, and its row holds
+    every run that only wiped the hash's block to `#t`;
+  - **`test-password-verbs` died at top level when libsodium could not load,** naming no test. Its
+    rows now build their strings inside their thunks, and the probe names all 172 rows.
+
+  Among the minors:
+  - **`collect-probe`'s watchdog** starts before the fork, outside the process, so a collection
+    cannot strand it, and the child is bounded by `timeout`. The caller dropped the control row's
+    time bound: a collection the child starts itself can do the waiting;
+  - **`password-hash` refuses an empty or unreadable string from C** with code 0, held by a new
+    decoy switch, `pwhash-str-empty`;
+  - **one default hash and one cheap pair, as the rule allows.** The argon2i row is held by an
+    argon2i-prefixed copy that libsodium answers 0 for;
+  - **the Password-limits record's opacity** is held by `record?` and `record-rtd`;
+  - **M4's list** gains three notes for callers.
+- **Gate times:** `test-password-verbs` 15 s, `-passwords` 74 s, `test-collect-safe` 36 s, the
+  oracle 11 s. The slowest suite is still `test-check-ci`, at 117 s, of 450. In the container: `make
+  test` 39 of 39, `check-test-fails` 13, `test-memory` 39 of 39, `check-memory-gate` 59 cases,
+  `make build` and `check-dev`.
 
 ### 2026-11-24 — M3 slice 1: the bindings, the writers and the pure core (PR #15)
 

@@ -185,8 +185,10 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
   - After a -1, every byte of `out` is zero, so there is no hash to answer (measured).
   - The decoy answers -1 and 1.
 - **A second case for `crypto_pwhash_str`: an answer of 0 with no readable string,** with code
-  0. `foreign-ascii-string` finds no 0 within `strbytes`, or a byte of 0x80 or more. No release
-  does this; the decoy's `pwhash-str-unreadable` reaches it. `raise-sodium-failed`'s fixed
+  0. `foreign-ascii-string` finds no 0 within `strbytes`, or a byte of 0x80 or more, or the string
+  it reads fails the pre-check, the empty one among them, so `password-hash` never answers a hash
+  its own `password-verify` would refuse unread. No release does this; the decoy's
+  `pwhash-str-unreadable` and `pwhash-str-empty` reach it (slice 2's review, M3S2-F7). `raise-sodium-failed`'s fixed
   message becomes "libsodium gave no result for a call that passed its checks", true of both.
 - **Decision 4 stands: `password-verify` answers `#f` for libsodium's -1, short memory
   included.**
