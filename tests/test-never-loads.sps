@@ -229,6 +229,7 @@
 
 (test-equal "the libraries under src/ that load libsodium, found from their imports: native, and each that imports a loader"
   (sorted '((chez-sodium)
+            (chez-sodium private byte-verbs)
             (chez-sodium private native)))
   (if src-read? loaders src-imports))
 
@@ -325,7 +326,7 @@
 ;; verb-names : (Listof Symbol)
 ;; The exports of (chez-sodium) that load libsodium. Every other export is a
 ;; condition export.
-(define verb-names '(sodium-version))
+(define verb-names '(sodium-version random-bytes blake2b constant-time-bytevector=?))
 
 ;; condition-names : (Listof Symbol)
 ;; The exports of (chez-sodium) less the verbs, as Chez lists them, sorted.
@@ -349,7 +350,10 @@
                sodium-library-unavailable-path
                sodium-library-unavailable-source
                sodium-library-unavailable-detail
-               sodium-library-unavailable-candidates)))
+               sodium-library-unavailable-candidates
+               sodium-failed?
+               sodium-failed-function
+               sodium-failed-code)))
 
 (test-equal "the condition exports of (chez-sodium), its exports less the verbs, are exactly the names the condition children check"
   checked-names
@@ -362,13 +366,15 @@
 (define conditions-program
   (string-append
    "#!r6rs\n"
-   "(import (rnrs) (rnrs eval) (only (chez-sodium private conditions) make-sodium-library-unavailable))\n"
+   "(import (rnrs) (rnrs eval) (only (chez-sodium private conditions) make-sodium-library-unavailable make-sodium-failed))\n"
    "(define env (environment '(rnrs) '(chez-sodium)))\n"
    "(define (pub n) (eval n env))\n"
    "(define referenced (map pub '(" (apply string-append (map (lambda (n) (string-append (symbol->string n) " ")) condition-names)) ")))\n"
    maps-scan-text
    "(define (yes-no x) (cond ((eq? x #t) 'yes) ((eq? x #f) 'no) (else (list 'neither x))))\n"
    "(define made (make-sodium-library-unavailable 'not-found \"/p\" 'system 7 '(\"c\")))\n"
+   "(define made-failed (make-sodium-failed \"crypto_generichash\" 13))\n"
+   "(define (refused thunk) (guard (e ((assertion-violation? e) 'refused) (#t 'other)) (list 'answered (thunk))))\n"
    "(define (show x) (write x) (newline))\n"
    "(define (field name) (list name ((pub name) made)))\n"
    "(show (cons 'before (has? \"libsodium\")))\n"
@@ -379,6 +385,9 @@
    "(show (field 'sodium-library-unavailable-source))\n"
    "(show (field 'sodium-library-unavailable-detail))\n"
    "(show (field 'sodium-library-unavailable-candidates))\n"
+   "(show (list 'sodium-failed? (yes-no ((pub 'sodium-failed?) made-failed)) (yes-no ((pub 'sodium-failed?) made)) (yes-no ((pub 'sodium-failed?) 42))))\n"
+   "(show (list 'sodium-failed-function ((pub 'sodium-failed-function) made-failed) (refused (lambda () ((pub 'sodium-failed-function) 42)))))\n"
+   "(show (list 'sodium-failed-code ((pub 'sodium-failed-code) made-failed) (refused (lambda () ((pub 'sodium-failed-code) 42)))))\n"
    "(show (list 'sodium-version\n"
    "  (guard (e (#t (list 'raised\n"
    "                      (yes-no ((pub 'chez-sodium-error?) e))\n"
@@ -408,6 +417,9 @@
                '(sodium-library-unavailable-source system)
                '(sodium-library-unavailable-detail 7)
                '(sodium-library-unavailable-candidates ("c"))
+               '(sodium-failed? yes no no)
+               '(sodium-failed-function "crypto_generichash" refused)
+               '(sodium-failed-code 13 refused)
                (list 'sodium-version sodium-version-answer)
                (cons 'after after)
                (cons 'valgrind valgrind-answer))))

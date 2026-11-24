@@ -16,6 +16,14 @@
    ;; sodium-version : -> String
    sodium-version
 
+   ;; --- the byte verbs (chez-sodium private byte-verbs) ---
+   ;; random-bytes : Natural -> Bytevector
+   random-bytes
+   ;; blake2b : Bytevector [Natural] [Bytevector] -> Bytevector   ; input, size, key
+   blake2b
+   ;; constant-time-bytevector=? : Bytevector Bytevector -> Boolean
+   constant-time-bytevector=?
+
    ;; --- conditions (chez-sodium private conditions) ---
    ;; chez-sodium-error? : Any -> Boolean
    chez-sodium-error?
@@ -32,10 +40,19 @@
    ;; sodium-library-unavailable-detail : SodiumLibraryUnavailable -> Any
    sodium-library-unavailable-detail
    ;; sodium-library-unavailable-candidates : SodiumLibraryUnavailable -> (Listof String)
-   sodium-library-unavailable-candidates)
+   sodium-library-unavailable-candidates
+   ;; sodium-failed? : Any -> Boolean
+   sodium-failed?
+   ;; sodium-failed-function : SodiumFailed -> String
+   sodium-failed-function
+   ;; sodium-failed-code : SodiumFailed -> Integer
+   sodium-failed-code)
   (import (chez-sodium private require-threaded)
           (only (chez-sodium private native) sodium-version)
+          (only (chez-sodium private byte-verbs)
+                random-bytes blake2b constant-time-bytevector=?)
           (only (chez-sodium private conditions)
+                sodium-failed? sodium-failed-function sodium-failed-code
                 chez-sodium-error?
                 sodium-library-unavailable? sodium-library-unavailable-reason
                 sodium-library-unavailable-path sodium-library-unavailable-source

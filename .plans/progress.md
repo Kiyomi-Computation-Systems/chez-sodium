@@ -35,7 +35,8 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
     suites against them.
 - **M2 is under way:** `random-bytes`, `blake2b` and `constant-time-bytevector=?`, built on M1's
   helper (brief §9; [the M2 plan](2026-11-23-m2-plan.md)). Slice 0, the plan and the records, is
-  PR #10; slice 1, the bindings, is on `m2-slice-1`, stacked on it; then slice 2, the verbs.
+  PR #10; slice 1, the bindings, is PR #11, stacked on it; slice 2, the verbs, is PR #12,
+  stacked on #11. Then M2's closing review.
 
 ## Answered for M1
 
@@ -111,6 +112,35 @@ its questions on 2026-11-23:
   install lines.
 
 ## Close-outs
+
+### 2026-11-23 — M2 slice 1: the bindings (PR #11)
+
+- **Written first by the caller:** native's eight bindings in step 6, step 7's five size reads,
+  and the new exports.
+- **Built** on `m2-slice-1` by three Sonnet builders, on disjoint files in one tree:
+  - **the load:** `test-native`'s rows for thirteen bindings, the oracle's size lines, and
+    `test-native-codes` for row 22;
+  - **the conventions:** eight convention rows, the allow-lists with `unsigned-64` and `size_t`,
+    and `test-constants`' prototype rows;
+  - **the decoy:** its eight entries, four switches and loud overflow; the missing-entry split;
+    and `test-decoy-source`.
+
+  Every mutant is logged, each killed but the oracle's equal-valued twins: `sizes-other` kills
+  the size functions' twins, and no value can tell the macros' apart
+  ([its mutation log](m2-slice-1-mutation-log.md)).
+- **Reviewed:** one Opus review found no blocker, 2 majors and 8 minors, each fixed
+  ([research/m2-slice-1-review/](research/m2-slice-1-review/README.md)).
+  - **The majors:**
+    - two sizes stored under each other's keys passed every suite, since the real sizes are
+      equal in pairs. Now `refusal-probe --sizes` holds native's five to the decoy's
+      `sizes-other`;
+    - the overflow row's C driver ran outside the gate. It now runs, with a child for each
+      switch, in gated Chez children (`refusal-probe --drive`).
+  - **ADR-0011 amended, accepted by the owner:** `test-constants`' prototype check, a C program
+    that calls no libsodium function, has run outside the gate since M1, and is now the
+    recorded second exception.
+- **CI's run** 45294352684 passed all five jobs. Under its gate, `-decoys` took 79 s and
+  `-combined` 75 s, of 450.
 
 ### 2026-11-23 — M2 slice 0: the plan and the records (PR #10)
 

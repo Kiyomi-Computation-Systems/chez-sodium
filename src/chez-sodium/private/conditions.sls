@@ -95,7 +95,9 @@
       (refuse-field 'refuse-secret 'rule "a symbol" rule))
     (unless (symbol? parameter)
       (refuse-field 'refuse-secret 'parameter "a symbol" parameter))
-    (assertion-violation who "a secret parameter is refused by its kind alone"
+    (assertion-violation who
+                         (string-append (symbol->string parameter) " is refused: "
+                                        (symbol->string rule) ", shown by its kind alone")
                          rule parameter (secret-shown value)))
 
   ;; checked-accessor : Symbol Symbol (Any -> Boolean) String (Any -> Any) -> (Any -> Any)

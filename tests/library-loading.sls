@@ -1,8 +1,8 @@
 #!r6rs
-;;; (library-loading): what the seven suites that load libsodium end to end
+;;; (library-loading): what the eight suites that load libsodium end to end
 ;;; share, tests/test-library-loading-*.sps (ADR-0002, ADR-0003, ADR-0006,
 ;;; ADR-0011). Their cost is their children, each under a Valgrind of its
-;;; own under the memory gate, so the rows are split among seven suites, each
+;;; own under the memory gate, so the rows are split among eight suites, each
 ;;; running at most 14 children, to keep each well under MEMORY_TIMEOUT
 ;;; (ADR-0011):
 ;;;
@@ -18,9 +18,13 @@
 ;;;                sodium_init called before and after the load
 ;;;   -discovery   the override unset: what discovery chooses, and not-found
 ;;;   -preflight   make build's preflight, and a raise that is not a refusal
+;;;   -verbs       the verbs' calls on the control build, one child a switch: what
+;;;                reaches C, and what each verb answers or raises
 ;;;
 ;;;   the probe         spawn a child through env and gated-command, and
 ;;;                     read what tests/refusal-probe.sps printed, as data
+;;;   the verb probe    the same for tests/verb-probe.sps, given verb calls:
+;;;                     verb-probe-with, verb-answer and verb-row-in
 ;;;   the answers       a probe's whole expected answer: loaded, refused,
 ;;;                     with its counts, its Valgrind line and its call log
 ;;;   the floors        the decoy's versions, from packaging/floors.sexp
@@ -47,6 +51,7 @@
 (library (library-loading)
   (export chez set? string-prefix? string-suffix? absolute? join
           spawn-in probe-with probe override switch-args as-data
+          verb-probe-with verb-answer verb-row-in
           once no-native-objects gated? valgrind-line
           outcome report with-sizes control-sizes other-sizes
           loaded-lines refused-lines loaded refused
@@ -152,6 +157,35 @@
 
   ;; probe : (Listof String) -> (U (List Integer (Listof Any) String) (List 'raised String))
   (define (probe env-args) (probe-with env-args '()))
+
+  ;; verb-probe-with : (Listof String) (Listof String)
+  ;;                   -> (U (List Integer (Listof Any) String) (List 'raised String))
+  ;; tests/verb-probe.sps under ENV-ARGS, given CALLS, each the text of one
+  ;; expression: its exit status, what it printed read as data, and stderr.
+  (define (verb-probe-with env-args calls)
+    (as-data (spawn env-args "tests/verb-probe.sps" calls)))
+
+  ;; verb-answer : (Listof Any) -> Expected
+  ;; The verb probe's whole answer: status 0, its LINES, one (OUTCOME GROWTH)
+  ;; for each call, then every count zero and whether it ran under Valgrind,
+  ;; and an empty stderr.
+  (define (verb-answer lines)
+    (list 0 (append lines (list no-native-objects valgrind-line)) ""))
+
+  ;; verb-row-in : (String -> String) (String -> Any) String (U String #f)
+  ;;               (Listof String) String (Listof Any) -> Void
+  ;; The test DESCRIPTION: the verb probe, given CALLS, on BUILD, at (SO-OF
+  ;; BUILD), under SWITCH; the build's compile, (COMPILED-STATUS BUILD), must
+  ;; have answered 0, then (verb-answer LINES), whole. A suite names it
+  ;; verb-row, with its own two.
+  (define (verb-row-in so-of compiled-status build switch calls description lines)
+    (test-equal (string-append "verbs on " build
+                               (if switch (string-append " under \"" switch "\"") "")
+                               ": " description)
+      (verb-answer lines)
+      (if (eqv? (compiled-status build) 0)
+          (verb-probe-with (cons (override (so-of build)) (switch-args switch)) calls)
+          (list 'not-compiled (compiled-status build)))))
 
   ;; override : String -> String
   (define (override path) (string-append "CHEZ_SODIUM_LIBRARY=" path))
