@@ -1,0 +1,187 @@
+######## 1.0.18: crypto_pwhash.h
+sodium/crypto_pwhash.h:37: #define crypto_pwhash_PASSWD_MIN crypto_pwhash_argon2id_PASSWD_MIN
+sodium/crypto_pwhash.h:39: size_t crypto_pwhash_passwd_min(void);
+sodium/crypto_pwhash.h:41: #define crypto_pwhash_PASSWD_MAX crypto_pwhash_argon2id_PASSWD_MAX
+sodium/crypto_pwhash.h:43: size_t crypto_pwhash_passwd_max(void);
+sodium/crypto_pwhash.h:49: #define crypto_pwhash_STRBYTES crypto_pwhash_argon2id_STRBYTES
+sodium/crypto_pwhash.h:51: size_t crypto_pwhash_strbytes(void);
+sodium/crypto_pwhash.h:53: #define crypto_pwhash_STRPREFIX crypto_pwhash_argon2id_STRPREFIX
+sodium/crypto_pwhash.h:55: const char *crypto_pwhash_strprefix(void);
+sodium/crypto_pwhash.h:57: #define crypto_pwhash_OPSLIMIT_MIN crypto_pwhash_argon2id_OPSLIMIT_MIN
+sodium/crypto_pwhash.h:59: size_t crypto_pwhash_opslimit_min(void);
+sodium/crypto_pwhash.h:61: #define crypto_pwhash_OPSLIMIT_MAX crypto_pwhash_argon2id_OPSLIMIT_MAX
+sodium/crypto_pwhash.h:63: size_t crypto_pwhash_opslimit_max(void);
+sodium/crypto_pwhash.h:65: #define crypto_pwhash_MEMLIMIT_MIN crypto_pwhash_argon2id_MEMLIMIT_MIN
+sodium/crypto_pwhash.h:67: size_t crypto_pwhash_memlimit_min(void);
+sodium/crypto_pwhash.h:69: #define crypto_pwhash_MEMLIMIT_MAX crypto_pwhash_argon2id_MEMLIMIT_MAX
+sodium/crypto_pwhash.h:71: size_t crypto_pwhash_memlimit_max(void);
+sodium/crypto_pwhash.h:73: #define crypto_pwhash_OPSLIMIT_INTERACTIVE crypto_pwhash_argon2id_OPSLIMIT_INTERACTIVE
+sodium/crypto_pwhash.h:75: size_t crypto_pwhash_opslimit_interactive(void);
+sodium/crypto_pwhash.h:77: #define crypto_pwhash_MEMLIMIT_INTERACTIVE crypto_pwhash_argon2id_MEMLIMIT_INTERACTIVE
+sodium/crypto_pwhash.h:79: size_t crypto_pwhash_memlimit_interactive(void);
+sodium/crypto_pwhash.h:81: #define crypto_pwhash_OPSLIMIT_MODERATE crypto_pwhash_argon2id_OPSLIMIT_MODERATE
+sodium/crypto_pwhash.h:83: size_t crypto_pwhash_opslimit_moderate(void);
+sodium/crypto_pwhash.h:85: #define crypto_pwhash_MEMLIMIT_MODERATE crypto_pwhash_argon2id_MEMLIMIT_MODERATE
+sodium/crypto_pwhash.h:87: size_t crypto_pwhash_memlimit_moderate(void);
+sodium/crypto_pwhash.h:89: #define crypto_pwhash_OPSLIMIT_SENSITIVE crypto_pwhash_argon2id_OPSLIMIT_SENSITIVE
+sodium/crypto_pwhash.h:91: size_t crypto_pwhash_opslimit_sensitive(void);
+sodium/crypto_pwhash.h:93: #define crypto_pwhash_MEMLIMIT_SENSITIVE crypto_pwhash_argon2id_MEMLIMIT_SENSITIVE
+sodium/crypto_pwhash.h:95: size_t crypto_pwhash_memlimit_sensitive(void);
+sodium/crypto_pwhash.h:116: int crypto_pwhash_str(char out[crypto_pwhash_STRBYTES],
+sodium/crypto_pwhash.h:117:                       const char * const passwd, unsigned long long passwdlen,
+sodium/crypto_pwhash.h:118:                       unsigned long long opslimit, size_t memlimit)
+sodium/crypto_pwhash.h:119:             __attribute__ ((warn_unused_result)) __attribute__ ((nonnull));
+sodium/crypto_pwhash.h:128: int crypto_pwhash_str_verify(const char str[crypto_pwhash_STRBYTES],
+sodium/crypto_pwhash.h:129:                              const char * const passwd,
+sodium/crypto_pwhash.h:130:                              unsigned long long passwdlen)
+sodium/crypto_pwhash.h:131:             __attribute__ ((warn_unused_result)) __attribute__ ((nonnull));
+sodium/crypto_pwhash.h:134: int crypto_pwhash_str_needs_rehash(const char str[crypto_pwhash_STRBYTES],
+sodium/crypto_pwhash.h:135:                                    unsigned long long opslimit, size_t memlimit)
+sodium/crypto_pwhash.h:136:             __attribute__ ((warn_unused_result)) __attribute__ ((nonnull));
+######## 1.0.18: crypto_pwhash_argon2id.h (macros the above expand to)
+29:#define crypto_pwhash_argon2id_PASSWD_MIN 0U
+30-SODIUM_EXPORT
+--
+33:#define crypto_pwhash_argon2id_PASSWD_MAX 4294967295U
+34-SODIUM_EXPORT
+--
+41:#define crypto_pwhash_argon2id_STRBYTES 128U
+42-SODIUM_EXPORT
+--
+45:#define crypto_pwhash_argon2id_STRPREFIX "$argon2id$"
+46-SODIUM_EXPORT
+--
+49:#define crypto_pwhash_argon2id_OPSLIMIT_MIN 1U
+50-SODIUM_EXPORT
+--
+53:#define crypto_pwhash_argon2id_OPSLIMIT_MAX 4294967295U
+54-SODIUM_EXPORT
+--
+57:#define crypto_pwhash_argon2id_MEMLIMIT_MIN 8192U
+58-SODIUM_EXPORT
+--
+61:#define crypto_pwhash_argon2id_MEMLIMIT_MAX \
+62-    ((SIZE_MAX >= 4398046510080U) ? 4398046510080U : (SIZE_MAX >= 2147483648U) ? 2147483648U : 32768U)
+--
+66:#define crypto_pwhash_argon2id_OPSLIMIT_INTERACTIVE 2U
+67-SODIUM_EXPORT
+--
+70:#define crypto_pwhash_argon2id_MEMLIMIT_INTERACTIVE 67108864U
+71-SODIUM_EXPORT
+--
+74:#define crypto_pwhash_argon2id_OPSLIMIT_MODERATE 3U
+75-SODIUM_EXPORT
+--
+78:#define crypto_pwhash_argon2id_MEMLIMIT_MODERATE 268435456U
+79-SODIUM_EXPORT
+--
+82:#define crypto_pwhash_argon2id_OPSLIMIT_SENSITIVE 4U
+83-SODIUM_EXPORT
+--
+86:#define crypto_pwhash_argon2id_MEMLIMIT_SENSITIVE 1073741824U
+87-SODIUM_EXPORT
+######## 1.0.22: crypto_pwhash.h
+sodium/crypto_pwhash.h:37: #define crypto_pwhash_PASSWD_MIN crypto_pwhash_argon2id_PASSWD_MIN
+sodium/crypto_pwhash.h:39: size_t crypto_pwhash_passwd_min(void);
+sodium/crypto_pwhash.h:41: #define crypto_pwhash_PASSWD_MAX crypto_pwhash_argon2id_PASSWD_MAX
+sodium/crypto_pwhash.h:43: size_t crypto_pwhash_passwd_max(void);
+sodium/crypto_pwhash.h:49: #define crypto_pwhash_STRBYTES crypto_pwhash_argon2id_STRBYTES
+sodium/crypto_pwhash.h:51: size_t crypto_pwhash_strbytes(void);
+sodium/crypto_pwhash.h:53: #define crypto_pwhash_STRPREFIX crypto_pwhash_argon2id_STRPREFIX
+sodium/crypto_pwhash.h:55: const char *crypto_pwhash_strprefix(void);
+sodium/crypto_pwhash.h:57: #define crypto_pwhash_OPSLIMIT_MIN crypto_pwhash_argon2id_OPSLIMIT_MIN
+sodium/crypto_pwhash.h:59: size_t crypto_pwhash_opslimit_min(void);
+sodium/crypto_pwhash.h:61: #define crypto_pwhash_OPSLIMIT_MAX crypto_pwhash_argon2id_OPSLIMIT_MAX
+sodium/crypto_pwhash.h:63: size_t crypto_pwhash_opslimit_max(void);
+sodium/crypto_pwhash.h:65: #define crypto_pwhash_MEMLIMIT_MIN crypto_pwhash_argon2id_MEMLIMIT_MIN
+sodium/crypto_pwhash.h:67: size_t crypto_pwhash_memlimit_min(void);
+sodium/crypto_pwhash.h:69: #define crypto_pwhash_MEMLIMIT_MAX crypto_pwhash_argon2id_MEMLIMIT_MAX
+sodium/crypto_pwhash.h:71: size_t crypto_pwhash_memlimit_max(void);
+sodium/crypto_pwhash.h:73: #define crypto_pwhash_OPSLIMIT_INTERACTIVE crypto_pwhash_argon2id_OPSLIMIT_INTERACTIVE
+sodium/crypto_pwhash.h:75: size_t crypto_pwhash_opslimit_interactive(void);
+sodium/crypto_pwhash.h:77: #define crypto_pwhash_MEMLIMIT_INTERACTIVE crypto_pwhash_argon2id_MEMLIMIT_INTERACTIVE
+sodium/crypto_pwhash.h:79: size_t crypto_pwhash_memlimit_interactive(void);
+sodium/crypto_pwhash.h:81: #define crypto_pwhash_OPSLIMIT_MODERATE crypto_pwhash_argon2id_OPSLIMIT_MODERATE
+sodium/crypto_pwhash.h:83: size_t crypto_pwhash_opslimit_moderate(void);
+sodium/crypto_pwhash.h:85: #define crypto_pwhash_MEMLIMIT_MODERATE crypto_pwhash_argon2id_MEMLIMIT_MODERATE
+sodium/crypto_pwhash.h:87: size_t crypto_pwhash_memlimit_moderate(void);
+sodium/crypto_pwhash.h:89: #define crypto_pwhash_OPSLIMIT_SENSITIVE crypto_pwhash_argon2id_OPSLIMIT_SENSITIVE
+sodium/crypto_pwhash.h:91: size_t crypto_pwhash_opslimit_sensitive(void);
+sodium/crypto_pwhash.h:93: #define crypto_pwhash_MEMLIMIT_SENSITIVE crypto_pwhash_argon2id_MEMLIMIT_SENSITIVE
+sodium/crypto_pwhash.h:95: size_t crypto_pwhash_memlimit_sensitive(void);
+sodium/crypto_pwhash.h:116: int crypto_pwhash_str(char out[crypto_pwhash_STRBYTES],
+sodium/crypto_pwhash.h:117:                       const char * const passwd, unsigned long long passwdlen,
+sodium/crypto_pwhash.h:118:                       unsigned long long opslimit, size_t memlimit)
+sodium/crypto_pwhash.h:119:             __attribute__ ((warn_unused_result)) __attribute__ ((nonnull));
+sodium/crypto_pwhash.h:128: int crypto_pwhash_str_verify(const char *str,
+sodium/crypto_pwhash.h:129:                              const char * const passwd,
+sodium/crypto_pwhash.h:130:                              unsigned long long passwdlen)
+sodium/crypto_pwhash.h:131:             __attribute__ ((warn_unused_result)) __attribute__ ((nonnull));
+sodium/crypto_pwhash.h:134: int crypto_pwhash_str_needs_rehash(const char *str,
+sodium/crypto_pwhash.h:135:                                    unsigned long long opslimit, size_t memlimit)
+sodium/crypto_pwhash.h:136:             __attribute__ ((warn_unused_result)) __attribute__ ((nonnull));
+######## 1.0.22: crypto_pwhash_argon2id.h (macros the above expand to)
+29:#define crypto_pwhash_argon2id_PASSWD_MIN 0U
+30-SODIUM_EXPORT
+--
+33:#define crypto_pwhash_argon2id_PASSWD_MAX 4294967295U
+34-SODIUM_EXPORT
+--
+41:#define crypto_pwhash_argon2id_STRBYTES 128U
+42-SODIUM_EXPORT
+--
+45:#define crypto_pwhash_argon2id_STRPREFIX "$argon2id$"
+46-SODIUM_EXPORT
+--
+49:#define crypto_pwhash_argon2id_OPSLIMIT_MIN 1U
+50-SODIUM_EXPORT
+--
+53:#define crypto_pwhash_argon2id_OPSLIMIT_MAX 4294967295U
+54-SODIUM_EXPORT
+--
+57:#define crypto_pwhash_argon2id_MEMLIMIT_MIN 8192U
+58-SODIUM_EXPORT
+--
+61:#define crypto_pwhash_argon2id_MEMLIMIT_MAX \
+62-    ((SIZE_MAX >= 4398046510080U) ? 4398046510080U : (SIZE_MAX >= 2147483648U) ? 2147483648U : 32768U)
+--
+66:#define crypto_pwhash_argon2id_OPSLIMIT_INTERACTIVE 2U
+67-SODIUM_EXPORT
+--
+70:#define crypto_pwhash_argon2id_MEMLIMIT_INTERACTIVE 67108864U
+71-SODIUM_EXPORT
+--
+74:#define crypto_pwhash_argon2id_OPSLIMIT_MODERATE 3U
+75-SODIUM_EXPORT
+--
+78:#define crypto_pwhash_argon2id_MEMLIMIT_MODERATE 268435456U
+79-SODIUM_EXPORT
+--
+82:#define crypto_pwhash_argon2id_OPSLIMIT_SENSITIVE 4U
+83-SODIUM_EXPORT
+--
+86:#define crypto_pwhash_argon2id_MEMLIMIT_SENSITIVE 1073741824U
+87-SODIUM_EXPORT
+######## diff of crypto_pwhash.h and crypto_pwhash_argon2id.h, 1.0.18 -> 1.0.22
+--- crypto_pwhash.h
+128c128
+< int crypto_pwhash_str_verify(const char str[crypto_pwhash_STRBYTES],
+---
+> int crypto_pwhash_str_verify(const char *str,
+134c134
+< int crypto_pwhash_str_needs_rehash(const char str[crypto_pwhash_STRBYTES],
+---
+> int crypto_pwhash_str_needs_rehash(const char *str,
+138c138
+< #define crypto_pwhash_PRIMITIVE "argon2i"
+---
+> #define crypto_pwhash_PRIMITIVE "argon2id,argon2i"
+--- crypto_pwhash_argon2id.h
+108c108
+< int crypto_pwhash_argon2id_str_verify(const char str[crypto_pwhash_argon2id_STRBYTES],
+---
+> int crypto_pwhash_argon2id_str_verify(const char * str,
+114c114
+< int crypto_pwhash_argon2id_str_needs_rehash(const char str[crypto_pwhash_argon2id_STRBYTES],
+---
+> int crypto_pwhash_argon2id_str_needs_rehash(const char * str,

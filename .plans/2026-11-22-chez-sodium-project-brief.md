@@ -142,11 +142,11 @@ Specified now so the design leaves room; built when Techo needs it.
 | `sodium_init` | `int (void)` | 0 the first time, then 1; -1 only if its mutex fails. Thread-safe. **1 is not a failure.** |
 | `sodium_version_string` | `const char *(void)` | `"1.0.18"`. Answers before `sodium_init`. |
 | `sodium_library_version_major`, `_minor` | `int (void)` | libtool numbers, not the release: 10.3 at 1.0.18; 26.1 to 26.4 at 1.0.19 to 1.0.22 (L-F14). Answer before `sodium_init`. |
-| `crypto_pwhash_str` | `int (char out[STRBYTES], const char *passwd, unsigned long long passwdlen, unsigned long long opslimit, size_t memlimit)` | 0; or -1 for limits out of range or no memory, with `out` zeroed. Memory is floored to whole KiB. `nonnull` on every pointer. |
-| `crypto_pwhash_str_verify` | `int (const char str[STRBYTES], const char *passwd, unsigned long long passwdlen)` | 0 on a match. -1 for a wrong password, a string it cannot parse, **and no memory**: at 1.0.18 errno reads `EINVAL` either way (L-F2). Reads `str` to its first NUL, and refuses any byte after the hash (L-F1). Costs what the string's own t and m say. |
-| `crypto_pwhash_str_needs_rehash` | `int (const char str[STRBYTES], unsigned long long opslimit, size_t memlimit)` | 0 when t and m/1024 match; 1 when either differs, lower or higher; -1 when it cannot parse the string, even a long one verify accepts. Ignores the algorithm, since it dispatches on the prefix, and ignores p and the salt and tag lengths (L-F6). |
+| `crypto_pwhash_str` | `int (char out[STRBYTES], const char *passwd, unsigned long long passwdlen, unsigned long long opslimit, size_t memlimit)` | 0; or -1 for limits out of range or no memory, with `out` zeroed. All of `out` is written either way: the string and zeros after it, or zeros (M3 plan §5.1). Memory is floored to whole KiB. `nonnull` on every pointer. |
+| `crypto_pwhash_str_verify` | `int (const char str[STRBYTES], const char *passwd, unsigned long long passwdlen)` | 0 on a match. -1 for a wrong password, a string it cannot parse, **and no memory**: at 1.0.18 errno reads `EINVAL` either way (L-F2). At 1.0.22 errno reads `ENOMEM` for no memory, which the binding does not read (M3 plan §4.2, item 4). `str` is an array of `STRBYTES` at 1.0.18 and a pointer at 1.0.22, `nonnull` at both. Reads `str` to its first NUL, and refuses any byte after the hash (L-F1). Costs what the string's own t and m say. |
+| `crypto_pwhash_str_needs_rehash` | `int (const char str[STRBYTES], unsigned long long opslimit, size_t memlimit)` | 0 when t and m/1024 match; 1 when either differs, lower or higher; -1 when it cannot parse the string, even a long one verify accepts, and for any string of `strbytes` characters or more, a salt or tag of the wrong length, or ops above 2³²−1. Ignores the algorithm, since it dispatches on the prefix: an argon2i hash at ops 3 or more answers 0. Ignores p where the string decodes: `p=4` at 32 KiB or more answers 0 (L-F6; M3 plan §5.1). A byte of 0x80 or more in the salt answers 0 at 1.0.18 and -1 at 1.0.22. |
 | `crypto_pwhash_strprefix` | `const char *(void)` | `"$argon2id$"` at 1.0.18 and 1.0.22: the default algorithm's prefix |
-| `crypto_pwhash_strbytes`, `_opslimit_{min,max,interactive,moderate,sensitive}`, `_memlimit_{min,max,interactive,moderate,sensitive}`, `_passwd_min`, `_passwd_max` | `size_t (void)` | At 1.0.18: ops 1 to 2³²−1; memory 8192 to 4398046510080 bytes; password 0 to 2³²−1 bytes; `strbytes` 128. The presets are interactive (2, 64 MiB), moderate (3, 256 MiB) and sensitive (4, 1 GiB). **An opslimit comes back as `size_t` and is passed as `unsigned long long`;** every value fits both. |
+| `crypto_pwhash_strbytes`, `_opslimit_{min,max,interactive,moderate,sensitive}`, `_memlimit_{min,max,interactive,moderate,sensitive}`, `_passwd_min`, `_passwd_max` | `size_t (void)` | At 1.0.18: ops 1 to 2³²−1; memory 8192 to 4398046510080 bytes; password 0 to 2³²−1 bytes; `strbytes` 128. The presets are interactive (2, 64 MiB), moderate (3, 256 MiB) and sensitive (4, 1 GiB). **An opslimit comes back as `size_t` and is passed as `unsigned long long`;** every value fits both. The same at 1.0.22, each equal to its header macro, and every memory constant a whole number of KiB (M3 plan §5.1). |
 | `randombytes_buf` | `void (void *buf, size_t size)` | Backed by `getrandom`, with no state, so safe across threads and `fork`. `nonnull` even at size 0. Aborts if no entropy source is available. Its bound, `randombytes_BYTES_MAX`, is a macro only: 2³²−1 at 1.0.18 and 1.0.22. |
 | `crypto_generichash` | `int (unsigned char *out, size_t outlen, const unsigned char *in, unsigned long long inlen, const unsigned char *key, size_t keylen)` | 0; or -1 for an output of 0 or over 64 bytes, or a key over 64. **Accepts sizes and keys of 1 to 15 bytes**, below the published 16. A key of length 0 gives the unkeyed hash, whatever its block holds. A -1 leaves `out` as it was. A NULL key or input with a nonzero length aborts (L-F8), though the header marks only `out` `nonnull` (M2 plan §5.1). |
 | `crypto_generichash_bytes`, `_bytes_min`, `_bytes_max`, `_keybytes`, `_keybytes_min`, `_keybytes_max` | `size_t (void)` | 32, 16, 64; 32, 16, 64. `_keybytes` is not bound: it has no use (ADR-0005, amended). |
@@ -201,8 +201,11 @@ What this changes in the brief:
   - In bytes, OWASP's `m=19456` would silently give a hash at 19 KiB, about 1000 times
     weaker. `password-needs-rehash?` would then call it current (L-F3).
   - In KiB, nothing is floored.
-  - The ranges are checked before C: ops from `_opslimit_min` to `_opslimit_max`;
-    memory from `_memlimit_min` to `_memlimit_max`, divided by 1024.
+  - The ranges are checked by `make-password-limits`, when it is called: ops from
+    `_opslimit_min` to `_opslimit_max`; memory from `_memlimit_min` to `_memlimit_max`,
+    divided by 1024 (ADR-0009, amended).
+- **A password's UTF-8 length runs from 0 to the cap,** then from `_passwd_min` to
+  `_passwd_max`, each checked before C (ADR-0007, amended).
 - **`password-verify` answers `#f` in three cases, which libsodium does not tell apart:**
   - a wrong password;
   - a hash it cannot read;
@@ -241,8 +244,10 @@ It answers `#t` when any of these holds:
 
 It answers `#f` only when libsodium answers 0 and the string passes items 3 and 4.
 
-It never raises because of the hash. It raises only for a caller's mistake, before C: a
-hash that is not a string, or limits out of range.
+It never raises because of the hash, even one another thread changes during the call, which
+answers `#t`. It raises only for a caller's mistake, before C: a hash that is not a string, or
+limits that are no preset and no `Password-limits`. `make-password-limits` refuses limits out
+of range when it is called (ADR-0009, amended).
 
 **Call it only after `password-verify` answers `#t`.** The documents show the login
 pattern:
@@ -335,8 +340,9 @@ Smaller than chez-sqlite3's tree, with the same shape and helpers.
 - **`below-floor` covers a version string the load cannot read:** NULL, or a string that
   is not three naturals (ADR-0003, amended).
 - **`&sodium-failed` has two cases** (ADR-0006, amended):
-  - `crypto_pwhash_str` answering -1 for limits that passed their range check, which means
-    it could not get the memory;
+  - `crypto_pwhash_str` answering anything but 0 for limits that passed their range check,
+    which means it could not get the memory (ADR-0006, amended in M3's plan), or answering 0
+    but leaving no readable string, with code 0, which only a decoy does;
   - `crypto_generichash` answering -1 for a size and key that passed theirs, which no
     release does: a decoy reaches it.
 
@@ -355,7 +361,10 @@ Smaller than chez-sqlite3's tree, with the same shape and helpers.
   - a wrong type;
   - a size, key length or limit out of range;
   - an input over the cap, except a hash string, which is answered (§4.1);
-  - an empty key.
+  - a password outside libsodium's length range;
+  - an empty key;
+  - a password, or `password-verify`'s hash, that another thread changed during the call,
+    refused after the section (ADR-0006, amended).
 - **No secret ever reaches a condition** (L-F9, P-F8).
   - **Every string and bytevector parameter is secret:**
     - a password and a hash string;
@@ -566,12 +575,12 @@ it catches.
 | 1 | The fast hash | RFC 7693 Appendix E's self-test through `blake2b`: unkeyed and keyed, sizes 20, 32, 48 and 64, six input lengths, one published result. The BLAKE2 reference's keyed known answers (`blake2b-kat.txt`). BLAKE2b-256(`"abc"`) = `bddd813c…d52319`, from a source independent of libsodium. | a dropped key; a wrong or ignored size; BLAKE2b-512 truncated to 256 |
 | 2 | Tier 2 | NIST's SHA-256 vectors; RFC 4231 for HMAC-SHA256, cases 6 and 7 among them; AWS's published Signature Version 4 example | a long key not pre-hashed; a wrong key length |
 | 3 | A password round trip | a non-ASCII password hashes and verifies; changing its last character verifies false | a length taken from the character count (P-F5) |
-| 4 | The C oracle, both ways | C hashes and Scheme verifies; Scheme hashes and C verifies. Passwords are sent as hex of their UTF-8 bytes, among them a non-ASCII one and `"a\x0;b"`. | hashes no other libsodium reads |
+| 4 | The C oracle, both ways | C hashes and Scheme verifies; Scheme hashes and C verifies. Passwords are sent as hex of their UTF-8 bytes, among them a non-ASCII one and `"a\x0;b"`, through the oracle's `hash HEX` and `verify STRING HEX` (ADR-0011, amended). | hashes no other libsodium reads |
 | 5 | The limits used | hash at `(make-password-limits 2 16)`, which is neither the minimum nor a preset, and assert the whole parameter field: `m=16,t=2,p=1` | limits ignored; KiB and bytes mixed up |
 | 6 | The presets | `password-needs-rehash?` on hand-written strings, which hashes nothing. Each preset's string is current at its own preset and stale at the others. | presets swapped |
-| 7 | The default | one hash with no limits reads `m=65536,t=2`; about 0.8 s under Valgrind | a wrong default |
-| 8 | Needs rehash | `#f` at the limits it was made with. `#t` at higher limits and at lower ones. `#t` for an argon2i hash, a p=4 hash, and another prefix, each at the same limits. `#t` for a long hash that verifies but that libsodium cannot parse. `#t` for a malformed string, and for one the pre-check refuses. Nothing is raised. | each of §4.2's rules |
-| 9 | The pre-check | A good hash, then U+0000 and junk: verify answers `#f`, needs-rehash `#t`. A byte of 0x80 or more inside the salt, where libsodium's needs-rehash answers 0. A string over the cap. Each row asserts from the decoy's log that no libsodium function was called. | a missing pre-check. C refuses the other bad strings itself, so only these rows can fail (P-F10) |
+| 7 | The default | one hash with no limits reads `m=65536,t=2`; about 0.7 s under Valgrind | a wrong default |
+| 8 | Needs rehash | `#f` at the limits it was made with. `#t` at higher limits and at lower ones. `#t` for an argon2i hash at ops 3 or more, a p=4 hash at 32 KiB or more, and another prefix, each at the same limits, where libsodium answers 0 (M3 plan §5.1). `#t` for a long hash that verifies but that libsodium cannot parse. `#t` for a malformed string, and for one the pre-check refuses. Nothing is raised. | each of §4.2's rules |
+| 9 | The pre-check | A good hash, then U+0000 and junk: verify answers `#f`, needs-rehash `#t`. A byte of 0x80 or more inside the salt, where libsodium's needs-rehash answers 0 at 1.0.18 and -1 at 1.0.22. A string over the cap. Each row asserts from the decoy's log that no libsodium function was called. | a missing pre-check. C refuses the other bad strings itself, so only these rows can fail (P-F10) |
 | 10 | The hash string's block | Under the gate, verify reads no byte past its block. The decoy logs the C string's length as equal to the string's. | a block without its terminating 0 (L-F1) |
 | 11 | An empty password | It hashes and verifies true, and a one-byte password verifies false. The block helper's own row: an empty bytevector gets a non-NULL block of at least one byte. | NULL for an empty input. libsodium accepts NULL with length 0, so only the helper's row can see it (P-F6) |
 | 12 | A password with U+0000 | `"a\x0;b"` verifies against its own hash, and not against `"a"`'s | a C-string length |
@@ -581,7 +590,7 @@ it catches.
 | 16 | Secrets in conditions | Pass a secret-looking symbol, number and character list as each verb's secret parameters. No message or irritant holds any of it. | `shown-value` used on a secret |
 | 17 | Raised after the section | A decoy `crypto_pwhash_str` answers -1, and a decoy `crypto_generichash` answers -1 and 1 (ADR-0006, amended), each under a guard for something else. The outer guard catches the `&sodium-failed` itself. | a raise from inside the extent (X-M2) |
 | 18 | Engines | Each verb under an engine, at every fuel from 1 until it completes. Each run answers right, raises nothing, and leaves no live block. | §6.2's section missing (X-M1) |
-| 19 | Collect-safe | chez-sqlite3's FIFO pattern. Decoy `crypto_pwhash_str` and `_verify` block on a FIFO. Another thread's `collect-rendezvous` ends within a time bound while they block, then the test releases them. No high limit is used, and it runs under Valgrind. | either call bound as plain (X-M3) |
+| 19 | Collect-safe | chez-sqlite3's FIFO pattern. Decoy `crypto_pwhash_str` and `_verify` block on a FIFO. Each verb's call blocks inside its section. Once the decoy's marker shows the call is in C, and a second has passed, another thread's `collect-rendezvous` ends within 5 s while they block, then the test releases them; a watchdog releases them after 10 s. No high limit is used, and it runs under Valgrind (ADR-0011, amended). | either call bound as plain (X-M3). A test-side plain binding, the standing control, is released by the watchdog |
 | 20 | The load | Decoys reach `below-floor`, `missing-api` and `init-failed`, and a `sodium_init` that answers 1, which loads. A decoy whose version string and major/minor disagree shows that the string decides. `invalid-override`, `load-failed` and `not-found` are reached as chez-sqlite3 reaches them, without a decoy. | a floor read from the wrong numbers |
 | 21 | An earlier `sodium_init`, for real | A child process calls the real `sodium_init` through its own binding, then loads chez-sodium. It loads, and a second direct call answers 1. | treating 1 as a failure (P-F13) |
 | 22 | The return codes | every return code §3.4 states, checked against the real library | a stated code that is not true |
@@ -592,8 +601,8 @@ it catches.
 
 - **Password rows hash at libsodium's minimum**, read from `_opslimit_min` and
   `_memlimit_min`. The exceptions are row 5's cheap pair and row 7's one default hash.
-  Under Valgrind, a minimum hash took about 5 ms once warm, and an interactive one about
-  0.8 s (P).
+  Under Valgrind, a minimum hash takes about 0.4 ms, and an interactive one about 0.7 s
+  (M3 plan §5.1; the review's 5 ms and 0.8 s were (P)'s).
 - **No row needs a high limit.** The collect-safe row uses a decoy.
 
 ### 8.3 Versions to run on

@@ -1,0 +1,416 @@
+################ ../../slice5/prefix-1.0.18/lib/libsodium.so.23
+library ../../slice5/prefix-1.0.18/lib/libsodium.so.23, version 1.0.18
+sodium_init 0
+min limits: ops 1 mem 8192; strbytes 128
+
+== 5a. crypto_pwhash_str (hash of "pw", min limits unless stated; out is 128 bytes of 0x5a first)
+  in range: answer -> 0
+  in range: string length -> 93
+  in range: bytes after the NUL up to strbytes (34 of them): zero / still 0x5a -> (34 0)
+  in range: string -> "$argon2id$v=19$m=8,t=1,p=1$07emREn11HMdlTztEGEJOw$UkM09Jj92MqOa56eDXT5LcQtPHwzns847nqEo+beMDE"
+  ops 0 (below min): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  ops 2^32 (above max): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  ops 2^64-1 (above max): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem 0 (below min): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem min-1 (below min): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem max+1 (above max; fits size_t): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem 2^64-1 (above max; largest size_t): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem max+1 fits size_t (< 2^64) -> #t
+  empty password, 1-byte block, length 0: answer -> 0
+    its string -> "$argon2id$v=19$m=8,t=1,p=1$WF2jpRRD2AuNhUpDk0YN/g$+OSrkoWVs0FPz/kjtKskAtQSjH4CplCYpBpMR3yvqaI"
+  ops 2, mem 16*1024+1: answer -> 0
+    whole parameter field -> "m=16,t=2,p=1"
+    memory floored to whole KiB (m=16) -> #t
+  ops 2, mem 16 KiB: answer -> 0
+    whole string -> "$argon2id$v=19$m=16,t=2,p=1$+VWF3zX29Zj64Hofk+pRJw$dxdmhfMviJHcqIjXmW0Q5GmS5U8jUvwj2kHRhRP3L9I"
+    whole parameter field -> "m=16,t=2,p=1"
+    fields (prefix, version, params, salt chars, tag chars) -> ("$argon2id$" "v=19" "m=16,t=2,p=1" 22 43)
+    total length -> 94
+
+== 5b. crypto_pwhash_str_verify (password "pw", min limits unless stated)
+  hash -> "$argon2id$v=19$m=8,t=1,p=1$G3l+79ke+VolO5DJeBf7Ew$f4PPEPgEJa+vZURqklKvZaKsC2LE9213fLd/rFWTJNc"
+  right password -> 0
+  wrong password -> -1
+  "garbage" -> -1
+  "" -> -1
+  hash then "\0junk" (block holds the bytes after the NUL) -> 0
+  hash then "junk" -> -1
+  hash then "\n" -> -1
+  space then hash -> -1
+  "a\0b" (length 3) against its own hash -> 0
+  "a" (length 1) against "a\0b"'s hash -> -1
+  empty password against its own hash -> 0
+  "x" against the empty password's hash -> -1
+  long valid hash -> "$argon2id$v=19$m=8,t=1,p=1$EyYDv0QsQbeigj9AAWd4og$2h21FCkx8IoVDEl4/mLnPx/13x3VOsaGEEcSznsHWANOIbT5yNoNpmiSmo3WFrwrB8CHtsaXS9cT0QGGUfFzow"
+    its length (strbytes is 128) -> 136
+    right password -> 0
+    wrong password -> -1
+  non-ASCII password as UTF-8 (byte length) -> 13
+    against its own hash -> 0
+    same text, last character changed (euro -> $) -> -1
+    its Latin-1 bytes (euro as 0x80) -> -1
+    its Latin-1 bytes, euro dropped -> -1
+    ASCII-only prefix "pässwörd" as UTF-8 -> -1
+
+== 5c. crypto_pwhash_str_needs_rehash (hash of "pw" at ops 1, mem 8192 unless stated)
+  same limits -> 0
+  ops+1 -> 1
+  memory x2 -> 1
+  memory +1023 bytes -> 0
+  memory +1024 bytes -> 1
+  memory -1 byte -> 1
+  hash made at ops 3: against ops 3 -> 0
+  hash made at ops 3: against ops 1 (lower) -> 1
+  hash made at mem 4x min: against min mem (lower) -> 1
+  "garbage" -> -1
+  the long valid hash (length > strbytes) -> -1
+  the long valid hash, against ops+1 -> -1
+  argon2i string (from the file) -> "$argon2i$v=19$m=8,t=3,p=1$M7piIWNtEXiEBDILqW0joQ$YvJYnNYtgmsRVSqwuv5bVM30pd8Gomfs5DL4FSDZfCA"
+    verify, right password -> 0
+    needs_rehash at ops 3, min mem (same limits) -> 0
+    needs_rehash at ops 4 -> 1
+  p=4 at the same t and m -> -1
+  p=0 -> -1
+  prefix $argon2d$ -> -1
+  prefix $argon2i$ (with the argon2id hash's v, t, m) -> 0
+  no $v= -> -1
+  $v=16 -> -1
+  "$argon2id" with no trailing $, no rest -> -1
+  one byte >= 0x80 (0xc3) as the salt's first character -> 0
+    the same string, verify -> -1
+  (m=64 KiB hash: unedited, same limits) -> 0
+  (m=64 KiB hash) p=4 at the same t and m (p=4 needs m >= 32 KiB) -> 0
+  (m=64 KiB hash) p=2 at the same t and m -> 0
+  (m=64 KiB hash) p=4, verify (tag is for p=1) -> -1
+  the hash then "\0junk" -> 0
+  ops 0 -> 1
+  memory 0 -> 1
+  ops 0 and memory 0 -> 1
+  ops 2^32 -> -1
+  ops 2^32-1 and memory = memlimit_max -> 1
+  ops 2^64-1 and memory 2^64-1 -> -1
+
+== 5d. hand-written preset strings; rows are strings, columns are limits (ops, mem) of the presets
+  salt (chars) -> ("QUJDREVGR0hJSktMTU5PUA" 22)
+  tag (chars) -> ("YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74" 43)
+  interactive: $argon2id$v=19$m=65536,t=2,p=1$QUJDREVGR0hJSktMTU5PUA$YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74
+    needs_rehash at interactive / moderate / sensitive: (0 1 1)
+  moderate: $argon2id$v=19$m=262144,t=3,p=1$QUJDREVGR0hJSktMTU5PUA$YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74
+    needs_rehash at interactive / moderate / sensitive: (1 0 1)
+  sensitive: $argon2id$v=19$m=1048576,t=4,p=1$QUJDREVGR0hJSktMTU5PUA$YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74
+    needs_rehash at interactive / moderate / sensitive: (1 1 0)
+  salt of 21 chars (last char dropped), moderate string, at moderate limits -> -1
+  tag of 42 chars (last char dropped), moderate string, at moderate limits -> -1
+  control, same string intact at moderate limits -> 0
+################ ../../slice5/prefix-1.0.22/lib/libsodium.so.26
+library ../../slice5/prefix-1.0.22/lib/libsodium.so.26, version 1.0.22
+sodium_init 0
+min limits: ops 1 mem 8192; strbytes 128
+
+== 5a. crypto_pwhash_str (hash of "pw", min limits unless stated; out is 128 bytes of 0x5a first)
+  in range: answer -> 0
+  in range: string length -> 93
+  in range: bytes after the NUL up to strbytes (34 of them): zero / still 0x5a -> (34 0)
+  in range: string -> "$argon2id$v=19$m=8,t=1,p=1$hySLdXw/EE8Uq/Hf4iWTRQ$r96W7jN+Ln83IgTmTLsiS3gwhx5mFDRLFcoh1wwn4JU"
+  ops 0 (below min): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  ops 2^32 (above max): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  ops 2^64-1 (above max): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem 0 (below min): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem min-1 (below min): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem max+1 (above max; fits size_t): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem 2^64-1 (above max; largest size_t): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem max+1 fits size_t (< 2^64) -> #t
+  empty password, 1-byte block, length 0: answer -> 0
+    its string -> "$argon2id$v=19$m=8,t=1,p=1$RxBDgs70zFrW+1b7VEXrjw$9s5/7YCeHz+gdGdJwhdyqtul8+y91NGpcNpdRwxW5NI"
+  ops 2, mem 16*1024+1: answer -> 0
+    whole parameter field -> "m=16,t=2,p=1"
+    memory floored to whole KiB (m=16) -> #t
+  ops 2, mem 16 KiB: answer -> 0
+    whole string -> "$argon2id$v=19$m=16,t=2,p=1$d15rDlid9ZP0ydj2MTZ7CQ$roYx+Tnby7Gq7ZC3wMydTyMDhL7qnwA6xhOR3rK9hBs"
+    whole parameter field -> "m=16,t=2,p=1"
+    fields (prefix, version, params, salt chars, tag chars) -> ("$argon2id$" "v=19" "m=16,t=2,p=1" 22 43)
+    total length -> 94
+
+== 5b. crypto_pwhash_str_verify (password "pw", min limits unless stated)
+  hash -> "$argon2id$v=19$m=8,t=1,p=1$BiNpT+S3fF3At+qdO8F4Og$NLLshMYyJK5FjZmB6wtLKKMf6QGYHAog3H/PKMn4VWM"
+  right password -> 0
+  wrong password -> -1
+  "garbage" -> -1
+  "" -> -1
+  hash then "\0junk" (block holds the bytes after the NUL) -> 0
+  hash then "junk" -> -1
+  hash then "\n" -> -1
+  space then hash -> -1
+  "a\0b" (length 3) against its own hash -> 0
+  "a" (length 1) against "a\0b"'s hash -> -1
+  empty password against its own hash -> 0
+  "x" against the empty password's hash -> -1
+  long valid hash -> "$argon2id$v=19$m=8,t=1,p=1$LhmUV7x/q7Qk5M5XwJreYw$MDvS9mc76GLKjR/gdOjeAz5KqgQ7VGbN0Er5zi9IJkTn+HcB7bzeRJSf6Eu+AhGLT6MkS8yFShQbnPchmDtcfg"
+    its length (strbytes is 128) -> 136
+    right password -> 0
+    wrong password -> -1
+  non-ASCII password as UTF-8 (byte length) -> 13
+    against its own hash -> 0
+    same text, last character changed (euro -> $) -> -1
+    its Latin-1 bytes (euro as 0x80) -> -1
+    its Latin-1 bytes, euro dropped -> -1
+    ASCII-only prefix "pässwörd" as UTF-8 -> -1
+
+== 5c. crypto_pwhash_str_needs_rehash (hash of "pw" at ops 1, mem 8192 unless stated)
+  same limits -> 0
+  ops+1 -> 1
+  memory x2 -> 1
+  memory +1023 bytes -> 0
+  memory +1024 bytes -> 1
+  memory -1 byte -> 1
+  hash made at ops 3: against ops 3 -> 0
+  hash made at ops 3: against ops 1 (lower) -> 1
+  hash made at mem 4x min: against min mem (lower) -> 1
+  "garbage" -> -1
+  the long valid hash (length > strbytes) -> -1
+  the long valid hash, against ops+1 -> -1
+  argon2i string (from the file) -> "$argon2i$v=19$m=8,t=3,p=1$M7piIWNtEXiEBDILqW0joQ$YvJYnNYtgmsRVSqwuv5bVM30pd8Gomfs5DL4FSDZfCA"
+    verify, right password -> 0
+    needs_rehash at ops 3, min mem (same limits) -> 0
+    needs_rehash at ops 4 -> 1
+  p=4 at the same t and m -> -1
+  p=0 -> -1
+  prefix $argon2d$ -> -1
+  prefix $argon2i$ (with the argon2id hash's v, t, m) -> 0
+  no $v= -> -1
+  $v=16 -> -1
+  "$argon2id" with no trailing $, no rest -> -1
+  one byte >= 0x80 (0xc3) as the salt's first character -> -1
+    the same string, verify -> -1
+  (m=64 KiB hash: unedited, same limits) -> 0
+  (m=64 KiB hash) p=4 at the same t and m (p=4 needs m >= 32 KiB) -> 0
+  (m=64 KiB hash) p=2 at the same t and m -> 0
+  (m=64 KiB hash) p=4, verify (tag is for p=1) -> -1
+  the hash then "\0junk" -> 0
+  ops 0 -> 1
+  memory 0 -> 1
+  ops 0 and memory 0 -> 1
+  ops 2^32 -> -1
+  ops 2^32-1 and memory = memlimit_max -> 1
+  ops 2^64-1 and memory 2^64-1 -> -1
+
+== 5d. hand-written preset strings; rows are strings, columns are limits (ops, mem) of the presets
+  salt (chars) -> ("QUJDREVGR0hJSktMTU5PUA" 22)
+  tag (chars) -> ("YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74" 43)
+  interactive: $argon2id$v=19$m=65536,t=2,p=1$QUJDREVGR0hJSktMTU5PUA$YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74
+    needs_rehash at interactive / moderate / sensitive: (0 1 1)
+  moderate: $argon2id$v=19$m=262144,t=3,p=1$QUJDREVGR0hJSktMTU5PUA$YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74
+    needs_rehash at interactive / moderate / sensitive: (1 0 1)
+  sensitive: $argon2id$v=19$m=1048576,t=4,p=1$QUJDREVGR0hJSktMTU5PUA$YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74
+    needs_rehash at interactive / moderate / sensitive: (1 1 0)
+  salt of 21 chars (last char dropped), moderate string, at moderate limits -> -1
+  tag of 42 chars (last char dropped), moderate string, at moderate limits -> -1
+  control, same string intact at moderate limits -> 0
+################ <profile>/lib/libsodium.so.26
+library <profile>/lib/libsodium.so.26, version 1.0.22
+sodium_init 0
+min limits: ops 1 mem 8192; strbytes 128
+
+== 5a. crypto_pwhash_str (hash of "pw", min limits unless stated; out is 128 bytes of 0x5a first)
+  in range: answer -> 0
+  in range: string length -> 93
+  in range: bytes after the NUL up to strbytes (34 of them): zero / still 0x5a -> (34 0)
+  in range: string -> "$argon2id$v=19$m=8,t=1,p=1$NIJHWTYqHvuUeDbQJfFM0A$dEOLcA0MjKiZVN6+q8tBsfI5qjB/56gs3sacf2eRPtY"
+  ops 0 (below min): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  ops 2^32 (above max): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  ops 2^64-1 (above max): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem 0 (below min): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem min-1 (below min): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem max+1 (above max; fits size_t): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem 2^64-1 (above max; largest size_t): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem max+1 fits size_t (< 2^64) -> #t
+  empty password, 1-byte block, length 0: answer -> 0
+    its string -> "$argon2id$v=19$m=8,t=1,p=1$LaUQQN0wAjBpiLVnDvn6FQ$qssxJKwJRDTCwgJdTRSmfsi8OemxPhB5YlICeYTGerQ"
+  ops 2, mem 16*1024+1: answer -> 0
+    whole parameter field -> "m=16,t=2,p=1"
+    memory floored to whole KiB (m=16) -> #t
+  ops 2, mem 16 KiB: answer -> 0
+    whole string -> "$argon2id$v=19$m=16,t=2,p=1$4XpiQweuZ79TO+gen4aZag$zaAMqsPmHF6BoYe/lpPPHKmxjFpZwAfDB8oDjLo7ePw"
+    whole parameter field -> "m=16,t=2,p=1"
+    fields (prefix, version, params, salt chars, tag chars) -> ("$argon2id$" "v=19" "m=16,t=2,p=1" 22 43)
+    total length -> 94
+
+== 5b. crypto_pwhash_str_verify (password "pw", min limits unless stated)
+  hash -> "$argon2id$v=19$m=8,t=1,p=1$R/xVEwdsmUub9JbplicMYg$9ijWCwj3dFkBKw0/53Y4eDWm6bV0DvR7eYB4wm1I/YQ"
+  right password -> 0
+  wrong password -> -1
+  "garbage" -> -1
+  "" -> -1
+  hash then "\0junk" (block holds the bytes after the NUL) -> 0
+  hash then "junk" -> -1
+  hash then "\n" -> -1
+  space then hash -> -1
+  "a\0b" (length 3) against its own hash -> 0
+  "a" (length 1) against "a\0b"'s hash -> -1
+  empty password against its own hash -> 0
+  "x" against the empty password's hash -> -1
+  long valid hash -> "$argon2id$v=19$m=8,t=1,p=1$6ajqX3US9pvfMp1FtR6KYg$irwAXaAg/5IbT4O7eQlrBZS1Dob/4pLZb8mC9G0BrIg9UyPwFcIht92cIzD6soK4NgaeeLaHmzYYUuyQIV58+Q"
+    its length (strbytes is 128) -> 136
+    right password -> 0
+    wrong password -> -1
+  non-ASCII password as UTF-8 (byte length) -> 13
+    against its own hash -> 0
+    same text, last character changed (euro -> $) -> -1
+    its Latin-1 bytes (euro as 0x80) -> -1
+    its Latin-1 bytes, euro dropped -> -1
+    ASCII-only prefix "pässwörd" as UTF-8 -> -1
+
+== 5c. crypto_pwhash_str_needs_rehash (hash of "pw" at ops 1, mem 8192 unless stated)
+  same limits -> 0
+  ops+1 -> 1
+  memory x2 -> 1
+  memory +1023 bytes -> 0
+  memory +1024 bytes -> 1
+  memory -1 byte -> 1
+  hash made at ops 3: against ops 3 -> 0
+  hash made at ops 3: against ops 1 (lower) -> 1
+  hash made at mem 4x min: against min mem (lower) -> 1
+  "garbage" -> -1
+  the long valid hash (length > strbytes) -> -1
+  the long valid hash, against ops+1 -> -1
+  argon2i string (from the file) -> "$argon2i$v=19$m=8,t=3,p=1$M7piIWNtEXiEBDILqW0joQ$YvJYnNYtgmsRVSqwuv5bVM30pd8Gomfs5DL4FSDZfCA"
+    verify, right password -> 0
+    needs_rehash at ops 3, min mem (same limits) -> 0
+    needs_rehash at ops 4 -> 1
+  p=4 at the same t and m -> -1
+  p=0 -> -1
+  prefix $argon2d$ -> -1
+  prefix $argon2i$ (with the argon2id hash's v, t, m) -> 0
+  no $v= -> -1
+  $v=16 -> -1
+  "$argon2id" with no trailing $, no rest -> -1
+  one byte >= 0x80 (0xc3) as the salt's first character -> -1
+    the same string, verify -> -1
+  (m=64 KiB hash: unedited, same limits) -> 0
+  (m=64 KiB hash) p=4 at the same t and m (p=4 needs m >= 32 KiB) -> 0
+  (m=64 KiB hash) p=2 at the same t and m -> 0
+  (m=64 KiB hash) p=4, verify (tag is for p=1) -> -1
+  the hash then "\0junk" -> 0
+  ops 0 -> 1
+  memory 0 -> 1
+  ops 0 and memory 0 -> 1
+  ops 2^32 -> -1
+  ops 2^32-1 and memory = memlimit_max -> 1
+  ops 2^64-1 and memory 2^64-1 -> -1
+
+== 5d. hand-written preset strings; rows are strings, columns are limits (ops, mem) of the presets
+  salt (chars) -> ("QUJDREVGR0hJSktMTU5PUA" 22)
+  tag (chars) -> ("YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74" 43)
+  interactive: $argon2id$v=19$m=65536,t=2,p=1$QUJDREVGR0hJSktMTU5PUA$YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74
+    needs_rehash at interactive / moderate / sensitive: (0 1 1)
+  moderate: $argon2id$v=19$m=262144,t=3,p=1$QUJDREVGR0hJSktMTU5PUA$YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74
+    needs_rehash at interactive / moderate / sensitive: (1 0 1)
+  sensitive: $argon2id$v=19$m=1048576,t=4,p=1$QUJDREVGR0hJSktMTU5PUA$YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74
+    needs_rehash at interactive / moderate / sensitive: (1 1 0)
+  salt of 21 chars (last char dropped), moderate string, at moderate limits -> -1
+  tag of 42 chars (last char dropped), moderate string, at moderate limits -> -1
+  control, same string intact at moderate limits -> 0
+################ ../../m1-plan/host-1.0.18/libsodium.so.23
+library ../../m1-plan/host-1.0.18/libsodium.so.23, version 1.0.18
+sodium_init 0
+min limits: ops 1 mem 8192; strbytes 128
+
+== 5a. crypto_pwhash_str (hash of "pw", min limits unless stated; out is 128 bytes of 0x5a first)
+  in range: answer -> 0
+  in range: string length -> 93
+  in range: bytes after the NUL up to strbytes (34 of them): zero / still 0x5a -> (34 0)
+  in range: string -> "$argon2id$v=19$m=8,t=1,p=1$LjldJbDQxBWoFzMQANDQuw$XLtIfVskejQT6+s51B2Qy6IB3phM3yZ7BKBaK2qK3Gc"
+  ops 0 (below min): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  ops 2^32 (above max): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  ops 2^64-1 (above max): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem 0 (below min): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem min-1 (below min): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem max+1 (above max; fits size_t): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem 2^64-1 (above max; largest size_t): answer; out bytes all 0 / count of 0x5a left -> (-1 #t 0)
+  mem max+1 fits size_t (< 2^64) -> #t
+  empty password, 1-byte block, length 0: answer -> 0
+    its string -> "$argon2id$v=19$m=8,t=1,p=1$kODYtzusmOgmNZmBjX9zyA$z+PaNSdKnpkaK+TbcF/UMb1J6kqAExY/cvycqykvoxE"
+  ops 2, mem 16*1024+1: answer -> 0
+    whole parameter field -> "m=16,t=2,p=1"
+    memory floored to whole KiB (m=16) -> #t
+  ops 2, mem 16 KiB: answer -> 0
+    whole string -> "$argon2id$v=19$m=16,t=2,p=1$lX6PqHV4249PDtmMxWBo+Q$AGI8Ipz0mKHIENfupWPQTHFRkCoBRk9FeE0ClkXzUgE"
+    whole parameter field -> "m=16,t=2,p=1"
+    fields (prefix, version, params, salt chars, tag chars) -> ("$argon2id$" "v=19" "m=16,t=2,p=1" 22 43)
+    total length -> 94
+
+== 5b. crypto_pwhash_str_verify (password "pw", min limits unless stated)
+  hash -> "$argon2id$v=19$m=8,t=1,p=1$Y/xDFVhAP9aolypQNIVCfA$oAhbmCTC5XmQ86hO1qLkP8ZTmhG3paU3TbqyNMNPXC0"
+  right password -> 0
+  wrong password -> -1
+  "garbage" -> -1
+  "" -> -1
+  hash then "\0junk" (block holds the bytes after the NUL) -> 0
+  hash then "junk" -> -1
+  hash then "\n" -> -1
+  space then hash -> -1
+  "a\0b" (length 3) against its own hash -> 0
+  "a" (length 1) against "a\0b"'s hash -> -1
+  empty password against its own hash -> 0
+  "x" against the empty password's hash -> -1
+  long valid hash -> "$argon2id$v=19$m=8,t=1,p=1$EAAu4+gkKLTvdoj0N/zgmw$FWWd7isOHvUNPl7YyyDl0ZEGcFWN+VAGoPfFLwvoI4vWgnMarKuw6kN1lH1Iw98zAvQe7ZwNx3akE3MI4F3PRw"
+    its length (strbytes is 128) -> 136
+    right password -> 0
+    wrong password -> -1
+  non-ASCII password as UTF-8 (byte length) -> 13
+    against its own hash -> 0
+    same text, last character changed (euro -> $) -> -1
+    its Latin-1 bytes (euro as 0x80) -> -1
+    its Latin-1 bytes, euro dropped -> -1
+    ASCII-only prefix "pässwörd" as UTF-8 -> -1
+
+== 5c. crypto_pwhash_str_needs_rehash (hash of "pw" at ops 1, mem 8192 unless stated)
+  same limits -> 0
+  ops+1 -> 1
+  memory x2 -> 1
+  memory +1023 bytes -> 0
+  memory +1024 bytes -> 1
+  memory -1 byte -> 1
+  hash made at ops 3: against ops 3 -> 0
+  hash made at ops 3: against ops 1 (lower) -> 1
+  hash made at mem 4x min: against min mem (lower) -> 1
+  "garbage" -> -1
+  the long valid hash (length > strbytes) -> -1
+  the long valid hash, against ops+1 -> -1
+  argon2i string (from the file) -> "$argon2i$v=19$m=8,t=3,p=1$M7piIWNtEXiEBDILqW0joQ$YvJYnNYtgmsRVSqwuv5bVM30pd8Gomfs5DL4FSDZfCA"
+    verify, right password -> 0
+    needs_rehash at ops 3, min mem (same limits) -> 0
+    needs_rehash at ops 4 -> 1
+  p=4 at the same t and m -> -1
+  p=0 -> -1
+  prefix $argon2d$ -> -1
+  prefix $argon2i$ (with the argon2id hash's v, t, m) -> 0
+  no $v= -> -1
+  $v=16 -> -1
+  "$argon2id" with no trailing $, no rest -> -1
+  one byte >= 0x80 (0xc3) as the salt's first character -> 0
+    the same string, verify -> -1
+  (m=64 KiB hash: unedited, same limits) -> 0
+  (m=64 KiB hash) p=4 at the same t and m (p=4 needs m >= 32 KiB) -> 0
+  (m=64 KiB hash) p=2 at the same t and m -> 0
+  (m=64 KiB hash) p=4, verify (tag is for p=1) -> -1
+  the hash then "\0junk" -> 0
+  ops 0 -> 1
+  memory 0 -> 1
+  ops 0 and memory 0 -> 1
+  ops 2^32 -> -1
+  ops 2^32-1 and memory = memlimit_max -> 1
+  ops 2^64-1 and memory 2^64-1 -> -1
+
+== 5d. hand-written preset strings; rows are strings, columns are limits (ops, mem) of the presets
+  salt (chars) -> ("QUJDREVGR0hJSktMTU5PUA" 22)
+  tag (chars) -> ("YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74" 43)
+  interactive: $argon2id$v=19$m=65536,t=2,p=1$QUJDREVGR0hJSktMTU5PUA$YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74
+    needs_rehash at interactive / moderate / sensitive: (0 1 1)
+  moderate: $argon2id$v=19$m=262144,t=3,p=1$QUJDREVGR0hJSktMTU5PUA$YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74
+    needs_rehash at interactive / moderate / sensitive: (1 0 1)
+  sensitive: $argon2id$v=19$m=1048576,t=4,p=1$QUJDREVGR0hJSktMTU5PUA$YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74
+    needs_rehash at interactive / moderate / sensitive: (1 1 0)
+  salt of 21 chars (last char dropped), moderate string, at moderate limits -> -1
+  tag of 42 chars (last char dropped), moderate string, at moderate limits -> -1
+  control, same string intact at moderate limits -> 0

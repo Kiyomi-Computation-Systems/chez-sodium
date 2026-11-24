@@ -45,8 +45,12 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   - **The harness:** `make test` runs 31 suites; the decoy has four switches for the verbs, and
     `test-decoy-source` holds its pointer rule against an honest mistake, and refuses by name
     each form it cannot read; row 24 reaches each verb's blocks through it.
-- **Next: M3,** the password verbs, collect-safe, with brief §4.2's rules (brief §9). Its plan
-  starts from "Owed to M3" below.
+- **M3 is under way** ([the M3 plan](2026-11-24-m3-plan.md)): the password verbs, collect-safe,
+  with brief §4.2's rules (brief §9).
+  - **Slice 0, the plan and the records,** is on `m3-plan`. The owner accepted every
+    recommendation on 2026-11-24.
+  - **Next: slice 1,** the bindings, the writers and the pure core; then slice 2, the verbs; then
+    M3's closing review.
 
 ## Answered for M1
 
@@ -92,37 +96,47 @@ its questions on 2026-11-23:
     lines gain them; the export row fails by name until they do (M1's closing review, M1-F6;
     plan §2.2).
 
-## Owed to M3
+## Answered for M3
 
-- The password verbs and their bindings, two of them collect-safe, and `test-conventions`' rows
-  for them, the first to use `collect-safe`.
-- `call-with-c-string` for the hash string, and the password's UTF-8 writer.
-  - v0.1.1's makes two Scheme copies of its string, which ADR-0008 forbids for a secret.
-  - So M3's writers bound every write by the block's size, and answer a string changed
-    mid-write as data.
-- `crypto_pwhash_str`'s `&sodium-failed`, and row 17's M3 half. The type's first raise and its
-  three names arrive in M2 (ADR-0006, amended).
-- The oracle's hex mode (row 4); the FIFO decoy (row 19).
-  - Row 19 references the library once before its first fork: a library first reached on two
-    threads at once refuses the second (ADR-0007, amended; M1-F10).
-- Rows 11 (the password half), 15, 16, 18, 22 and 24 for the password verbs (plan §1).
-- **How M3's constants are read:** `crypto_pwhash_strbytes`, the ops and memory bounds and
-  presets, and `crypto_pwhash_strprefix`, at the load, in a step after step 7, or at each call.
-  ADR-0001's M2 amendment reads only `crypto_generichash`'s sizes at the load, and leaves the
-  rest to M3 (M2's closing review, M2-F5).
-- **The shape rows for the password verbs,** as `test-byte-verbs`' S1 to S5 hold the byte verbs:
-  one `call-in-section` per verb, every check before it, the whole list of symbols inside it,
-  and the import clauses whole. Those rows read `byte-verbs.sls` alone (M2S2-F1; M2-F5).
-- **Row 24 for the password verbs goes through the decoy:** each new decoy entry names its
-  blocks through the weak `watch_set`, through its pointers' `volatile uintptr_t` copies, and
-  `test-decoy-source`'s list and `(library-loading)`'s `every-entry` gain the new entries
-  (ADR-0011, amended; M2-F5).
-- **R16 for the password verbs holds each refusal that states a bound to one print** for three
-  secrets under its rule: two strings of one UTF-8 length and one of another, non-ASCII among
-  them, as the byte verbs' differential rows do. A password is a string, so one passed where a
-  bound goes must be refused by its kind (M2C-F1; M2C3-F1).
-- **A new `tests/*.c` joins `test-decoy-source`'s every-file row,** and includes no local file
-  (M2C-F5).
+M2 left these to M3. [The M3 plan](2026-11-24-m3-plan.md) answers each, and the owner answered
+its questions on 2026-11-24, accepting every recommendation:
+
+- **The bindings:** seventeen, the three password calls and fourteen constants, in plan §4.1,
+  item 1. `crypto_pwhash_str` and `_str_verify` are the first `__collect_safe` bindings, and the
+  convention table names each binding's convention (ADR-0001 and ADR-0002, amended).
+  `_passwd_min` and `_passwd_max` are bound and checked (plan §4.2, item 1).
+- **The writers:** native's `call-with-c-string` and `call-with-utf8`, which bound every write
+  by the block and answer a string changed mid-write as data, through a CHANGED thunk (plan
+  §4.1, item 2; ADR-0007, amended). `password-hash` and `password-verify` then refuse it as
+  `changed-during-call`, and `password-needs-rehash?` answers `#t` (plan §4.2, item 6;
+  ADR-0006 and ADR-0009, amended).
+- **`crypto_pwhash_str`'s `&sodium-failed`:** any answer but 0, its code the answer, and row 17's
+  M3 half from the decoy's -1 and 1 (plan §4.1, item 3; §4.2, item 3; ADR-0006, amended).
+- **The oracle's hex mode and the FIFO decoy:** plan §4.1, item 4. Row 19's verbs block inside
+  their sections, which §5.1 measured: another thread's collection still ends, within 17 ms
+  under Valgrind (ADR-0007 and ADR-0011, amended).
+- **Rows 11, 15, 16, 18, 22 and 24 for the password verbs:** plan §4.1, items 5 and 8.
+- **How M3's constants are read:** once, at the load, in step 7, held to the library by the
+  decoy's `pwhash-limits-other` (plan §4.1, item 6; ADR-0001 and ADR-0002, amended).
+- **The shape rows for the password verbs:** plan §4.1, item 7, reading `password-verbs.sls`
+  alone.
+- **Row 24 through the decoy:** plan §4.1, item 8. Every pointer of the three calls is
+  `nonnull` at both releases, so the compile holds the pointer rule for each.
+- **R16 for the password verbs:** three passwords under each bound refusal, two of one UTF-8
+  length, one of them non-ASCII (plan §4.1, item 10).
+- **The every-file row:** any new `tests/*.c` joins it (plan §4.1, item 10).
+- **New:**
+  - **the pure core,** `(chez-sodium private password-text)`, with the UTF-8 count, the
+    pre-check and needs-rehash's exact shape check (plan §4.1, item 11; ADR-0009 and ADR-0012,
+    amended);
+  - **`make-password-limits` checks its ranges when it is called** (plan §4.2, item 2;
+    ADR-0009, amended), and is exported alone: ADR-0012's "no constructor" means a condition's
+    (plan §4.2, item 5; ADR-0012, amended);
+  - **Techo's question,** whether `password-verify` can tell short memory from a wrong
+    password. Techo's session asked on 2026-11-24, in its brief
+    `.plans/briefs/chez-sodium-verify-out-of-memory.md`. At 1.0.18 libsodium itself makes the
+    two one, so the owner chose no change in M3: `#f` covers all three causes, and the documents
+    give Techo's fallback (plan §4.2, item 4; ADR-0006, amended). Techo's session was told.
 
 ## Owed to M4
 
@@ -134,11 +148,62 @@ its questions on 2026-11-23:
 - **The documents' notes from M2:** what the cap is; that the compare leaks only the lengths;
   that `random-bytes` aborts the process without an entropy source; that `blake2b` can raise
   `&sodium-failed`.
+- **The documents' notes from M3** (plan §3):
+  - `password-verify` answers `#f` for a wrong password, an unreadable hash and short memory
+    alike, with a caller's fallback: after a `#f`, hash a throwaway string at the same limits.
+    It sees only a failure libsodium is told of, under `ulimit` or with no overcommit, since a
+    container's memory limit kills the process instead, and it fits only hashes made at the
+    caller's current limits;
+  - a hash's own limits set what verifying it costs, so hashes come from trusted storage;
+  - a container's memory limit can get the process killed;
+  - the login pattern: `password-needs-rehash?` only after `password-verify` answers `#t`;
+  - a password changed by another thread during the call is refused.
 - **The docs rule of `check-floors`** waits for `docs/`.
 - **The install-line checks of `test-manifest`** wait for the first release, which writes the
   install lines.
 
 ## Close-outs
+
+### 2026-11-24 — M3 slice 0: the plan and the records (PR #14)
+
+- **Measured first,** by two Sonnet agents on disjoint directories, each rerun by the caller, at
+  1.0.18 and 1.0.22 on four libraries ([research/m3-plan/](research/m3-plan/README.md)):
+  - set A: the declarations, the prototypes, the decoy's pointer rule, the constants, every
+    return code, and short memory against a wrong password;
+  - set B: the costs, the UTF-8 writer, collect-safe by behaviour inside a critical section, and
+    the types `__collect_safe` takes.
+
+  What it found:
+  - every pointer of the three password calls is `nonnull`, and `str` is spelled differently at
+    each release;
+  - a collect-safe call blocked inside `critical-section` lets another thread's collection end,
+    within 17 ms under Valgrind;
+  - a hash at the minimum costs about 0.4 ms under Valgrind;
+  - at 1.0.18 libsodium itself turns short memory into a mismatch.
+- **Written** on `m3-plan` by the caller:
+  - [the M3 plan](2026-11-24-m3-plan.md);
+  - ADR-0001, ADR-0002, ADR-0006, ADR-0007, ADR-0009, ADR-0011 and ADR-0012, amended;
+  - the brief, the constraints, AGENTS.md and this ledger, to match.
+- **The owner decided, on 2026-11-24,** each with the plan's recommendation:
+  - `_passwd_min` and `_passwd_max` bound and checked;
+  - `make-password-limits` checking its ranges when called;
+  - no change for Techo's question: `password-verify`'s `#f` covers short memory. Techo's
+    session was told;
+  - the constants read once, at the load;
+  - any answer but 0 from `crypto_pwhash_str` raising `&sodium-failed`;
+  - `make-password-limits` exported alone;
+  - the names.
+- **Reviewed:** one Opus review found no blocker, 7 majors and 10 minors, each fixed
+  ([research/m3-slice-0-review/](research/m3-slice-0-review/README.md); plan §4.5). The majors:
+  - **row 19 passed with a plain binding,** 8 runs of 8, reproduced by the caller. It now waits
+    for a marker the decoy leaves once the call is in C;
+  - **the loaders row expected the pure library to load libsodium;**
+  - **R16 for `length-out-of-range` could not run in process;**
+  - **`&sodium-failed`'s code 0 had no row;**
+  - **`changed-during-call` made `password-needs-rehash?` raise because of the hash,** against
+    ADR-0009, decision 3. It answers `#t` instead;
+  - **nothing held "no Scheme copy" outside the writers;**
+  - **the twins `opslimit_max` and `passwd_max`** passed every real-library row.
 
 ### 2026-11-24 — M2's closing review and its fixes (PR #13)
 

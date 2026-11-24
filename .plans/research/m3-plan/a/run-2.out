@@ -1,0 +1,68 @@
+######## headers of 1.0.18
+== prototypes.c -Wall -Werror -std=c11
+compiled
+crypto_pwhash_str                            1
+crypto_pwhash_str_verify                     1
+crypto_pwhash_str_needs_rehash               1
+crypto_pwhash_strprefix                      1
+crypto_pwhash_strbytes                       1
+crypto_pwhash_opslimit_min                   1
+crypto_pwhash_opslimit_max                   1
+crypto_pwhash_opslimit_interactive           1
+crypto_pwhash_opslimit_moderate              1
+crypto_pwhash_opslimit_sensitive             1
+crypto_pwhash_memlimit_min                   1
+crypto_pwhash_memlimit_max                   1
+crypto_pwhash_memlimit_interactive           1
+crypto_pwhash_memlimit_moderate              1
+crypto_pwhash_memlimit_sensitive             1
+crypto_pwhash_passwd_min                     1
+crypto_pwhash_passwd_max                     1
+crypto_pwhash_str_needs_rehash               0
+crypto_pwhash_str                            0
+== decoys, ternary, -Wall -Werror -shared -fPIC
+rehash-str-ternary.c: exit 1 Werror=nonnull-compare 
+str-out-ternary.c: exit 1 Werror=nonnull-compare 
+str-passwd-ternary.c: exit 1 Werror=nonnull-compare 
+verify-passwd-ternary.c: exit 1 Werror=nonnull-compare 
+verify-str-ternary.c: exit 1 Werror=nonnull-compare 
+== decoys, volatile, -Wall -Werror -shared -fPIC
+rehash-str-volatile.c: exit 0 
+str-out-volatile.c: exit 0 
+str-passwd-volatile.c: exit 0 
+verify-passwd-volatile.c: exit 0 
+verify-str-volatile.c: exit 0 
+######## headers of 1.0.22
+== prototypes.c -Wall -Werror -std=c11
+compiled
+crypto_pwhash_str                            1
+crypto_pwhash_str_verify                     1
+crypto_pwhash_str_needs_rehash               1
+crypto_pwhash_strprefix                      1
+crypto_pwhash_strbytes                       1
+crypto_pwhash_opslimit_min                   1
+crypto_pwhash_opslimit_max                   1
+crypto_pwhash_opslimit_interactive           1
+crypto_pwhash_opslimit_moderate              1
+crypto_pwhash_opslimit_sensitive             1
+crypto_pwhash_memlimit_min                   1
+crypto_pwhash_memlimit_max                   1
+crypto_pwhash_memlimit_interactive           1
+crypto_pwhash_memlimit_moderate              1
+crypto_pwhash_memlimit_sensitive             1
+crypto_pwhash_passwd_min                     1
+crypto_pwhash_passwd_max                     1
+crypto_pwhash_str_needs_rehash               0
+crypto_pwhash_str                            0
+== decoys, ternary, -Wall -Werror -shared -fPIC
+rehash-str-ternary.c: exit 1 Werror=nonnull-compare 
+str-out-ternary.c: exit 1 Werror=nonnull-compare 
+str-passwd-ternary.c: exit 1 Werror=nonnull-compare 
+verify-passwd-ternary.c: exit 1 Werror=nonnull-compare 
+verify-str-ternary.c: exit 1 Werror=nonnull-compare 
+== decoys, volatile, -Wall -Werror -shared -fPIC
+rehash-str-volatile.c: exit 0 
+str-out-volatile.c: exit 0 
+str-passwd-volatile.c: exit 0 
+verify-passwd-volatile.c: exit 0 
+verify-str-volatile.c: exit 0 

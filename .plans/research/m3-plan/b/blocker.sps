@@ -1,0 +1,51 @@
+#!r6rs
+;; Item 3: __collect_safe by behaviour.
+;; Usage: scheme --program blocker.sps BLOCKER.so CASE FIFO MARKER
+;;   CASE: a (cs, no critical section) b (cs, in one) c (plain, none) d (plain, in one)
+;; Prints one line: case opener-answer collector-answer rendezvous-ms released-by
+(import (chezscheme))
+(define args (cdr (command-line)))
+(define lib (car args)) (define case-id (cadr args)) (define fifo (caddr args)) (define marker (cadddr args))
+(load-shared-object lib)
+(define plain (foreign-procedure "block_on" (uptr) int))
+(define safe (foreign-procedure __collect_safe "block_on" (uptr) int))
+(define (now-ms) (let ((t (current-time 'time-monotonic))) (+ (* 1000 (time-second t)) (quotient (time-nanosecond t) 1000000))))
+(define (pause ms) (sleep (make-time 'time-duration (* ms 1000000) 0)))
+(define (path-block p)
+  (let* ((bv (string->utf8 p)) (n (bytevector-length bv)) (b (foreign-alloc (+ n 1))))
+    (do ((i 0 (+ i 1))) ((= i n)) (foreign-set! 'unsigned-8 b i (bytevector-u8-ref bv i)))
+    (foreign-set! 'unsigned-8 b n 0) b))
+(define (release!) (system (string-append "exec 3<>'" fifo "'")))
+;; wait-until : (-> Any) Natural -> Boolean   (DONE? every 10 ms, at most STEPS times)
+(define (wait-until done? steps)
+  (let loop ((i 0)) (cond ((done?) #t) ((= i steps) #f) (else (pause 10) (loop (+ i 1))))))
+(define state (make-vector 4 #f)) ; 0 calling, 1 opener answer, 2 collector answer, 3 rendezvous ms
+;; reference everything once from the main thread
+(let ((b (path-block "/nonexistent/none")))
+  (plain b) (safe b) (foreign-free b))
+(critical-section (vector-ref state 0))
+(collect-rendezvous)
+(release!) ; a no-reader O_RDWR open of the FIFO returns at once
+(let* ((b (path-block fifo))
+       (binding (if (member case-id '("a" "b")) safe plain))
+       (call (if (member case-id '("a" "c"))
+                 (lambda () (vector-set! state 0 #t) (binding b))
+                 (lambda () (critical-section (vector-set! state 0 #t) (binding b))))))
+  (fork-thread (lambda () (let ((a (guard (e (#t (list 'raised (condition-message e)))) (call)))) (vector-set! state 1 (list 'answer a)))))
+  (fork-thread
+   (lambda ()
+     (let ((a (guard (e (#t (list 'raised (condition-message e))))
+                (if (wait-until (lambda () (vector-ref state 0)) 3000)
+                    (let ((t0 (begin (pause 300) (now-ms))))
+                      (collect-rendezvous)
+                      (vector-set! state 3 (- (now-ms) t0))
+                      (release!)
+                      'collected)
+                    'opener-never-called))))
+       (vector-set! state 2 a))))
+  (let* ((o (wait-until (lambda () (vector-ref state 1)) 4000))
+         (c (wait-until (lambda () (vector-ref state 2)) 4000)))
+    (printf "~a opener=~a collector=~a rendezvous-ms=~a released-by=~a\n" case-id
+            (if o (vector-ref state 1) 'opener-hung) (if c (vector-ref state 2) 'collector-hung)
+            (vector-ref state 3) (if (file-exists? marker) 'watchdog 'collector))
+    (if o (foreign-free b))))

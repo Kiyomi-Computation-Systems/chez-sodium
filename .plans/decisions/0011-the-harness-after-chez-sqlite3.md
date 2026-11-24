@@ -9,6 +9,8 @@
   review, and accepted by the owner that day
   ([amendment](#amendment-2026-11-23-a-c-program-that-calls-no-libsodium-function)); its last
   point added after M2's closing review, and accepted by the owner that day.
+  Amended 2026-11-24 in M3's plan, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-24-m3s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** development tooling, the suites and CI; no library change
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §7, §8.2, §9's M0, and
@@ -171,7 +173,55 @@ Accepted (the owner, 2026-11-23), from M2 slice 1's review, M2S1-F2.
   `LD_PRELOAD` to the interposer alone. Added after M2's closing review (M2-F4), accepted by the
   owner that day.
 
+## Amendment, 2026-11-24: M3's plan
+
+Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-plan.md), §4.1, items
+4 and 8.
+
+- **The decoy's seventeen new entries:**
+  - each logs its call, every pointer through its `volatile uintptr_t`, and a C string as `p[L]`
+    with its `strlen`;
+  - each names every block to `watch_set`, with its length;
+  - `crypto_pwhash_str` writes `A5` over all of `out` before a fixed hash string.
+- **Its new switches:**
+  - `pwhash-limits-other`: constants no release has ([ADR-0001], amended). Under it, a gated
+    oracle child and `refusal-probe --constants` print the fourteen, which tells twins apart;
+  - `pwhash-str-fails` and `pwhash-str-other`: `crypto_pwhash_str` answers -1, or 1;
+  - `pwhash-str-unreadable`: it answers 0 and leaves `out` all `A5` ([ADR-0006], amended);
+  - `verify-other`: verify answers 1 for a match;
+  - `strprefix-null`: a NULL prefix;
+  - `pwhash-blocks`: row 19's FIFO.
+- **Row 19, by behaviour.**
+  - Under `pwhash-blocks`, `crypto_pwhash_str` and `crypto_pwhash_str_verify` create the marker
+    `$CHEZ_SODIUM_DECOY_FIFO.entered`, then open the FIFO, and block until a writer opens it.
+    With the variable unset, each answers -1 at once.
+  - A gated child, `collect-probe`, references the library once, and forks a thread that calls
+    the verb.
+  - **It waits for the marker, then 1 s,** as chez-sqlite3's row waits for its opener. Only then
+    does it run `collect-rendezvous`, and release the FIFO. Without the wait the rendezvous can
+    end before the call is in C, and a plain binding passes: slice 0's review saw it pass 8 runs
+    of 8 (M3S0-F1).
+  - The child starts the watchdog once the marker appears; it releases the FIFO after 10 s. The
+    rendezvous must end within 5 s.
+  - Its standing control, a test-side plain binding of the decoy's verify called the same way,
+    is released by the watchdog.
+  - The FIFO's writer and the watchdog are shells, which run no Scheme and no libsodium. They run
+    outside the gate.
+- **The decoy spells each array parameter as its header does.** `out` is an array at both
+  releases. `str` is an array at 1.0.18 and a pointer at 1.0.22. A definition spelled otherwise
+  fails `-Werror=array-parameter` (measured).
+  - So the two functions that take `str` are each defined twice, whole, under
+    `#if SODIUM_LIBRARY_VERSION_MAJOR < 26` and `#else`, and `test-decoy-source` reads both.
+  - Its scanner refuses a parameter of one identifier with no type words as unreadable, which a
+    parameter macro would otherwise pass as a scalar (M3S0-F8).
+- **The C oracle gains a hex mode,** `hash HEX` and `verify STRING HEX`, for row 4, in gated
+  children. It also gains the constants' lines.
+- **Row 24's password half:** the second wipe child runs each password verb at the decoy's
+  limits.
+
+[ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md
 [ADR-0004]: 0004-a-threaded-chez.md
+[ADR-0006]: 0006-errors-and-no-secret-shown.md
 [ADR-0008]: 0008-every-block-wiped-before-free.md
 [ADR-0010]: 0010-linux-only.md
