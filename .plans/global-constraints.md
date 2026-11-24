@@ -140,8 +140,9 @@ record it comes from, and where a rule and its record disagree, the record wins.
   `string->utf8`. Above that is an assertion violation, raised before C. A hash string over the
   cap fails the pre-check instead ([ADR-0007], [ADR-0009]).
 - **The cap is written once,** as `input-cap` in `(chez-sodium private cap)`, and checked for
-  every operand, whatever the verb does next: the compare checks both before it compares their
-  lengths ([ADR-0007], amended).
+  every input and operand, whatever the verb does next: the compare checks both before it
+  compares their lengths. `blake2b`'s key and output are capped through libsodium's own bounds,
+  which a row holds within the cap ([ADR-0007], amended).
 - **A size or key length is checked against libsodium's own bounds, before C,** since C accepts
   sizes and keys of 1 to 15 bytes ([ADR-0007], amended).
 - **No claims, positions or sweeps:** a stateless verb shares no state across sections

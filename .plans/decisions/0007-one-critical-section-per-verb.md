@@ -8,7 +8,8 @@
   Amended 2026-11-23 after M1's closing review, and accepted by the owner that day
   ([amendment](#amendment-2026-11-23-the-first-reference-on-two-threads)).
   Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
-  review ([amendment](#amendment-2026-11-23-m2s-plan)).
+  review ([amendment](#amendment-2026-11-23-m2s-plan)); its last two points added after M2's
+  closing review, and accepted by the owner that day.
 - **Date:** 2026-11-22
 - **Scope:** every public verb
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §4.4, §6.2, §11.3 and
@@ -170,6 +171,14 @@ and 4.
   `foreign-set!` copy in takes 1.8 ms, 36 times the hash's 49 µs, and 48 ms under Valgrind.
   Brief §4.4's 2 ms is the copy's, and it holds for one capped input. The compare copies two,
   about 3.6 ms plain.
+- **A path that makes no block and calls no C holds no section,** as decision 8 says of
+  `sodium-version`: `random-bytes 0`, and the compare of operands of different lengths, are the
+  others. Added after M2's closing review (M2-F4, from M2S2-F9).
+- **`blake2b`'s key and output are capped through libsodium's own bounds,** `_keybytes_max` and
+  `_bytes_max`, 64 at 1.0.18 and 1.0.22, and never compared with `input-cap` themselves. A row of
+  `test-byte-verbs` holds both bounds within the cap, so a libsodium whose bounds passed it would
+  fail that row, not slip a longer key past the cap. Added after M2's closing review (M2-F4,
+  from M2S2-F11).
 
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0006]: 0006-errors-and-no-secret-shown.md

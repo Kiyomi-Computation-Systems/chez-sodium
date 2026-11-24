@@ -459,6 +459,24 @@
         (raised (lambda () (refuse-secret 'w 'r 123456 'x)))
         (raised (lambda () (refuse-secret (list #\p #\w) 'r 'p 'x)))))
 
+(test-equal "refuse-secret refuses a detail that is no string, from itself, showing it by shown-value: a number, a symbol and a list of them as they are, anything else by kind"
+  '((assertion-violation refuse-secret (detail 65536))
+    (assertion-violation refuse-secret (detail up-to))
+    (assertion-violation refuse-secret (detail (1 2)))
+    (assertion-violation refuse-secret (detail (kind bytevector)))
+    (assertion-violation refuse-secret (detail (kind vector))))
+  (list (raised (lambda () (refuse-secret 'w 'r 'p "v" 65536)))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" 'up-to)))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" '(1 2))))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" (string->utf8 "hunter2"))))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" (vector 1))))))
+
+(test-equal "refuse-secret with a detail, a string, refuses as without it: the irritants are the rule, the parameter and the kind, whatever the detail says"
+  '((assertion-violation w (r p (kind string)))
+    (assertion-violation w (r p (kind string))))
+  (list (raised (lambda () (refuse-secret 'w 'r 'p "v" "at most 65536 bytes")))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" "")))))
+
 ;; --- &sodium-failed ------------------------------------------------------------------
 
 (test-equal "an &sodium-failed carries its function and its code"

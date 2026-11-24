@@ -40,9 +40,20 @@
 ;;;                                    typedef that may be a pointer
 ;;;   (extern unreadable block)        an extern "C" { around definitions
 ;;;
+;;; and, of the file as a whole, FILE being the file's path:
+;;;
+;;;   (FILE unreadable paste)          a ## in any directive: a parameter's
+;;;                                    name the preprocessor builds
+;;;   (FILE unreadable splice)         a backslash at the end of a line
+;;;                                    outside a directive: a name cut in two
+;;;   (FILE unreadable include)        an #include of anything but a system
+;;;                                    header in <...> and "sodium.h": a local
+;;;                                    file may define what the glob never reads
+;;;
 ;;; What it does not read: a function whose name a macro builds, or whose
-;;; name is no family name; and which arm of an #if holds, since every arm is
-;;; text to it.
+;;; name is no family name; a macro that builds a name by other means than ##;
+;;; a splice inside a comment or a string; and which arm of an #if holds,
+;;; since every arm is text to it.
 ;;;
 ;;; This process loads no libsodium. Each expected value is one the scanner
 ;;; cannot produce by failing, and none is #f. Whatever can raise is computed
@@ -315,11 +326,12 @@
                              (else (list function (car rest) 'plain)))))
           (loop (cdr rest) (if breach (cons breach found) found))))))
 
-;; directives : String -> (Listof String)
-;; Every preprocessor directive of TEXT, comments and strings stripped, the
-;; text after its # trimmed, its backslash continuations joined.
-(define (directives text)
-  (let loop ((lines (lines-of (strip text #f))) (current #f) (found '()))
+;; directives : String Boolean -> (Listof String)
+;; Every preprocessor directive of TEXT, comments stripped, and strings too
+;; unless KEEP-STRINGS?, the text after its # trimmed, its backslash
+;; continuations joined.
+(define (directives text keep-strings?)
+  (let loop ((lines (lines-of (strip text keep-strings?))) (current #f) (found '()))
     (if (null? lines)
         (reverse (if current (cons current found) found))
         (let* ((line (car lines))
@@ -342,7 +354,7 @@
 ;; The identifiers in the replacement lists of TEXT's #define lines, each
 ;; outside its own macro's parameters.
 (define (macro-words text)
-  (let loop ((rest (directives text)) (found '()))
+  (let loop ((rest (directives text #f)) (found '()))
     (if (null? rest)
         found
         (let ((d (car rest)))
@@ -368,6 +380,75 @@
           (filter (lambda (token) (and (ident-token? token) (not (member token params))))
                   (if (< start n) (slice toks start n) '()))))))
 
+;; contains? : String String -> Boolean
+;; Whether PART occurs in S.
+(define (contains? s part)
+  (let ((n (string-length s)) (m (string-length part)))
+    (let loop ((i 0))
+      (cond ((> (+ i m) n) #f)
+            ((string=? (substring s i (+ i m)) part) #t)
+            (else (loop (+ i 1)))))))
+
+;; trim-right : String -> String
+(define (trim-right s)
+  (let loop ((b (string-length s)))
+    (if (and (> b 0) (char-whitespace? (string-ref s (- b 1))))
+        (loop (- b 1))
+        (substring s 0 b))))
+
+;; spliced? : String -> Boolean
+;; Whether a line ends in a backslash, as the compiler reads it: trailing
+;; blanks after it are tolerated.
+(define (spliced? line)
+  (let ((s (trim-right line)))
+    (and (> (string-length s) 0) (char=? (string-ref s (- (string-length s) 1)) #\\))))
+
+;; pasted? : String -> Boolean
+;; Whether any directive of TEXT has a ##.
+(define (pasted? text)
+  (exists (lambda (d) (contains? d "##")) (directives text #f)))
+
+;; splice-outside-directive? : String -> Boolean
+;; Whether a line outside every directive, continuations included, ends in a
+;; backslash.
+(define (splice-outside-directive? text)
+  (let loop ((lines (lines-of (strip text #f))) (continued? #f))
+    (and (pair? lines)
+         (let* ((line (car lines))
+                (in-directive? (or continued? (and (directive line) #t))))
+           (or (and (not in-directive?) (spliced? line))
+               (loop (cdr lines) (and in-directive? (spliced? line))))))))
+
+;; include-argument : String -> (U String #f)
+;; What follows the word include, include_next or import in directive D, trimmed,
+;; or #f when D is another directive.
+(define (include-argument d)
+  (let loop ((j 0))
+    (if (and (< j (string-length d)) (ident-char? (string-ref d j)))
+        (loop (+ j 1))
+        (and (member (substring d 0 j) '("include" "include_next" "import"))
+             (trim (substring d j (string-length d)))))))
+
+;; foreign-include? : String -> Boolean
+;; Whether TEXT includes anything but a header in <...> or "sodium.h".
+(define (foreign-include? text)
+  (exists (lambda (d)
+            (let ((arg (include-argument d)))
+              (and arg
+                   (not (and (> (string-length arg) 1)
+                             (char=? (string-ref arg 0) #\<)
+                             (char=? (string-ref arg (- (string-length arg) 1)) #\>)))
+                   (not (string=? arg "\"sodium.h\"")))))
+          (directives text #t)))
+
+;; file-refusals : String String -> (Listof Any)
+;; (NAME unreadable paste), (NAME unreadable splice) and (NAME unreadable
+;; include), for each that holds of TEXT, in that order.
+(define (file-refusals text name)
+  (append (if (pasted? text) (list (list name 'unreadable 'paste)) '())
+          (if (splice-outside-directive? text) (list (list name 'unreadable 'splice)) '())
+          (if (foreign-include? text) (list (list name 'unreadable 'include)) '())))
+
 ;; scan : String -> (List (Listof (List String (Listof String))) (Listof Any))
 ;; The family functions TEXT defines with a body, each with its pointer
 ;; parameters, in order; and the breaches of the rule among them, and what
@@ -380,12 +461,18 @@
 ;;   (FUNCTION unreadable parameter)  a parameter that is neither a pointer
 ;;                                 nor of scalar words
 ;;   (extern unreadable block)     an extern "C" { ... } around definitions
+;;   (NAME unreadable paste), (NAME unreadable splice), (NAME unreadable include)
+;;                                 of the file as a whole, as above, after the rest;
+;;                                 NAME is the optional second argument, "file"
+;;                                 when none is given
 ;; An unreadable function is not among the functions read.
-(define (scan text)
-  (let* ((toks (tokens (code-text text))) (n (vector-length toks)) (macros (macro-words text)))
+(define (scan text . name)
+  (let* ((file-name (if (null? name) "file" (car name)))
+         (refusals (file-refusals text file-name))
+         (toks (tokens (code-text text))) (n (vector-length toks)) (macros (macro-words text)))
     (let loop ((i 0) (depth 0) (functions '()) (found '()))
       (cond
-        ((>= i n) (list (reverse functions) (reverse found)))
+        ((>= i n) (list (reverse functions) (append (reverse found) refusals)))
         ((string=? (vector-ref toks i) "{")
          (if (and (= depth 0) (> i 0) (string=? (vector-ref toks (- i 1)) "extern"))
              (loop (+ i 1) depth functions (cons (list "extern" 'unreadable 'block) found))
@@ -459,7 +546,7 @@
               (let ((text (read-text (car rest))))
                 (cond ((not (string? text)) (list 'unreadable (car rest) text))
                       ((eq? (includes-sodium? text) 'yes)
-                       (loop (cdr rest) (cons (cons (car rest) (scan text)) found)))
+                       (loop (cdr rest) (cons (cons (car rest) (scan text (car rest))) found)))
                       (else (loop (cdr rest) found)))))))))
 
 ;; --- the real files ----------------------------------------------------------------------
@@ -773,6 +860,89 @@
          "}")
   '((("randombytes_buf" ("buf")))
     (("randombytes_buf" unreadable head) ("randombytes_buf" "buf" plain))))
+
+(define memcmp-plain
+  (list "int sodium_memcmp(const void *const b1, const void *const b2, size_t len)"
+        "{"
+        "  volatile uintptr_t p = (uintptr_t) b1;"
+        "  volatile uintptr_t q = (uintptr_t) b2;"
+        "  called(\"x\", PASTED ? \"p\" : \"NULL\", q ? \"p\" : \"NULL\", len);"
+        "  return 0;"
+        "}"))
+
+(define memcmp-read '(("sodium_memcmp" ("b1" "b2"))))
+
+(plant "a parameter's name built by ##: the file is unreadable, by paste, and the function is still read"
+  (apply lines (append (list "#define DECOY_PARAM(n) b##n") memcmp-plain))
+  `(,memcmp-read (("file" unreadable paste))))
+
+(plant "a ## on a continued directive line is a paste too"
+  (apply lines (append (list "#define DECOY_PARAM(n) \\" "  b ## n") memcmp-plain))
+  `(,memcmp-read (("file" unreadable paste))))
+
+(plant "a ## in a comment or a string is no paste"
+  (apply lines (append (list "/* b##n */ // b##n" "const char *glue = \"b##n\";") memcmp-plain))
+  `(,memcmp-read ()))
+
+(plant "a ## in a string inside a directive is no paste either"
+  (apply lines (append (list "#define GLUE_TEXT \"b##n\"") memcmp-plain))
+  `(,memcmp-read ()))
+
+(plant "a name cut by a backslash and a newline: the file is unreadable, by splice"
+  (lines "int sodium_memcmp(const void *const b1, const void *const b2, size_t len)"
+         "{"
+         "  volatile uintptr_t p = (uintptr_t) b1;"
+         "  volatile uintptr_t q = (uintptr_t) b2;"
+         "  called(\"x\", b\\"
+         "1 ? \"p\" : \"NULL\", q ? \"p\" : \"NULL\", len);"
+         "  return 0;"
+         "}")
+  `(,memcmp-read (("file" unreadable splice))))
+
+(plant "a backslash and blanks at the end of a line is a splice too"
+  (lines "int decoy_x = 1 + \\  "
+         "  2;")
+  '(() (("file" unreadable splice))))
+
+(plant "a directive's own continuation is no splice, and the line after it is plain"
+  (lines "#define A(x) \\"
+         "  (x)"
+         "int decoy_y = 1;")
+  '(() ()))
+
+(plant "a backslash in a string or a comment, at the end of a line, is no splice"
+  (lines "const char *s = \"a\\\\\";"
+         "/* b\\ */"
+         "int decoy_y = 1;")
+  '(() ()))
+
+(plant "an include of a local file, in quotes: the file is unreadable, by include"
+  (lines "#include <stdio.h>" "#include \"decoy-extra.h\"")
+  '(() (("file" unreadable include))))
+
+(plant "an include through a macro is unreadable too"
+  (lines "#define HEADER <stdio.h>" "#include HEADER")
+  '(() (("file" unreadable include))))
+
+(plant "an include_next of a local file is unreadable"
+  (lines "#include_next \"decoy-extra.h\"")
+  '(() (("file" unreadable include))))
+
+(plant "system headers in <...> and \"sodium.h\" are no refusal, however spaced"
+  (lines "#include <stdio.h>" "  #  include <sys/types.h>" "#include \"sodium.h\"" "#include <sodium.h>")
+  '(() ()))
+
+(plant "an include named in a comment is no include"
+  (lines "/* #include \"decoy-extra.h\" */" "// #include \"decoy-extra.h\"")
+  '(() ()))
+
+(plant "all three at once, in the order paste, splice, include"
+  (lines "#define G(n) b##n" "int decoy_y = 1 + \\" "2;" "#include \"x.h\"")
+  '(() (("file" unreadable paste) ("file" unreadable splice) ("file" unreadable include))))
+
+(test-equal "a file's own name is the FILE of its refusals"
+  '(() (("tests/x.c" unreadable include)))
+  (scan "#include \"x.h\"\n" "tests/x.c"))
 
 ;; --- which files are read ------------------------------------------------------------------
 

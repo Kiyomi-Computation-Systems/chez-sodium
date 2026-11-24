@@ -31,8 +31,16 @@
 ;;;   memcmp-other     sodium_memcmp answering 1 for equal operands: the compare
 ;;;                    answers #f, since only 0 is a match
 ;;;
+;;; One more child is the C oracle (tests/libsodium-oracle.c), run against the
+;;; control build under sizes-other. Against the real library each size
+;;; function answers what its twins do, so no row there can tell the oracle's
+;;; line for one from another's; here the five answers differ, and each line
+;;; is held to its own function. It is the last row that spawns, since its
+;;; switch is set in this process's environment, and every other child sets or
+;;; unsets its own.
+;;;
 ;;; Under the memory gate each child runs under a Valgrind of its own
-;;; (ADR-0011), so this suite runs 6 children, at most 14. Each child's counts
+;;; (ADR-0011), so this suite runs 7 children, at most 14. Each child's counts
 ;;; are required zero, and each says whether it ran under Valgrind, which a row
 ;;; requires yes exactly when the gate asked.
 ;;;
@@ -45,7 +53,8 @@
         (srfi :64)
         (chez-sodium-testing)
         (library-loading)
-        (only (chezscheme) file-directory? foreign-entry?))
+        (libsodium-oracle)
+        (only (chezscheme) file-directory? foreign-entry? getenv putenv))
 
 ;; SRFI-64 sets no exit status. This suite's last line turns the runner's
 ;; counts into one.
@@ -306,6 +315,29 @@
 (verb-row "memcmp-other" (table-calls memcmp-other-table)
   "sodium_memcmp answering 1 for equal operands is no match: the compare answers #f, and #t only for 0, as at length 0"
   (table-lines memcmp-other-table))
+
+;; --- the C oracle against the decoy -----------------------------------------------------------
+
+;; oracle-under-sizes-other : -> Any
+;; libsodium-oracle's answer for the control build with CHEZ_SODIUM_DECOY set
+;; to sizes-other: what the oracle reads in the decoy's five sizes.
+(define oracle-under-sizes-other
+  (guard (e (#t (list 'raised (describe e))))
+    (if (eqv? (compiled-status "control") 0)
+        (begin (putenv "CHEZ_SODIUM_DECOY" "sizes-other")
+               (libsodium-oracle getenv (so-of "control")))
+        (list 'not-compiled (compiled-status "control")))))
+
+;; Each (NAME F M): F the decoy's answer through its function, M the header's
+;; macro. The decoy answers 33, 8, 80, 9 and 81; the header says 32, 16, 64, 16
+;; and 64: no two of the ten are alike but in the macros' pairs, so a line read
+;; through another function shows.
+(test-equal "the C oracle on the control build under sizes-other: its output whole, each size line the decoy's answer for its own function and the header's macro for it, and Valgrind's line as the gate asked"
+  (list (cons 'version (car floor-values)) '(major . 10) '(minor . 3) '(init 0 0)
+        '(generichash-bytes 33 32) '(generichash-bytes-min 8 16) '(generichash-bytes-max 80 64)
+        '(generichash-keybytes-min 9 16) '(generichash-keybytes-max 81 64)
+        valgrind-line)
+  oracle-under-sizes-other)
 
 ;; --- this process --------------------------------------------------------------------------------
 

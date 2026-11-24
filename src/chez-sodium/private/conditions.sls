@@ -83,22 +83,33 @@
   (define (refuse-field who field what value)
     (assertion-violation who (string-append "not " what) field (secret-shown value)))
 
-  ;; refuse-secret : Symbol Symbol Symbol Any -> Nothing
+  ;; refuse-secret : Symbol Symbol Symbol Any [String] -> Nothing
   ;; WHO's refusal of VALUE, a secret parameter, under RULE: an assertion
   ;; violation whose irritants are RULE, PARAMETER and VALUE's kind, in that
   ;; order. WHO, RULE and PARAMETER must be symbols, else the refusal is
-  ;; refuse-secret's own.
-  (define (refuse-secret who rule parameter value)
-    (unless (symbol? who)
-      (refuse-field 'refuse-secret 'who "a symbol" who))
-    (unless (symbol? rule)
-      (refuse-field 'refuse-secret 'rule "a symbol" rule))
-    (unless (symbol? parameter)
-      (refuse-field 'refuse-secret 'parameter "a symbol" parameter))
-    (assertion-violation who
-                         (string-append (symbol->string parameter) " is refused: "
-                                        (symbol->string rule) ", shown by its kind alone")
-                         rule parameter (secret-shown value)))
+  ;; refuse-secret's own. DETAIL, when given, is a string appended to the
+  ;; message, for a bound the caller states: never the value, and never an
+  ;; irritant. One that is no string is refuse-secret's own refusal, its
+  ;; irritants (detail V), V by shown-value.
+  (define refuse-secret
+    (case-lambda
+      ((who rule parameter value) (refuse-secret who rule parameter value ""))
+      ((who rule parameter value detail)
+       (unless (symbol? who)
+         (refuse-field 'refuse-secret 'who "a symbol" who))
+       (unless (symbol? rule)
+         (refuse-field 'refuse-secret 'rule "a symbol" rule))
+       (unless (symbol? parameter)
+         (refuse-field 'refuse-secret 'parameter "a symbol" parameter))
+       (unless (string? detail)
+         (assertion-violation 'refuse-secret "detail is not a string"
+                              'detail (shown-value detail)))
+       (assertion-violation who
+                            (string-append (symbol->string parameter) " is refused: "
+                                           (symbol->string rule) ", shown by its kind alone"
+                                           (if (string=? detail "") "" "; ")
+                                           detail)
+                            rule parameter (secret-shown value)))))
 
   ;; checked-accessor : Symbol Symbol (Any -> Boolean) String (Any -> Any) -> (Any -> Any)
   ;; ACCESSOR, a record's or a condition type's, for WHO: called on what

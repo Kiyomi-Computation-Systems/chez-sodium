@@ -39,9 +39,9 @@
 ;;; #f for something that can raise: constant-time-bytevector=?'s #f is
 ;;; asserted as (no-raise #f). Nothing here depends on an order of evaluation:
 ;;; effects run through for-each, let* and named lets, and map is used only
-;;; where its calls do not depend on one another. Every engine row follows a reference to each library at
-;;; the top of the suite: a library first reached inside an engine that is then
-;;; abandoned stays wedged.
+;;; where its calls do not depend on one another. Every engine row follows a
+;;; reference to each library at the top of the suite: a library first reached
+;;; inside an engine that is then abandoned stays wedged.
 (import (rnrs)
         (rnrs eval)
         (srfi :64)
@@ -438,7 +438,7 @@
   (refusal 'random-bytes 'over-the-cap 'n 65537)
   (lambda () (random-bytes 65537)))
 
-(check "R15 random-bytes the greatest fixnum is refused, over-the-cap, before any block"
+(check "R15 random-bytes the greatest fixnum is refused, over-the-cap, by the cap check"
   (refusal 'random-bytes 'over-the-cap 'n (greatest-fixnum))
   (lambda () (random-bytes (greatest-fixnum))))
 
