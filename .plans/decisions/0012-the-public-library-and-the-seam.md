@@ -6,6 +6,8 @@
   ([amendment](#amendment-2026-11-23-memory-imported-once)).
   Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
   review ([amendment](#amendment-2026-11-23-m2s-plan)).
+  Amended 2026-11-24 in M3's plan, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-24-m3s-plan)).
 - **Date:** 2026-11-23
 - **Scope:** the public library, and what `make check-seam` holds under `src/`
 - **Settles:** the M1 plan §4.2, items 1 and 7
@@ -100,6 +102,39 @@ and §4.2, item 2, with the owner's answers of 2026-11-23.
 - **M2's exports:** the three verbs, and `sodium-failed?`, `sodium-failed-function` and
   `sodium-failed-code`, which decision 2 put in M3; their first raise is M2's ([ADR-0006],
   amended).
+
+## Amendment, 2026-11-24: M3's plan
+
+Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-plan.md), §4.1, items
+2 and 11, and §4.2, item 5.
+
+- **`(chez-sodium private password-verbs)` holds the three verbs and `make-password-limits`,**
+  beside native, as `byte-verbs` does.
+  - It imports `require-threaded` first, then `(rnrs)`, native, conditions, cap and
+    password-text, and nothing from `(chezscheme)`.
+  - A row holds the import clause whole.
+- **`(chez-sodium private password-text)` is pure:** `utf8-length`, `readable-hash-string?` and
+  `current-hash-shape?`. It imports `require-threaded`, `(rnrs)` and cap alone, and loads no
+  libsodium.
+  - `test-never-loads`' loaders row holds that: it gains `password-verbs` alone, and a
+    `password-text` that imported native would join it (M3S0-F2).
+- **No Scheme copy of a secret, read as data.** A row reads `password-text.sls` and
+  `password-verbs.sls` and refuses `string->utf8`, `utf8->string`, `string->list`,
+  `list->string`, `substring`, `string-copy`, `string->bytevector` and `bytevector-copy`, and
+  `string-append` but inside a top-level `-message` definition of no parameters. The value rows
+  cannot see a copy: `string->utf8`'s length is the right count (M3S0-F6).
+- **Native gains the writers, `call-with-c-string` and `call-with-utf8`, and
+  `foreign-ascii-string`.** Only native reads and writes foreign memory (rule (f)), and every
+  block is made by `call-with-block` (decision 7).
+- **M3's exports:** `password-hash`, `password-verify`, `password-needs-rehash?` and
+  `make-password-limits`.
+- **Decision 2's "never a `&` name or a constructor" means a condition's.**
+  - The rule keeps a caller from building or extending our conditions.
+  - `make-password-limits` builds limits, not a condition.
+  - Its record type is opaque and sealed. Neither the type, nor a predicate, nor an accessor is
+    exported, so the constructor is the only way to make a `Password-limits`.
+
+  The owner chose this on 2026-11-24.
 
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0006]: 0006-errors-and-no-secret-shown.md

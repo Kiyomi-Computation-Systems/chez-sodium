@@ -1,0 +1,122 @@
+################ ../../slice5/prefix-1.0.18/lib/libsodium.so.23
+library ../../slice5/prefix-1.0.18/lib/libsodium.so.23, version 1.0.18
+crypto_pwhash_strbytes 128
+crypto_pwhash_passwd_min 0
+crypto_pwhash_passwd_max 4294967295
+crypto_pwhash_opslimit_min 1
+crypto_pwhash_opslimit_max 4294967295
+crypto_pwhash_opslimit_interactive 2
+crypto_pwhash_opslimit_moderate 3
+crypto_pwhash_opslimit_sensitive 4
+crypto_pwhash_memlimit_min 8192
+crypto_pwhash_memlimit_max 4398046510080
+crypto_pwhash_memlimit_interactive 67108864
+crypto_pwhash_memlimit_moderate 268435456
+crypto_pwhash_memlimit_sensitive 1073741824
+crypto_pwhash_strprefix "$argon2id$"
+crypto_pwhash_memlimit_min: multiple of 1024 #t, /1024 = 8
+crypto_pwhash_memlimit_max: multiple of 1024 #t, /1024 = 4294967295
+crypto_pwhash_memlimit_interactive: multiple of 1024 #t, /1024 = 65536
+crypto_pwhash_memlimit_moderate: multiple of 1024 #t, /1024 = 262144
+crypto_pwhash_memlimit_sensitive: multiple of 1024 #t, /1024 = 1048576
+opslimit_max fits unsigned 32: #t
+memlimit_max/1024 fits unsigned 32: #t (4294967295, 2^32-1 = 4294967295)
+################ ../../slice5/prefix-1.0.22/lib/libsodium.so.26
+library ../../slice5/prefix-1.0.22/lib/libsodium.so.26, version 1.0.22
+crypto_pwhash_strbytes 128
+crypto_pwhash_passwd_min 0
+crypto_pwhash_passwd_max 4294967295
+crypto_pwhash_opslimit_min 1
+crypto_pwhash_opslimit_max 4294967295
+crypto_pwhash_opslimit_interactive 2
+crypto_pwhash_opslimit_moderate 3
+crypto_pwhash_opslimit_sensitive 4
+crypto_pwhash_memlimit_min 8192
+crypto_pwhash_memlimit_max 4398046510080
+crypto_pwhash_memlimit_interactive 67108864
+crypto_pwhash_memlimit_moderate 268435456
+crypto_pwhash_memlimit_sensitive 1073741824
+crypto_pwhash_strprefix "$argon2id$"
+crypto_pwhash_memlimit_min: multiple of 1024 #t, /1024 = 8
+crypto_pwhash_memlimit_max: multiple of 1024 #t, /1024 = 4294967295
+crypto_pwhash_memlimit_interactive: multiple of 1024 #t, /1024 = 65536
+crypto_pwhash_memlimit_moderate: multiple of 1024 #t, /1024 = 262144
+crypto_pwhash_memlimit_sensitive: multiple of 1024 #t, /1024 = 1048576
+opslimit_max fits unsigned 32: #t
+memlimit_max/1024 fits unsigned 32: #t (4294967295, 2^32-1 = 4294967295)
+################ <profile>/lib/libsodium.so.26
+library <profile>/lib/libsodium.so.26, version 1.0.22
+crypto_pwhash_strbytes 128
+crypto_pwhash_passwd_min 0
+crypto_pwhash_passwd_max 4294967295
+crypto_pwhash_opslimit_min 1
+crypto_pwhash_opslimit_max 4294967295
+crypto_pwhash_opslimit_interactive 2
+crypto_pwhash_opslimit_moderate 3
+crypto_pwhash_opslimit_sensitive 4
+crypto_pwhash_memlimit_min 8192
+crypto_pwhash_memlimit_max 4398046510080
+crypto_pwhash_memlimit_interactive 67108864
+crypto_pwhash_memlimit_moderate 268435456
+crypto_pwhash_memlimit_sensitive 1073741824
+crypto_pwhash_strprefix "$argon2id$"
+crypto_pwhash_memlimit_min: multiple of 1024 #t, /1024 = 8
+crypto_pwhash_memlimit_max: multiple of 1024 #t, /1024 = 4294967295
+crypto_pwhash_memlimit_interactive: multiple of 1024 #t, /1024 = 65536
+crypto_pwhash_memlimit_moderate: multiple of 1024 #t, /1024 = 262144
+crypto_pwhash_memlimit_sensitive: multiple of 1024 #t, /1024 = 1048576
+opslimit_max fits unsigned 32: #t
+memlimit_max/1024 fits unsigned 32: #t (4294967295, 2^32-1 = 4294967295)
+################ ../../m1-plan/host-1.0.18/libsodium.so.23
+library ../../m1-plan/host-1.0.18/libsodium.so.23, version 1.0.18
+crypto_pwhash_strbytes 128
+crypto_pwhash_passwd_min 0
+crypto_pwhash_passwd_max 4294967295
+crypto_pwhash_opslimit_min 1
+crypto_pwhash_opslimit_max 4294967295
+crypto_pwhash_opslimit_interactive 2
+crypto_pwhash_opslimit_moderate 3
+crypto_pwhash_opslimit_sensitive 4
+crypto_pwhash_memlimit_min 8192
+crypto_pwhash_memlimit_max 4398046510080
+crypto_pwhash_memlimit_interactive 67108864
+crypto_pwhash_memlimit_moderate 268435456
+crypto_pwhash_memlimit_sensitive 1073741824
+crypto_pwhash_strprefix "$argon2id$"
+crypto_pwhash_memlimit_min: multiple of 1024 #t, /1024 = 8
+crypto_pwhash_memlimit_max: multiple of 1024 #t, /1024 = 4294967295
+crypto_pwhash_memlimit_interactive: multiple of 1024 #t, /1024 = 65536
+crypto_pwhash_memlimit_moderate: multiple of 1024 #t, /1024 = 262144
+crypto_pwhash_memlimit_sensitive: multiple of 1024 #t, /1024 = 1048576
+opslimit_max fits unsigned 32: #t
+memlimit_max/1024 fits unsigned 32: #t (4294967295, 2^32-1 = 4294967295)
+################ macros at 1.0.18
+STRBYTES                           macro 128            function 128            agree
+PASSWD_MIN                         macro 0              function 0              agree
+PASSWD_MAX                         macro 4294967295     function 4294967295     agree
+OPSLIMIT_MIN                       macro 1              function 1              agree
+OPSLIMIT_MAX                       macro 4294967295     function 4294967295     agree
+OPSLIMIT_INTERACTIVE               macro 2              function 2              agree
+OPSLIMIT_MODERATE                  macro 3              function 3              agree
+OPSLIMIT_SENSITIVE                 macro 4              function 4              agree
+MEMLIMIT_MIN                       macro 8192           function 8192           agree
+MEMLIMIT_MAX                       macro 4398046510080  function 4398046510080  agree
+MEMLIMIT_INTERACTIVE               macro 67108864       function 67108864       agree
+MEMLIMIT_MODERATE                  macro 268435456      function 268435456      agree
+MEMLIMIT_SENSITIVE                 macro 1073741824     function 1073741824     agree
+STRPREFIX macro $argon2id$, function $argon2id$, agree
+################ macros at 1.0.22
+STRBYTES                           macro 128            function 128            agree
+PASSWD_MIN                         macro 0              function 0              agree
+PASSWD_MAX                         macro 4294967295     function 4294967295     agree
+OPSLIMIT_MIN                       macro 1              function 1              agree
+OPSLIMIT_MAX                       macro 4294967295     function 4294967295     agree
+OPSLIMIT_INTERACTIVE               macro 2              function 2              agree
+OPSLIMIT_MODERATE                  macro 3              function 3              agree
+OPSLIMIT_SENSITIVE                 macro 4              function 4              agree
+MEMLIMIT_MIN                       macro 8192           function 8192           agree
+MEMLIMIT_MAX                       macro 4398046510080  function 4398046510080  agree
+MEMLIMIT_INTERACTIVE               macro 67108864       function 67108864       agree
+MEMLIMIT_MODERATE                  macro 268435456      function 268435456      agree
+MEMLIMIT_SENSITIVE                 macro 1073741824     function 1073741824     agree
+STRPREFIX macro $argon2id$, function $argon2id$, agree

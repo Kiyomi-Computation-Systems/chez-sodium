@@ -6,6 +6,8 @@
   ([amendment](#amendment-2026-11-23-the-allow-lists)).
   Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
   review ([amendment](#amendment-2026-11-23-m2s-plan)).
+  Amended 2026-11-24 in M3's plan, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-24-m3s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** chez-sodium: every binding to libsodium
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §2, §3.4, §6.1 and §6.4
@@ -131,8 +133,57 @@ and 8. Item 7 was put to the owner beside the verbs' home, and confirmed with th
 - **The allow-lists grow as the earlier amendment says:** `unsigned-64` joins the arguments with
   `crypto_generichash`'s `inlen`, and `size_t` the results with the first size function.
 
+## Amendment, 2026-11-24: M3's plan
+
+Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-plan.md), §4.1, items
+1 and 6, and §4.2, item 1.
+
+- **M3's constants are read once, at the load.** Step 7 calls each of the fourteen constant
+  functions once, after the five sizes, and records its answer ([ADR-0002], amended):
+  `crypto_pwhash_strbytes`, `_strprefix`, the five opslimits, the five memlimits, `_passwd_min`
+  and `_passwd_max`. The verbs and `make-password-limits` check against the recorded numbers,
+  in Scheme, before any section. The prefix is read with `c-string->string`, and a NULL one is
+  recorded as `#f` ([ADR-0009], amended).
+- **The check, by behaviour.** The decoy's `pwhash-limits-other` answers values no release has,
+  each bound inside the real one:
+  - `strbytes` 160;
+  - ops 2 to 9, presets 5, 6 and 7;
+  - memory 16 to 1024 KiB, presets 24, 32 and 40 KiB;
+  - passwords 1 to 100 bytes;
+  - the prefix `"$argon2i$"`.
+
+  Through it, each bound is refused one past its edge and accepted at it, and each preset hashes
+  at the decoy's numbers. `strbytes` is the out block's size, seen in the wipe's
+  `sodium_memzero(p,160)` line, and in the decoy's 140-character hash string, which a reader
+  bounded by 128 cannot finish. A constant written in Scheme, in place of the read one or beside
+  it, fails one of these.
+- **Twins of equal value need the decoy.** `opslimit_max` and `passwd_max` both answer
+  4294967295 at every release, and their macros are both `4294967295U`. Against a real library,
+  native reading one into the other's key passes, and so does the oracle printing one under the
+  other's name. So, as M2 did for its sizes, a gated oracle child and `refusal-probe --constants`
+  each print the fourteen under `pwhash-limits-other`, asserted whole (slice 0's review,
+  M3S0-F7). A macro swapped with its twin cannot be held by any value.
+- **The constants are held to the library on every lane.** The oracle prints each function's
+  answer and its header macro, and `test-native` holds native's numbers to both (row 22).
+  - Measured at 1.0.18 and 1.0.22 on four libraries: each equals its macro, and every memory
+    constant is a whole number of KiB ([research/m3-plan/](../research/m3-plan/README.md)).
+- **`_passwd_min` and `_passwd_max` are bound and checked,** as brief §3.1 lists them. The owner
+  chose this on 2026-11-24. At every release measured they are 0 and 4294967295, so today the
+  cap is the bound that binds. The check matters if a release raises the minimum: an empty
+  password would otherwise reach `crypto_pwhash_str` and come back as a memory failure.
+- **The convention table's `CONVENTION` column, empty for every earlier row, names it.**
+  - `crypto_pwhash_str` and `crypto_pwhash_str_verify` are the first two `__collect_safe`
+    bindings. A binding whose convention differs from its row fails by name, and row 19 holds
+    them by behaviour.
+  - The allow-lists gain no type.
+  - Chez accepts a `u8*` argument under `__collect_safe` without a word, and refuses only
+    `string` and `utf-8` (measured), so the allow-lists, not Chez, keep `u8*` out.
+- **Every pointer of the three password calls is `nonnull`,** at both releases, so the compile
+  holds decision 5 for each of them.
+
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md
 [ADR-0007]: 0007-one-critical-section-per-verb.md
 [ADR-0008]: 0008-every-block-wiped-before-free.md
+[ADR-0009]: 0009-what-needs-rehash-means.md
 [ADR-0011]: 0011-the-harness-after-chez-sqlite3.md

@@ -39,12 +39,16 @@ record it comes from, and where a rule and its record disagree, the record wins.
   exported procedure has a Typed Racket style signature comment, and `docs/reference.md` is held
   to them by a test ([ADR-0005]).
 - **`(chez-sodium)` defines nothing:** it re-exports its private libraries' names, each `eq?` to
-  its definition. It exports predicates and accessors, never a `&` name or a constructor
-  ([ADR-0012]).
+  its definition. It exports predicates and accessors, never a condition's `&` name or
+  constructor ([ADR-0012]). `make-password-limits` is exported; its record is opaque and sealed,
+  and its type, predicate and accessors are not ([ADR-0012], amended).
 - **The verbs live beside native,** which keeps the load, the raw bindings and the helpers:
-  `(chez-sodium private byte-verbs)` holds M2's three. It imports `require-threaded` first and
-  nothing from `(chezscheme)`, and holds its checks before its one `call-in-section`; rows read
-  both as data ([ADR-0012], amended).
+  `(chez-sodium private byte-verbs)` holds M2's three, and `(chez-sodium private password-verbs)`
+  M3's three and `make-password-limits`. Each imports `require-threaded` first and nothing from
+  `(chezscheme)`, and holds its checks before its one `call-in-section`; rows read both as data
+  ([ADR-0012], amended).
+- **`(chez-sodium private password-text)` is pure:** the UTF-8 count, the hash string's
+  pre-check and needs-rehash's shape check. It loads no libsodium ([ADR-0012], amended).
 - **`check-seam` reads `src/` alone,** with chez-sqlite3's rules (c) to (i) and (k), and rule
   (m): only `native` imports `(chez-sodium private memory)`, and no library exports a name it
   imports from `memory` ([ADR-0012]).
@@ -57,8 +61,9 @@ record it comes from, and where a rule and its record disagree, the record wins.
 
 - **No C shim; nothing is compiled at install.** Every binding is a `foreign-procedure` in a
   `(chez-sodium private …)` library, and every constant is read through libsodium's own function
-  for it. `crypto_generichash`'s five sizes are read once, at the load, and the decoy's
-  `sizes-other` holds that by behaviour ([ADR-0001], amended).
+  for it. `crypto_generichash`'s five sizes and M3's fourteen password constants are read once,
+  at the load, and the decoy's `sizes-other` and `pwhash-limits-other` hold that by behaviour
+  ([ADR-0001], amended).
 - **A binding uses the type C names:** `size_t` for `size_t`, as argument and result;
   `unsigned-64` for `unsigned long long`; `uptr` for every pointer. An opslimit is read as
   `size_t` and passed as `unsigned-64` ([ADR-0001]).
@@ -71,7 +76,9 @@ record it comes from, and where a rule and its record disagree, the record wins.
   range; `size_t` and `unsigned-64` run from 0 to 2⁶⁴−1; a length is never longer than its block
   ([ADR-0001]).
 - **`crypto_pwhash_str` and `crypto_pwhash_str_verify` are `__collect_safe`.** Every other call is
-  plain, bounded by the cap ([ADR-0001], [ADR-0007]).
+  plain, bounded by the cap ([ADR-0001], [ADR-0007]). The convention table names each binding's
+  convention, and row 19 holds the two by behaviour, from inside the verb's section
+  ([ADR-0001], [ADR-0011], amended).
 - **No `lock-object` for data** ([ADR-0001]).
 - **One library holds `foreign-procedure`, and one holds `foreign-alloc`** ([ADR-0001]).
 - **Every binding has a row in the convention table,** which `test-conventions` holds every
@@ -90,8 +97,8 @@ record it comes from, and where a rule and its record disagree, the record wins.
   `libsodium.so.26`, then `libsodium.so.23`; never the bare `libsodium.so`. Discovery is a pure
   function of its inputs ([ADR-0002]).
 - **One load, in order, never fall through:** choose, load, bind the version entries, check the
-  floor, call `sodium_init`, bind the rest, read the sizes ([ADR-0002], amended). No entry point
-  is optional. The load runs once, and a failure is remembered and raised again ([ADR-0002]).
+  floor, call `sodium_init`, bind the rest, read the sizes and the constants ([ADR-0002],
+  amended). No entry point is optional. The load runs once, and a failure is remembered and raised again ([ADR-0002]).
 - **`sodium_init` answering 0 or 1 loads,** and the load records the answer. Any other answer is
   `init-failed`, its detail the answer ([ADR-0002]).
 - **Each milestone binds its own verbs' entry points** in step 6, "bind the rest", each with its
@@ -106,9 +113,9 @@ record it comes from, and where a rule and its record disagree, the record wins.
 ## Conditions and secrets
 
 - **Every library condition is a `&chez-sodium-error`:** `&sodium-library-unavailable`, or
-  `&sodium-failed`, whose two cases are `crypto_pwhash_str` answering -1 for limits that passed
-  their range check, and `crypto_generichash` answering anything but 0 for a size and key that
-  passed theirs.
+  `&sodium-failed`, raised when `crypto_pwhash_str` or `crypto_generichash` answers anything but
+  0 for limits, sizes and a key that passed their checks, and when `crypto_pwhash_str` answers 0
+  but leaves no readable string, with code 0.
   `&sodium-failed`'s fields are `function` and `code` ([ADR-0006], amended).
 - **Every raise carries `&who`:** `chez-sodium` for the load's refusals, the public verb for a
   refusal raised through the public surface, the given WHO for a helper's, and its own name for
@@ -118,8 +125,13 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **A caller's mistake is an assertion violation, raised before C:** a wrong type; a size, key
   length or limit out of range; an input over the cap, other than a hash string; an empty key
   ([ADR-0006]).
-- **`password-verify` answers `#f` for libsodium's -1,** whatever caused it, and raises no
-  condition for it ([ADR-0006]).
+- **`password-verify` answers `#f` for libsodium's -1,** whatever caused it, short memory
+  included, and raises no condition for it. The owner confirmed it on 2026-11-24, when Techo
+  asked ([ADR-0006], amended).
+- **A password or hash another thread changed during the call is refused after the section,**
+  `changed-during-call`, by `password-hash` and `password-verify`. `password-needs-rehash?`
+  answers `#t` for a hash changed during its call, since it never raises because of the hash
+  ([ADR-0006], [ADR-0009], amended).
 - **No secret reaches a condition.** A refusal of a secret parameter names the parameter and its
   kind only, whatever the value's type: irritants `(RULE PARAMETER (kind K))`, through
   `refuse-secret`, in every helper too. Every string and bytevector parameter is secret: a
@@ -154,8 +166,9 @@ record it comes from, and where a rule and its record disagree, the record wins.
   ([ADR-0007]).
 - **`call-in-section` is the one section:** THUNK in one `critical-section`, a raise inside
   caught there and raised again once it ends. A path that makes no block and calls no C holds
-  none: `sodium-version`, `random-bytes 0`, and the compare of operands of different lengths
-  ([ADR-0007], amended).
+  none: `sodium-version`, `random-bytes 0`, the compare of operands of different lengths, and
+  the password verbs' answers without C, for a hash that fails the pre-check or needs-rehash's
+  shape check ([ADR-0007], amended).
 - **Native's load runs in one critical section,** which answers data, and a refusal is raised
   after it ([ADR-0007]).
 - **Every engine row references the library once before its first engine.** A library first
@@ -179,7 +192,8 @@ record it comes from, and where a rule and its record disagree, the record wins.
   callback, never as a `foreign-set!` loop ([ADR-0008]).
 - **No Scheme copy of a secret.** A password's UTF-8 is written straight into its block, and a
   caller's bytevector is copied straight into its block, with no `bytevector-copy`
-  ([ADR-0008]).
+  ([ADR-0008]). A row reads `password-text.sls` and `password-verbs.sls` as data and refuses
+  each procedure that copies a string ([ADR-0012], amended).
 - **A password is hashed as its UTF-8 bytes, exactly as given.** The binding never normalises
   it ([ADR-0008]).
 - **The documents say what wiping cannot reach:** the caller's copies, the bytevectors a verb
@@ -192,7 +206,16 @@ record it comes from, and where a rule and its record disagree, the record wins.
   not the loaded library's `crypto_pwhash_strprefix()`; or its parameters do not read `p=1`. It
   answers `#f` only otherwise, and never raises because of the hash ([ADR-0009]).
 - **Custom limits are made by `make-password-limits`, with memory in KiB,** each range checked
-  before C. The default is `'interactive` ([ADR-0009]).
+  when it is called, so a `Password-limits` is always in range. The default is `'interactive`
+  ([ADR-0009], amended).
+- **A password's UTF-8 length runs from 0 to the cap, then from `_passwd_min` to `_passwd_max`,**
+  counted from its characters before the section. In the section it is written straight into
+  its block, each character's bytes only if they fit; a string whose width changed is answered
+  as data ([ADR-0007], amended).
+- **needs-rehash's item 4 is exact:** the loaded prefix, then `v=` digits, `$m=` digits, `,t=`
+  digits, `,p=1$`, and more. Anything else, a NULL prefix included, is `#t`. The pre-check and
+  this check run before any section, and only a hash that passes both reaches libsodium
+  ([ADR-0009], amended).
 - **A hash string is checked before C:** printable ASCII, U+0021 to U+007E, with no U+0000,
   within the cap, and no limit tied to `crypto_pwhash_strbytes()`. One that fails gets `#f` from
   `password-verify` and `#t` from `password-needs-rehash?`, without reaching C. Its block ends in
@@ -239,7 +262,10 @@ record it comes from, and where a rule and its record disagree, the record wins.
   child that runs only Scheme is outside the rule. There are two exceptions: the wipe row's
   children, since Valgrind's allocator bypasses their `free()` interposer ([ADR-0011], [ADR-0008];
   chez-sqlite3 ADR-0005, amended); and `test-constants`' prototype check, a C program that calls
-  no libsodium function ([ADR-0011], amended). Any other C program a suite runs is gated.
+  no libsodium function ([ADR-0011], amended). Any other C program a suite runs is gated. Row
+  19's FIFO writer and watchdog are shells, which run no Scheme and no libsodium. Row 19 waits
+  for the decoy's marker before its rendezvous, or a plain binding passes ([ADR-0011],
+  amended).
 - **The C oracle is a program named `libsodium-oracle`.** The gate's rule for child logs names
   it ([ADR-0011]).
 - **Each wipe row's child sets `LD_PRELOAD` to the interposer alone,** never appended: under the
@@ -249,6 +275,9 @@ record it comes from, and where a rule and its record disagree, the record wins.
   `test-decoy-source` holds it for every pointer parameter of every function `sodium.h` declares
   that a `tests/*.c` defines, since a compile holds it only for a `nonnull` one. The decoy's log
   ends in `overflow` when full ([ADR-0011], amended).
+- **A decoy spells each array parameter as its header does:** `crypto_pwhash_str`'s `out` as an
+  array, and `str` as an array at 1.0.18 and a pointer at 1.0.22, by
+  `SODIUM_LIBRARY_VERSION_MAJOR` ([ADR-0011], amended).
 - **Row 24 reaches a verb's blocks through the decoy,** whose entries name each block to the
   wipe child's interposer through a weak `watch_set`; the child asserts each call's whole list
   of blocks ([ADR-0011], amended).

@@ -1,0 +1,7 @@
+mode operation runs median_us_per_call min max
+plain utf8-ascii-65536-chars 7 1978.3 1949.545 2069.645
+plain utf8-euro-21845-chars 7 1970.007 1916.914 2181.807
+plain foreign-set!-loop-in 7 1755.818 1754.355 1809.492
+valgrind utf8-ascii-65536-chars 7 54584.094 54273.702 55164.642
+valgrind utf8-euro-21845-chars 7 52197.669 51383.071 53031.445
+valgrind foreign-set!-loop-in 7 48197.393 47006.033 48934.121

@@ -4,6 +4,8 @@
   M1's plan, and accepted by the owner that day ([amendment](#amendment-2026-11-23-m1s-plan)).
   Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
   review ([amendment](#amendment-2026-11-23-m2s-plan)).
+  Amended 2026-11-24 in M3's plan, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-24-m3s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** chez-sodium, on Linux distributions and Guix environments
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §7.2's discovery and load,
@@ -115,6 +117,26 @@ and 7. Item 7 was put to the owner beside the verbs' home, and confirmed with th
 - **"The last step" now reads "step 6".** Decision 4 and the first amendment say each milestone
   binds its entry points in the last step, which was step 6 until this one. M3 binds its own in
   step 6 too.
+
+## Amendment, 2026-11-24: M3's plan
+
+Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-plan.md), §4.1, items
+1 and 6.
+
+- **M3 binds seventeen entry points,** appended to step 6 after `sodium_memcmp`, in this order:
+  - the calls: `crypto_pwhash_str`, `crypto_pwhash_str_verify` and
+    `crypto_pwhash_str_needs_rehash`;
+  - then `crypto_pwhash_strbytes` and `crypto_pwhash_strprefix`;
+  - then `crypto_pwhash_opslimit_min`, `_max`, `_interactive`, `_moderate` and `_sensitive`;
+  - then `crypto_pwhash_memlimit_` likewise;
+  - then `crypto_pwhash_passwd_min` and `_passwd_max`.
+
+  The first two are `__collect_safe` ([ADR-0001], amended). Each comes with its convention row,
+  its decoy entry, its `missing-api` row and row 22.
+- **Step 7 reads the fourteen constants after the five sizes,** in that order, each once
+  ([ADR-0001], amended). The steps keep their order: choose; load; bind the version entries;
+  check the floor; call `sodium_init`; bind the rest; read the sizes and the constants. The
+  decoy's log shows the nineteen reads last.
 
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md

@@ -8,6 +8,8 @@
   review ([amendment](#amendment-2026-11-23-m2s-plan)).
   Amended 2026-11-24 after the second review of M2's closing fixes, the design the owner's
   choice that day ([amendment](#amendment-2026-11-24-a-secrets-refusal-states-its-bound-as-numbers)).
+  Amended 2026-11-24 in M3's plan, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-24-m3s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** every condition chez-sodium raises, and every refusal of a caller's mistake
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §5
@@ -168,6 +170,59 @@ review of its fixes, M2C-F1 ([research](../research/m2-closing-fix-review/README
   length with other bytes, and one of another length under the same rule. The three prints are
   the same, so no spelling of the secret's text, bytes or length can reach them. It also finds
   none of the first secret's text, its bytes as written, or its length.
+
+## Amendment, 2026-11-24: M3's plan
+
+Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-plan.md), §4.1, items
+3 and 9, and §4.2, items 3,
+4 and 6.
+
+- **`&sodium-failed` for `crypto_pwhash_str`: any answer but 0,** for limits that passed their
+  checks, as `crypto_generichash`'s case reads.
+  - Decision 3 said "-1". The owner chose "anything but 0" on 2026-11-24.
+  - The function is `"crypto_pwhash_str"`, the code its answer, and the `&who` `password-hash`.
+    It is raised after the section.
+  - After a -1, every byte of `out` is zero, so there is no hash to answer (measured).
+  - The decoy answers -1 and 1.
+- **A second case for `crypto_pwhash_str`: an answer of 0 with no readable string,** with code
+  0. `foreign-ascii-string` finds no 0 within `strbytes`, or a byte of 0x80 or more. No release
+  does this; the decoy's `pwhash-str-unreadable` reaches it. `raise-sodium-failed`'s fixed
+  message becomes "libsodium gave no result for a call that passed its checks", true of both.
+- **Decision 4 stands: `password-verify` answers `#f` for libsodium's -1, short memory
+  included.**
+  - **Techo's question.** On 2026-11-24 Techo asked whether short memory could be told apart:
+    a `#f` counts as a failed login, and five lock the account.
+  - **At the floor it cannot be told apart.** At 1.0.18, `argon2_verify` turns any failure of
+    the hash into a mismatch (`argon2.c`, line 258), so errno reads `EINVAL` either way.
+  - **At 1.0.22 it keeps the allocation error** (line 272), and errno reads `ENOMEM`. Reading it
+    would need a binding of libc's errno, read after a collect-safe call, and it would not cover
+    the floor.
+  - **Verifying without the `_str` call** needs a second argon2 parser, which must accept
+    whatever libsodium's accepts.
+  - The owner chose no change on 2026-11-24 ([research/m3-plan/](../research/m3-plan/README.md), set A, item 6).
+  - The documents say so, and give a caller's fallback: after a `#f`, hash a throwaway string at
+    the same limits, and read a `&sodium-failed` there as short memory. It has two limits, which
+    the documents state:
+    - it sees only a failure libsodium is told of, under `ulimit` or with no overcommit. In a
+      container with a memory limit the process is killed instead (decision 4);
+    - it fits only hashes made at the caller's current limits.
+- **The rule symbols M3 adds:**
+  - `not-a-string`, for `password` and `hash`;
+  - `length-out-of-range`, for `password`, against `_passwd_min` and `_passwd_max`;
+  - `not-password-limits`, for `limits`;
+  - `ops-out-of-range` and `memory-out-of-range`, for `make-password-limits`' `ops` and
+    `memory-kib`;
+  - `changed-during-call`, for a `password` or `hash` another thread changed during the call.
+
+  M2's `not-a-natural` and `over-the-cap` serve M3 too. A password or a hash is shown as
+  `(RULE PARAMETER (kind K))`. Ops, memory and a limits value are shown by `shown-value`, which
+  shows a string by its kind.
+- **`changed-during-call` is raised after the section,** by `password-hash` and
+  `password-verify`. The writers stop before any write past their block, and answer the change
+  as data. `password-verify` raises it rather than answering `#f`, which would read as a wrong
+  password. `password-needs-rehash?` never raises because of the hash ([ADR-0009], decision 3),
+  so it answers `#t` for a hash changed during its call (slice 0's review, M3S0-F5).
+- **A hash string that fails the pre-check is answered, not refused** ([ADR-0009]).
 
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md
 [ADR-0007]: 0007-one-critical-section-per-verb.md

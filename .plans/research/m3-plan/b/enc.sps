@@ -1,0 +1,122 @@
+#!r6rs
+;; Item 2: a string's UTF-8 written into a foreign block, character by character.
+(import (chezscheme))
+
+;; utf8-length : String -> Natural
+(define (utf8-length s)
+  (let loop ((i 0) (n 0))
+    (if (= i (string-length s)) n
+        (let ((c (char->integer (string-ref s i))))
+          (loop (+ i 1) (+ n (cond ((< c #x80) 1) ((< c #x800) 2) ((< c #x10000) 3) (else 4))))))))
+
+;; write-utf8! : String Uptr Natural -> (U Natural 'overrun 'short)
+;; Bound checked before each character's bytes. Answers the byte count written.
+(define (write-utf8! s block size)
+  (let ((len (string-length s)))
+    (let loop ((i 0) (p 0))
+      (if (= i len)
+          (if (= p size) p 'short)
+          (let* ((c (char->integer (string-ref s i)))
+                 (w (cond ((< c #x80) 1) ((< c #x800) 2) ((< c #x10000) 3) (else 4))))
+            (if (> (+ p w) size) 'overrun
+                (begin
+                  (case w
+                    ((1) (foreign-set! 'unsigned-8 block p c))
+                    ((2) (foreign-set! 'unsigned-8 block p (+ #xC0 (bitwise-arithmetic-shift-right c 6)))
+                         (foreign-set! 'unsigned-8 block (+ p 1) (+ #x80 (bitwise-and c #x3F))))
+                    ((3) (foreign-set! 'unsigned-8 block p (+ #xE0 (bitwise-arithmetic-shift-right c 12)))
+                         (foreign-set! 'unsigned-8 block (+ p 1) (+ #x80 (bitwise-and (bitwise-arithmetic-shift-right c 6) #x3F)))
+                         (foreign-set! 'unsigned-8 block (+ p 2) (+ #x80 (bitwise-and c #x3F))))
+                    (else (foreign-set! 'unsigned-8 block p (+ #xF0 (bitwise-arithmetic-shift-right c 18)))
+                          (foreign-set! 'unsigned-8 block (+ p 1) (+ #x80 (bitwise-and (bitwise-arithmetic-shift-right c 12) #x3F)))
+                          (foreign-set! 'unsigned-8 block (+ p 2) (+ #x80 (bitwise-and (bitwise-arithmetic-shift-right c 6) #x3F)))
+                          (foreign-set! 'unsigned-8 block (+ p 3) (+ #x80 (bitwise-and c #x3F)))))
+                  (loop (+ i 1) (+ p w)))))))))
+
+;; unchecked-write-utf8! : String Uptr -> Natural   (no bound: answers bytes written)
+(define (unchecked-write-utf8! s block)
+  (let loop ((i 0) (p 0))
+    (if (= i (string-length s)) p
+        (let* ((c (char->integer (string-ref s i))))
+          (cond ((< c #x80) (foreign-set! 'unsigned-8 block p c) (loop (+ i 1) (+ p 1)))
+                ((< c #x800)
+                 (foreign-set! 'unsigned-8 block p (+ #xC0 (bitwise-arithmetic-shift-right c 6)))
+                 (foreign-set! 'unsigned-8 block (+ p 1) (+ #x80 (bitwise-and c #x3F))) (loop (+ i 1) (+ p 2)))
+                ((< c #x10000)
+                 (foreign-set! 'unsigned-8 block p (+ #xE0 (bitwise-arithmetic-shift-right c 12)))
+                 (foreign-set! 'unsigned-8 block (+ p 1) (+ #x80 (bitwise-and (bitwise-arithmetic-shift-right c 6) #x3F)))
+                 (foreign-set! 'unsigned-8 block (+ p 2) (+ #x80 (bitwise-and c #x3F))) (loop (+ i 1) (+ p 3)))
+                (else
+                 (foreign-set! 'unsigned-8 block p (+ #xF0 (bitwise-arithmetic-shift-right c 18)))
+                 (foreign-set! 'unsigned-8 block (+ p 1) (+ #x80 (bitwise-and (bitwise-arithmetic-shift-right c 12) #x3F)))
+                 (foreign-set! 'unsigned-8 block (+ p 2) (+ #x80 (bitwise-and (bitwise-arithmetic-shift-right c 6) #x3F)))
+                 (foreign-set! 'unsigned-8 block (+ p 3) (+ #x80 (bitwise-and c #x3F))) (loop (+ i 1) (+ p 4))))))))
+
+(define (read-block block n)
+  (let ((bv (make-bytevector n)))
+    (do ((i 0 (+ i 1))) ((= i n) bv) (bytevector-u8-set! bv i (foreign-ref 'unsigned-8 block i)))))
+
+;; check : String String -> Void
+(define (check label s)
+  (let* ((n (utf8-length s)) (b (foreign-alloc (max n 1))) (r (write-utf8! s b n)))
+    (printf "~a: len ~a count ~a write ~a match ~a\n" label (string-length s) n r
+            (and (eqv? r n) (equal? (read-block b n) (string->utf8 s))))
+    (foreign-free b)))
+
+(define (main-check)
+  (printf "-- 2a\n")
+  (printf "integer->char #xD800: ~a\n" (guard (e (#t (condition-message e))) (integer->char #xD800)))
+  (printf "integer->char #xDFFF: ~a\n" (guard (e (#t (condition-message e))) (integer->char #xDFFF)))
+  (printf "integer->char #x110000: ~a\n" (guard (e (#t (condition-message e))) (integer->char #x110000)))
+  (printf "integer->char #xD7FF -> ~s, #xE000 -> ~s\n" (char->integer (integer->char #xD7FF)) (char->integer (integer->char #xE000)))
+  (printf "all scalar chars (0..#x10FFFF minus surrogates) round-trip: ~a\n"
+          (let loop ((i 0))
+            (cond ((> i #x10FFFF) #t)
+                  ((<= #xD800 i #xDFFF) (loop (+ i 1)))
+                  ((= (char->integer (integer->char i)) i) (loop (+ i 1)))
+                  (else i))))
+  (printf "string-set! with surrogate integer: ~a\n"
+          (guard (e (#t (condition-message e))) (let ((s (make-string 1 #\a))) (string-set! s 0 (integer->char #xD800)) s)))
+  (printf "utf16->string/ string from bytevector with lone surrogate bytes (CESU) -> ~a\n"
+          (guard (e (#t (condition-message e))) (string->list (utf8->string (bytevector #xED #xA0 #x80)))))
+  (printf "(string-length (utf8->string #vu8(#xED #xA0 #x80))) chars: ~a\n"
+          (guard (e (#t 'raised)) (map char->integer (string->list (utf8->string (bytevector #xED #xA0 #x80))))))
+  (printf "(bytevector->string/ utf-16 lone surrogate): ~a\n"
+          (guard (e (#t (condition-message e))) (map char->integer (string->list (utf16->string (bytevector #x00 #xD8) 'little)))))
+  (printf "-- 2b\n")
+  (check "empty" "")
+  (check "a" "a")
+  (for-each (lambda (cp) (check (format "U+~a" (number->string cp 16)) (string (integer->char cp))))
+            '(0 #x7F #x80 #x7FF #x800 #xFFFF #x10000 #x10FFFF))
+  (check "pässwörd€" "pässwörd€")
+  (let* ((cps '(97 #xE4 #x20AC #x1F600)) (s (make-string 65536)))
+    (let loop ((i 0) (n 0))
+      (if (< i 65536) (let ((cp (list-ref cps (modulo (* i 7) 4))))
+                        (string-set! s i (integer->char cp)) (loop (+ i 1) (+ n 1)))))
+    (printf "64 KiB mixed string has ~a UTF-8 bytes\n" (utf8-length s))
+    (check "64k-chars mixed" s))
+  (let* ((cps '(97 #xE4 #x20AC #x1F600)) (s (make-string 26214)))
+    (do ((i 0 (+ i 1))) ((= i 26212)) (string-set! s i (integer->char (list-ref cps (modulo i 4)))))
+    (string-set! s 26212 #\x20AC) (string-set! s 26213 #\x20AC)
+    (printf "mixed string of ~a chars has ~a UTF-8 bytes\n" (string-length s) (utf8-length s))
+    (check "64 KiB-bytes mixed" s))
+  (printf "-- 2d\n")
+  (let* ((s (make-string 8 #\a)) (n (utf8-length s)) (b (foreign-alloc 64)))
+    (do ((i 0 (+ i 1))) ((= i 64)) (foreign-set! 'unsigned-8 b i #x5A))
+    (printf "counted ~a\n" n)
+    (string-set! s 3 (integer->char #x20AC))
+    (let ((w (unchecked-write-utf8! s b)))
+      (printf "unchecked writer wrote ~a bytes into a block of ~a: overrun by ~a\n" w n (- w n)))
+    (foreign-free b))
+  (let* ((s (make-string 8 #\a)) (n (utf8-length s)) (b (foreign-alloc n)))
+    (string-set! s 3 (integer->char #x20AC))
+    (printf "checked writer, ASCII->U+20AC after count: ~a\n" (write-utf8! s b n))
+    (foreign-free b))
+  (let* ((s (make-string 8 #\a)) (s2 (make-string 8 #\a)) (n (utf8-length (string-append s "€"))) (b (foreign-alloc n)))
+    (printf "checked writer, string 8 chars, block counted for 8 + 3 bytes: ~a\n" (write-utf8! s b n))
+    (foreign-free b))
+  (let* ((s (make-string 8 #\€)) (n (utf8-length s)) (b (foreign-alloc n)))
+    (string-set! s 3 #\a)
+    (printf "checked writer, U+20AC->ASCII after count (ends short): ~a\n" (write-utf8! s b n))
+    (foreign-free b)))
+(main-check)

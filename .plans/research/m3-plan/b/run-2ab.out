@@ -1,0 +1,32 @@
+-- 2a
+integer->char #xD800: ~s is not a valid unicode scalar value
+integer->char #xDFFF: ~s is not a valid unicode scalar value
+integer->char #x110000: ~s is not a valid unicode scalar value
+integer->char #xD7FF -> 55295, #xE000 -> 57344
+all scalar chars (0..#x10FFFF minus surrogates) round-trip: #t
+string-set! with surrogate integer: ~s is not a valid unicode scalar value
+utf16->string/ string from bytevector with lone surrogate bytes (CESU) -> (�)
+(string-length (utf8->string #vu8(#xED #xA0 #x80))) chars: (65533)
+(bytevector->string/ utf-16 lone surrogate): (65533)
+-- 2b
+empty: len 0 count 0 write 0 match #t
+a: len 1 count 1 write 1 match #t
+U+0: len 1 count 1 write 1 match #t
+U+7F: len 1 count 1 write 1 match #t
+U+80: len 1 count 2 write 2 match #t
+U+7FF: len 1 count 2 write 2 match #t
+U+800: len 1 count 3 write 3 match #t
+U+FFFF: len 1 count 3 write 3 match #t
+U+10000: len 1 count 4 write 4 match #t
+U+10FFFF: len 1 count 4 write 4 match #t
+pässwörd€: len 9 count 13 write 13 match #t
+64 KiB mixed string has 163840 UTF-8 bytes
+64k-chars mixed: len 65536 count 163840 write 163840 match #t
+mixed string of 26214 chars has 65536 UTF-8 bytes
+64 KiB-bytes mixed: len 26214 count 65536 write 65536 match #t
+-- 2d
+counted 8
+unchecked writer wrote 10 bytes into a block of 8: overrun by 2
+checked writer, ASCII->U+20AC after count: overrun
+checked writer, string 8 chars, block counted for 8 + 3 bytes: short
+checked writer, U+20AC->ASCII after count (ends short): short

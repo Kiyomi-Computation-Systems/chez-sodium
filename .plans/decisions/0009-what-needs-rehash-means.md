@@ -2,6 +2,8 @@
 
 - **Status:** Accepted (the owner, 2026-11-22), brief §11.1. Decision 4's KiB unit and the
   bound `crypto_pwhash_strprefix` are brief §11.5; the default limits are brief §11.7.
+  Amended 2026-11-24 in M3's plan, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-24-m3s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** `password-needs-rehash?`, the limits, and the hash-string checks it shares with
   `password-verify`
@@ -95,6 +97,45 @@
   presets; 7, the default; 8, each of decision 2's items, with nothing raised; 9, the pre-check,
   from the decoy's log (P-F10); 10, the terminating 0.
 
+## Amendment, 2026-11-24: M3's plan
+
+Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-plan.md), §4.1, items
+6 and 11, and §4.2, item 2.
+
+- **Decision 2's item 4, exactly.** `current-hash-shape?`, in the pure library
+  `(chez-sodium private password-text)`, holds it.
+  - The hash begins with the loaded prefix. It then reads `v=` and digits, `$m=` and digits,
+    `,t=` and digits, `,p=1$`, and at least one character more.
+  - Anything else answers `#t`.
+  - It is stricter than libsodium's parser, so a hash it refuses is only rehashed.
+- **Why the rule is needed, measured.** libsodium's needs-rehash answers 0 in two cases where
+  the binding must answer `#t`:
+  - an argon2i hash at its own limits, ops 3 or more;
+  - a `p=4` or `p=2` string at 32 KiB or more.
+
+  Below those limits libsodium answers -1 itself, so each rule's row uses a string libsodium
+  answers 0 for ([research/m3-plan/](../research/m3-plan/README.md), set A).
+- **The prefix is read once, at the load** ([ADR-0001], amended). A NULL prefix is recorded as
+  `#f`, and then every hash answers `#t`, without C.
+- **libsodium answers -1, so the binding `#t`:**
+  - for any string of `strbytes` characters or more;
+  - for a salt of 21 characters, or a tag of 42;
+  - for ops above 2³²−1, which the limits' ranges rule out.
+
+  At 1.0.22 it also answers -1 for a byte of 0x80 or more in the salt, where 1.0.18 answers 0.
+  The pre-check refuses that string first.
+- **The checks that answer `#t` without C run after every refusal and before any section:** the
+  pre-check, then item 4. A refusal comes first, so a bad hash with bad limits is refused. Only
+  a hash that passes both reaches libsodium.
+- **A hash another thread changed during the call answers `#t`.** Decision 3 stands: the writer
+  that copies it into its block answers the change as data, and needs-rehash reads it as a hash
+  that is not current (slice 0's review, M3S0-F5).
+- **`make-password-limits` checks decision 4's ranges when it is called.** The owner chose this
+  on 2026-11-24. A `Password-limits` is always in range.
+- **Decision 5's pre-check is `readable-hash-string?`:** every character is U+0021 to U+007E, so
+  there is no U+0000, and there are at most `input-cap` characters. The empty string fails it.
+
+[ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0005]: 0005-the-subset-rule.md
 [ADR-0006]: 0006-errors-and-no-secret-shown.md
 [ADR-0007]: 0007-one-critical-section-per-verb.md

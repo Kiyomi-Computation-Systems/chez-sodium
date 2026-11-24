@@ -7,9 +7,11 @@
   the block helper and CI's `floor` and `current` lanes (its plan is
   `.plans/2026-11-22-m1-plan.md`). M2 built `random-bytes`, `blake2b` and
   `constant-time-bytevector=?` on M1's helper, in `(chez-sodium private byte-verbs)`
-  beside native (its plan is `.plans/2026-11-23-m2-plan.md`). M3 comes next: the
-  password verbs, collect-safe, with brief §4.2's rules. `.plans/progress.md` says where
-  the project stands and what comes next.
+  beside native (its plan is `.plans/2026-11-23-m2-plan.md`). M3 is under way: the
+  password verbs, collect-safe, with brief §4.2's rules, in
+  `(chez-sodium private password-verbs)` beside native, on a pure core,
+  `(chez-sodium private password-text)`. Its plan is `.plans/2026-11-24-m3-plan.md`.
+  `.plans/progress.md` says where the project stands and what comes next.
 * The plan is the brief, `.plans/2026-11-22-chez-sodium-project-brief.md`. Read it before
   any work.
   - Its §11 holds the owner's decisions; its §10 records that nothing is open.
@@ -59,11 +61,20 @@
   - Never in a wrapper: the block is already freed by then.
   - Never as a `foreign-set!` loop: it costs as much as the copy.
 * No Scheme copy of a secret. A password's UTF-8 goes straight into its block, and a
-  caller's bytevector is copied straight into its block. The documents say what
+  caller's bytevector is copied straight into its block.
+  - Native's `call-with-utf8` writes it from `char->integer`, never through
+    `string->utf8`, each character's bytes only if they fit the block counted before the
+    section. `call-with-c-string` writes a hash string and its 0 the same way.
+  - A change another thread makes mid-write is seen when it changes a character's width,
+    or puts a hash character out of range. It is answered as data. After the section,
+    `password-hash` and `password-verify` refuse it as `changed-during-call`, and
+    `password-needs-rehash?` answers `#t`. The documents say what
   wiping cannot reach: the caller's copies, the bytevectors a verb returns, and copies
   the collector leaves behind.
 * A hash string is checked before C: printable ASCII, with no U+0000, within the input
-  cap. Its block ends in a 0, since C reads it up to its first NUL (brief §4.1).
+  cap. Its block ends in a 0, since C reads it up to its first NUL (brief §4.1). The
+  pre-check and needs-rehash's shape check live in the pure
+  `(chez-sodium private password-text)`, and run before any section.
 * A password is hashed as its UTF-8 bytes, exactly as given. The binding never
   normalises it.
 * `password-needs-rehash?` answers `#t` for any hash that is not what `password-hash`
@@ -198,7 +209,8 @@
 * **Each verb's whole extent is one `critical-section`** (brief §6.2): making the
   blocks, copying in, the C call, copying out, the wipe and the free.
   A path that makes no block and calls no C holds none: `sodium-version` (ADR-0007,
-  decision 8), `random-bytes 0`, and the compare of operands of different lengths
+  decision 8), `random-bytes 0`, the compare of operands of different lengths, and the
+  password verbs' answers for a hash that fails the pre-check or the shape check
   (ADR-0007, amended).
   - Arguments are checked before it.
   - It answers data, and the verb raises only after it.

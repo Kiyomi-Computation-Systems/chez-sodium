@@ -10,6 +10,8 @@
   Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
   review ([amendment](#amendment-2026-11-23-m2s-plan)); its last two points added after M2's
   closing review, and accepted by the owner that day.
+  Amended 2026-11-24 in M3's plan, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-24-m3s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** every public verb
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §4.4, §6.2, §11.3 and
@@ -179,6 +181,43 @@ and 4.
   `test-byte-verbs` holds both bounds within the cap, so a libsodium whose bounds passed it would
   fail that row, not slip a longer key past the cap. Added after M2's closing review (M2-F4,
   from M2S2-F11).
+
+## Amendment, 2026-11-24: M3's plan
+
+Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-plan.md), §4.1, items
+2 and 4, and §4.2, item 2.
+
+- **The password verbs' ranges:**
+  - **`password`:** its UTF-8 length, summed from its characters. First 0 to the cap,
+    `over-the-cap`; then `_passwd_min` to `_passwd_max`, `length-out-of-range`. `refuse-secret`
+    states each bound in numbers.
+  - **`limits`:** a preset (`'interactive`, `'moderate` or `'sensitive`) or a
+    `Password-limits`.
+  - **`make-password-limits ops memory-kib`:** checks its ranges when it is called. `ops` runs
+    from `_opslimit_min` to `_opslimit_max`, and `memory-kib` from `_memlimit_min` / 1024 to
+    `_memlimit_max` / 1024, each a whole number of KiB at every release measured. The owner
+    chose this on 2026-11-24.
+  - **`hash`:** a string. The pre-check answers the rest ([ADR-0009]).
+- **The hash string is capped through the pre-check:** one over the cap is answered, never
+  refused.
+- **A collect-safe call inside the section still lets other threads collect.**
+  - Measured: a `__collect_safe` call blocked on a FIFO inside `critical-section` let another
+    thread's `collect-rendezvous` finish. It took 0 ms, and at most 17 ms under Valgrind.
+  - A plain call held the rendezvous until a watchdog released the FIFO, whether outside a
+    section or inside one ([research/m3-plan/](../research/m3-plan/README.md), set B).
+  - Row 19 holds each collect-safe password call this way.
+- **The password's UTF-8 is written in the section, bounded by its block.**
+  - The verb counts it before the section.
+  - The writer stops before any write past the block, and answers a string whose width changed
+    as data.
+  - At the cap, 64 KiB, it costs about 2 ms plain and 55 ms under Valgrind, 1.1 times M2's byte
+    copy.
+- **`password-hash`'s out block is `strbytes` long, and C writes all of it,** on success and on
+  -1 (measured). So its FILL! writes nothing.
+- **The password verbs' answers without C hold no section,** as `sodium-version`'s does: a hash
+  that fails the pre-check, for both verbs, and one that fails needs-rehash's shape check, a
+  NULL prefix's among them ([ADR-0009], amended). So the list of paths that hold none now reads:
+  `sodium-version`, `random-bytes 0`, the compare of operands of different lengths, and these.
 
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0006]: 0006-errors-and-no-secret-shown.md
