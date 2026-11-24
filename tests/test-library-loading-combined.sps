@@ -1,11 +1,11 @@
 #!r6rs
-;;; One of the six suites that load libsodium end to end, through
+;;; One of the seven suites that load libsodium end to end, through
 ;;; (chez-sodium private native), tests/refusal-probe.sps and a decoy
 ;;; (ADR-0002, ADR-0003, ADR-0006, ADR-0011): this one holds the decoy's
 ;;; builds combined with its behaviours: the kept refusal and the kept load,
-;;; with the marker, values that are no switch, and the wipe seen in the
-;;; decoy's log. tests/test-library-loading-decoys.sps holds each switch
-;;; alone.
+;;; with the marker, values that are no switch, the wipe seen in the
+;;; decoy's log, what every switch answers, and the log's overflow.
+;;; tests/test-library-loading-decoys.sps holds each switch alone.
 ;;;
 ;;; The wipe rows read the decoy's log, which is the same when the wipe
 ;;; writes a block already freed: only the memory gate fails that here, with
@@ -13,9 +13,9 @@
 ;;; (ADR-0008).
 ;;;
 ;;; Under the memory gate each child runs under a Valgrind of its own, so
-;;; the rows are split among six suites, each running at most 14 children,
+;;; the rows are split among seven suites, each running at most 14 children,
 ;;; to keep each well under MEMORY_TIMEOUT (ADR-0011); (library-loading)
-;;; holds what all six use.
+;;; holds what all seven use.
 ;;;
 ;;; Native loads libsodium in its library body, once per process, and Chez
 ;;; runs that body before a program's own, so a refusal cannot be caught in
@@ -163,7 +163,7 @@
 (define (no-switch value)
   (lambda (so)
     (loaded so 'override control-report
-            (append (list (string-append "decoy(?" value ")")) version-calls (list "sodium_init()")))))
+            (append (list (string-append "decoy(?" value ")")) version-calls (list init-call) size-calls))))
 
 (decoy-row "control" "Below-floor" '()
   "a value that is no switch behaves as the control, and the log names it"
@@ -202,6 +202,83 @@
     (cons 0 ((wiped 1) so))
     (cons (compiled-status "control")
           (probe-with (cons (override so) (switch-args #f)) '("--wipe" "0")))))
+
+;; --- what each switch answers, and the log's overflow ------------------------------------
+;; The probe's --drive mode loads the decoy itself and binds the verbs' eight
+;; entry points with foreign-procedure of its own: the five size functions,
+;; randombytes_buf, crypto_generichash and sodium_memcmp. It calls each on
+;; blocks it makes with foreign-alloc and prints every answer and every
+;; output block, whole. One child per switch: the control, and each of the
+;; four others. Each decoy's log, whole, shows every call that was made.
+;;
+;; The blocks: randombytes_buf is asked for 9 bytes of a block of 10, and
+;; crypto_generichash for 7 of a block of 8, each block 11 hex before the
+;; call. A5 over exactly the length, and the byte after it still 11, shows
+;; both ends. sodium_memcmp is called on equal blocks, on blocks that
+;; differ, at length 0 on blocks that differ, and with a NULL operand, first
+;; and second, at length 4.
+
+;; written : Natural -> Bytevector
+;; A block of N+1 bytes after a call that wrote A5 over N of them, from a
+;; block of 11s.
+(define (written n)
+  (let ((bytes (make-bytevector (+ n 1) #xA5)))
+    (bytevector-u8-set! bytes n #x11)
+    bytes))
+
+(define drive-calls
+  '("randombytes_buf(p,9)" "crypto_generichash(p,7,p,3,p,2)"
+    "sodium_memcmp(p,p,4)" "sodium_memcmp(p,p,4)" "sodium_memcmp(p,p,0)"
+    "sodium_memcmp(NULL,p,4)" "sodium_memcmp(p,NULL,4)"))
+
+;; The log's end once a thousand more sodium_init calls have filled it, and
+;; what one more does: nothing.
+(define overflow-lines
+  (list (cons 'head "decoy(control)")
+        (cons 'tail "sodium_init() sodium_init() overflow")
+        (cons 'unmoved 'yes)
+        (cons 'overflows 1)
+        (cons 'fits 'yes)))
+
+;; driven : (U String #f) (Listof Natural) Integer (Listof Integer) Boolean -> Expected
+;; The probe's whole answer under SWITCH: the five SIZES, the answer HASH of
+;; crypto_generichash, the five answers MEMCMPS of sodium_memcmp, then the
+;; decoy's log, and the overflow's lines when OVERFLOW?.
+(define (driven switch sizes hash memcmps overflow?)
+  (list 0
+        (append (list (cons 'sizes sizes)
+                      (cons 'randombytes (written 9))
+                      (list 'generichash hash (written 7))
+                      (cons 'memcmp memcmps)
+                      (cons 'calls (join (append (list (read-switch (or switch "control")))
+                                                 size-calls drive-calls))))
+                (if overflow? overflow-lines '())
+                (list no-native-objects valgrind-line))
+        ""))
+
+;; drive-row : String (U String #f) (Listof Natural) Integer (Listof Integer) Boolean -> Void
+(define (drive-row description switch sizes hash memcmps overflow?)
+  (let ((so (so-of "control")))
+    (test-equal description
+      (cons 0 (driven switch sizes hash memcmps overflow?))
+      (cons (compiled-status "control")
+            (probe-with (cons (override so) (switch-args switch))
+                        (append '("--drive" "yes") (if overflow? '("--overflow" "yes") '())))))))
+
+(drive-row "the control, called directly: the sizes 32, 16, 64, 16 and 64, A5 over exactly the length, 0, and 0, -1, 0, -1, -1; then a full log ends in one overflow entry and takes nothing more"
+  #f control-sizes 0 '(0 -1 0 -1 -1) #t)
+
+(drive-row "sizes-other, called directly: the sizes 33, 8, 80, 9 and 81, and every other answer the control's"
+  "sizes-other" other-sizes 0 '(0 -1 0 -1 -1) #f)
+
+(drive-row "generichash-fails, called directly: crypto_generichash answers -1 and still writes A5 over its length"
+  "generichash-fails" control-sizes -1 '(0 -1 0 -1 -1) #f)
+
+(drive-row "generichash-other, called directly: crypto_generichash answers 1 and writes A5 over its length"
+  "generichash-other" control-sizes 1 '(0 -1 0 -1 -1) #f)
+
+(drive-row "memcmp-other, called directly: equal blocks answer 1, differing ones -1, and length 0 and a NULL operand answer 0 and -1 as ever"
+  "memcmp-other" control-sizes 0 '(1 -1 0 -1 -1) #f)
 
 ;; --- this process ----------------------------------------------------------------------------
 

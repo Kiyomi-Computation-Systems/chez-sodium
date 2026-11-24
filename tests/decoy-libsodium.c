@@ -18,10 +18,11 @@
  * when it is linked and no switch read at run time can hide an entry point
  * from dlsym:
  *
- *   (none)                   the control: the five entry points
+ *   (none)                   the control: the thirteen entry points
  *                            (chez-sodium private native) binds
  *   DECOY_LACKS_<entry>      that one entry point left out
- *   DECOY_NOT_SODIUM         no sodium_* function at all
+ *   DECOY_NOT_SODIUM         no sodium_*, randombytes_* or crypto_* function
+ *                            at all
  *   DECOY_MARKER             also defines decoy_marker, which no other
  *                            build has: whether a process ever loaded this
  *                            build is foreign-entry?'s answer for it
@@ -41,20 +42,38 @@
  *   init-other         sodium_init answers 2, a second code, so that no
  *                      single value passes for "refused"
  *   init-already       sodium_init answers 1, which loads
+ *   sizes-other        crypto_generichash's five size functions answer 33,
+ *                      8, 80, 9 and 81, which no release does (the control's
+ *                      are 32, 16, 64, 16 and 64)
+ *   generichash-fails  crypto_generichash answers -1
+ *   generichash-other  crypto_generichash answers 1, a second code
+ *   memcmp-other       sodium_memcmp answers 1 for equal operands, -1 for
+ *                      different ones (the control's are 0 and -1); at
+ *                      length 0 it answers 0, and with exactly one NULL
+ *                      operand at a nonzero length -1, under every switch
  *   anything else      the control's behaviour, an empty value included
  *
  * The call log. Loading the library writes its first entry, decoy(SWITCH):
  * decoy(control) when the variable is unset, decoy(?VALUE) for a value not
- * listed above. Then every sodium_* function appends one entry, its name
- * and its arguments, as it is called. decoy_calls() returns the log,
- * entries separated by one space. The suite asserts it whole, so the log
- * holds which switch the library read, the load's order, and that nothing
- * runs after a refusal.
+ * listed above. Then every sodium_*, randombytes_* and crypto_* function
+ * appends one entry, its name and its arguments, as it is called, with p
+ * for a pointer and NULL for NULL. decoy_calls() returns the log, entries
+ * separated by one space. The suite asserts it whole, so the log holds which
+ * switch the library read, the load's order, and that nothing runs after a
+ * refusal. A log too full for the next entry ends in one overflow entry and
+ * takes nothing more, so a long run cannot pass for a short one.
+ *
+ * randombytes_buf and crypto_generichash write the byte A5 over every byte
+ * of their output, under every switch, so that a block they fill is never
+ * zero before its wipe.
  *
  * Every pointer it logs is read through a volatile uintptr_t, and only that
- * is tested, whether or not sodium.h marks the parameter nonnull: a plain
- * test of a nonnull parameter fails -Werror=nonnull-compare, and the
- * compiler may delete it (ADR-0011).
+ * is tested, logged and written through, whether or not sodium.h marks the
+ * parameter nonnull: a plain test of a nonnull parameter fails
+ * -Werror=nonnull-compare, and the compiler may delete it (ADR-0011).
+ * tests/test-decoy-source.sps holds every sodium_*, randombytes_* and
+ * crypto_* function here to that; the helpers called and decoy_calls are
+ * outside it.
  */
 #include <stdarg.h>
 #include <stdint.h>
@@ -68,19 +87,34 @@
 #endif
 
 static char calls[4096];
+static int overflowed = 0;
 
-/* called: appends one entry, printf-style, to the call log. */
+#define DECOY_OVERFLOW " overflow"
+
+/* called: appends one entry, printf-style, to the call log. An entry that
+   would leave no room for the overflow entry is not written: the log ends
+   in overflow instead, and takes nothing more. */
 static void called(const char *format, ...)
 {
+  char entry[512];
   size_t used = strlen(calls);
+  size_t room = sizeof calls - sizeof DECOY_OVERFLOW;
+  int length;
   va_list args;
-  if (used > 0 && used + 1 < sizeof calls) {
-    calls[used++] = ' ';
-    calls[used] = '\0';
-  }
+  if (overflowed)
+    return;
   va_start(args, format);
-  vsnprintf(calls + used, sizeof calls - used, format, args);
+  length = vsnprintf(entry, sizeof entry, format, args);
   va_end(args);
+  if (length < 0 || (size_t) length >= sizeof entry
+      || used + (used > 0 ? 1 : 0) + (size_t) length > room) {
+    memcpy(calls + used, DECOY_OVERFLOW, sizeof DECOY_OVERFLOW);
+    overflowed = 1;
+    return;
+  }
+  if (used > 0)
+    calls[used++] = ' ';
+  memcpy(calls + used, entry, (size_t) length + 1);
 }
 
 /* decoy_calls: the call log. Not a libsodium name, so a real libsodium
@@ -108,7 +142,11 @@ enum decoy_switch {
   LIBTOOL_LOW,
   INIT_FAILS,
   INIT_OTHER,
-  INIT_ALREADY
+  INIT_ALREADY,
+  SIZES_OTHER,
+  GENERICHASH_FAILS,
+  GENERICHASH_OTHER,
+  MEMCMP_OTHER
 };
 
 static const struct {
@@ -124,6 +162,10 @@ static const struct {
   {"init-fails", INIT_FAILS},
   {"init-other", INIT_OTHER},
   {"init-already", INIT_ALREADY},
+  {"sizes-other", SIZES_OTHER},
+  {"generichash-fails", GENERICHASH_FAILS},
+  {"generichash-other", GENERICHASH_OTHER},
+  {"memcmp-other", MEMCMP_OTHER},
 };
 
 static enum decoy_switch mode = CONTROL;
@@ -209,6 +251,112 @@ void sodium_memzero(void *const pnt, const size_t len)
   if (p)
     for (i = 0; i < len; i++)
       bytes[i] = 0;
+}
+#endif
+
+#ifndef DECOY_LACKS_randombytes_buf
+/* Logs its call, then writes A5 over every byte of BUF. Nothing is written
+   for a NULL address. */
+void randombytes_buf(void *const buf, const size_t size)
+{
+  volatile uintptr_t p = (uintptr_t) buf;
+  volatile unsigned char *bytes = (volatile unsigned char *) p;
+  size_t i;
+  called("randombytes_buf(%s,%zu)", p ? "p" : "NULL", size);
+  if (p)
+    for (i = 0; i < size; i++)
+      bytes[i] = 0xA5;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_generichash
+/* Logs its call, writes A5 over every byte of OUT under every switch, and
+   answers 0, or -1 and 1 under the two switches. */
+int crypto_generichash(unsigned char *out, size_t outlen,
+                       const unsigned char *in, unsigned long long inlen,
+                       const unsigned char *key, size_t keylen)
+{
+  volatile uintptr_t o = (uintptr_t) out;
+  volatile uintptr_t i = (uintptr_t) in;
+  volatile uintptr_t k = (uintptr_t) key;
+  volatile unsigned char *bytes = (volatile unsigned char *) o;
+  size_t n;
+  called("crypto_generichash(%s,%zu,%s,%llu,%s,%zu)",
+         o ? "p" : "NULL", outlen, i ? "p" : "NULL", inlen, k ? "p" : "NULL", keylen);
+  if (o)
+    for (n = 0; n < outlen; n++)
+      bytes[n] = 0xA5;
+  return mode == GENERICHASH_FAILS ? -1 : mode == GENERICHASH_OTHER ? 1 : 0;
+}
+#endif
+
+/* The five sizes: the control's are 32, 16, 64, 16 and 64, and sizes-other's
+   are 33, 8, 80, 9 and 81. */
+#ifndef DECOY_LACKS_crypto_generichash_bytes
+size_t crypto_generichash_bytes(void)
+{
+  called("crypto_generichash_bytes()");
+  return mode == SIZES_OTHER ? 33 : 32;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_generichash_bytes_min
+size_t crypto_generichash_bytes_min(void)
+{
+  called("crypto_generichash_bytes_min()");
+  return mode == SIZES_OTHER ? 8 : 16;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_generichash_bytes_max
+size_t crypto_generichash_bytes_max(void)
+{
+  called("crypto_generichash_bytes_max()");
+  return mode == SIZES_OTHER ? 80 : 64;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_generichash_keybytes_min
+size_t crypto_generichash_keybytes_min(void)
+{
+  called("crypto_generichash_keybytes_min()");
+  return mode == SIZES_OTHER ? 9 : 16;
+}
+#endif
+
+#ifndef DECOY_LACKS_crypto_generichash_keybytes_max
+size_t crypto_generichash_keybytes_max(void)
+{
+  called("crypto_generichash_keybytes_max()");
+  return mode == SIZES_OTHER ? 81 : 64;
+}
+#endif
+
+#ifndef DECOY_LACKS_sodium_memcmp
+/* At length 0 it answers 0, under every switch. At a nonzero length, with
+   exactly one NULL address, it answers -1, under every switch: an operand
+   that cannot be read is no match. Only two readable operands are compared,
+   byte by byte: 0 when equal, -1 when they differ, and under memcmp-other 1
+   and -1. */
+int sodium_memcmp(const void *const b1, const void *const b2, size_t len)
+{
+  volatile uintptr_t p1 = (uintptr_t) b1;
+  volatile uintptr_t p2 = (uintptr_t) b2;
+  volatile const unsigned char *x = (volatile const unsigned char *) p1;
+  volatile const unsigned char *y = (volatile const unsigned char *) p2;
+  size_t i;
+  int equal = 1;
+  called("sodium_memcmp(%s,%s,%zu)", p1 ? "p" : "NULL", p2 ? "p" : "NULL", len);
+  if (len == 0)
+    return 0;
+  if (!p1 || !p2)
+    return -1;
+  for (i = 0; i < len; i++)
+    if (x[i] != y[i])
+      equal = 0;
+  if (mode == MEMCMP_OTHER)
+    return equal ? 1 : -1;
+  return equal ? 0 : -1;
 }
 #endif
 

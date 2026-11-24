@@ -1,15 +1,16 @@
 #!r6rs
-;;; One of the six suites that load libsodium end to end, through
+;;; One of the seven suites that load libsodium end to end, through
 ;;; (chez-sodium private native), tests/refusal-probe.sps and a decoy
 ;;; (ADR-0002, ADR-0003, ADR-0006, ADR-0011): this one holds each entry
-;;; point left out, one at a time, a build with no sodium_* function, and the
-;;; load's order (a lacking build under a switch that an earlier step
-;;; refuses).
+;;; point of the load's five left out, one at a time, a build with no sodium_*
+;;; function, and the load's order (a lacking build under a switch that an
+;;; earlier step refuses). tests/test-library-loading-missing-verbs.sps holds
+;;; the other eight.
 ;;;
 ;;; Under the memory gate each child runs under a Valgrind of its own, so
-;;; the rows are split among six suites, each running at most 14 children,
+;;; the rows are split among seven suites, each running at most 14 children,
 ;;; to keep each well under MEMORY_TIMEOUT (ADR-0011); (library-loading)
-;;; holds what all six use.
+;;; holds what all seven use.
 ;;;
 ;;; Native loads libsodium in its library body, once per process, and Chez
 ;;; runs that body before a program's own, so a refusal cannot be caught in
@@ -100,7 +101,7 @@
 
 ;; builds : (Listof (Pairof String (Listof String)))
 ;; The builds this suite's rows use.
-(define builds (decoy-builds (append (quote ("control" "not-sodium")) (map lacks-build every-entry))))
+(define builds (decoy-builds (append (quote ("control" "not-sodium")) (map lacks-build first-entries))))
 
 (define (so-of build) (in-scratch (string-append build ".so")))
 
@@ -134,7 +135,7 @@
 
 ;; --- each entry left out ---------------------------------------------------------------
 
-(missing-api-rows decoy-row every-entry)
+(missing-api-rows decoy-row first-entries)
 
 (decoy-row "not-sodium" #f '()
   "a library with no sodium_* function is missing-api, naming sodium_version_string, the first asked"
@@ -150,7 +151,7 @@
 
 (decoy-row "lacks-sodium_memzero" "init-fails" '()
   "sodium_init comes before the rest: init-failed with its answer, not missing-api"
-  (lambda (so) (refused 'init-failed so 'override -1 '() (loaded-calls "init-fails"))))
+  (lambda (so) (refused 'init-failed so 'override -1 '() (init-calls "init-fails"))))
 
 (decoy-row "lacks-sodium_init" "below-floor" '()
   "the floor comes before sodium_init's binding: below-floor, not missing-api"

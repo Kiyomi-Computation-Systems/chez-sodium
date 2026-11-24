@@ -18,6 +18,14 @@
  *   (minor . 4)               sodium_library_version_minor()
  *   (init 0 1)                sodium_init() called twice: its first two
  *                             answers, 0 and then 1
+ *   (generichash-bytes F M)   then four more lines, one for each of
+ *                             crypto_generichash's five sizes, in this
+ *                             order: generichash-bytes, -bytes-min,
+ *                             -bytes-max, -keybytes-min and -keybytes-max.
+ *                             F is the size function's answer, called
+ *                             through the library; M is the header's macro
+ *                             for it, crypto_generichash_BYTES, _BYTES_MIN,
+ *                             _BYTES_MAX, _KEYBYTES_MIN or _KEYBYTES_MAX
  *   (valgrind . yes)          whether this process runs under Valgrind's
  *                             memcheck: yes when /proc/self/maps maps
  *                             vgpreload_memcheck, else no. Under make
@@ -92,6 +100,11 @@ int main(int argc, char **argv)
     FIND(major, sodium_library_version_major)
     FIND(minor, sodium_library_version_minor)
     FIND(init, sodium_init)
+    FIND(bytes, crypto_generichash_bytes)
+    FIND(bytes_min, crypto_generichash_bytes_min)
+    FIND(bytes_max, crypto_generichash_bytes_max)
+    FIND(keybytes_min, crypto_generichash_keybytes_min)
+    FIND(keybytes_max, crypto_generichash_keybytes_max)
     /* C leaves the order of a call's arguments open: each answer is read
      * into its own variable first, in the order they are printed. */
     {
@@ -100,11 +113,25 @@ int main(int argc, char **argv)
       int minor_answer = minor();
       int first_init = init();
       int second_init = init();
+      size_t bytes_answer = bytes();
+      size_t bytes_min_answer = bytes_min();
+      size_t bytes_max_answer = bytes_max();
+      size_t keybytes_min_answer = keybytes_min();
+      size_t keybytes_max_answer = keybytes_max();
       printf("(version . ");
       put_quoted(version_answer);
-      printf(")\n(major . %d)\n(minor . %d)\n(init %d %d)\n(valgrind . %s)\n",
-             major_answer, minor_answer, first_init, second_init,
-             under_valgrind() ? "yes" : "no");
+      printf(")\n(major . %d)\n(minor . %d)\n(init %d %d)\n",
+             major_answer, minor_answer, first_init, second_init);
+      printf("(generichash-bytes %zu %zu)\n", bytes_answer, (size_t) crypto_generichash_BYTES);
+      printf("(generichash-bytes-min %zu %zu)\n", bytes_min_answer,
+             (size_t) crypto_generichash_BYTES_MIN);
+      printf("(generichash-bytes-max %zu %zu)\n", bytes_max_answer,
+             (size_t) crypto_generichash_BYTES_MAX);
+      printf("(generichash-keybytes-min %zu %zu)\n", keybytes_min_answer,
+             (size_t) crypto_generichash_KEYBYTES_MIN);
+      printf("(generichash-keybytes-max %zu %zu)\n", keybytes_max_answer,
+             (size_t) crypto_generichash_KEYBYTES_MAX);
+      printf("(valgrind . %s)\n", under_valgrind() ? "yes" : "no");
     }
   }
   return 0;

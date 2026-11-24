@@ -23,14 +23,20 @@
 ;;;                  libtool numbers, recorded and never compared (ADR-0003)
 ;;;   5. init        sodium_init, bound and called once; 0 and 1 load, any
 ;;;                  other answer is init-failed, and the answer is recorded
-;;;   6. the rest    every other entry point, bound eagerly: sodium_memzero.
-;;;                  Each later verb's entry points are appended here, with one
-;;;                  pair each in the answers
+;;;   6. the rest    every other entry point, bound eagerly: sodium_memzero,
+;;;                  then randombytes_buf, crypto_generichash, its five size
+;;;                  functions and sodium_memcmp. Each later verb's entry
+;;;                  points are appended here. Each binding a verb calls has
+;;;                  one pair in the answers; a size function has none, and
+;;;                  its value has one, from step 7
+;;;   7. the sizes   crypto_generichash's five size functions, each called
+;;;                  once, its answer recorded: the verbs check against these
+;;;                  numbers, and no size is written in Scheme (ADR-0001)
 ;;;
-;;; Steps 1 to 6 are the let* of one definition, load-answers, run inside one
-;;; call-in-section: dlopen, every bind and sodium_init happen in one critical
-;;; section, which answers data (ADR-0007, decision 9). Our own pure code
-;;; refuses inside it, and the guard of call-in-section raises the refusal
+;;; Steps 1 to 7 are the let* of one definition, load-answers, run inside one
+;;; call-in-section: dlopen, every bind, sodium_init and the size calls happen
+;;; in one critical section, which answers data (ADR-0007, decision 9). Our
+;;; own pure code refuses inside it, and the guard of call-in-section raises the refusal
 ;;; again once the section has ended, where load-step, outside it, makes the
 ;;; raise serious, records it and raises it. So no caller's handler runs
 ;;; inside the section. An engine spends no ticks inside a section, so the
@@ -105,6 +111,9 @@
   (export loaded-libsodium sodium-version
           sodium-version-string sodium-library-version-major sodium-library-version-minor
           sodium-init sodium-memzero
+          randombytes-buf crypto-generichash sodium-memcmp
+          generichash-bytes generichash-bytes-min generichash-bytes-max
+          generichash-keybytes-min generichash-keybytes-max
           call-in-section call-with-block call-with-bytes foreign-bytes
           c-string->bytevector c-string->string)
   (import (chez-sodium private require-threaded)
@@ -365,12 +374,12 @@
                   (loop (+ i 1))))))
         proc)))
 
-  ;; --- 1 to 6. the load, in one section ------------------------------------------
+  ;; --- 1 to 7. the load, in one section ------------------------------------------
 
-  ;; The load's answers, as an alist: the record of the load, and each raw
-  ;; binding. The let* is the order of the steps above. A later verb's entry
-  ;; points are bound by inits appended after raw-memzero, with one pair each
-  ;; added to the answers.
+  ;; The load's answers, as an alist: the record of the load, each raw
+  ;; binding, and the sizes. The let* is the order of the steps above. A later
+  ;; verb's entry points are bound by inits appended after raw-memcmp, before
+  ;; the sizes are read, with one pair each added to the answers.
   (define load-answers
     (load-step
      (call-in-section
@@ -413,7 +422,47 @@
                ;; void sodium_memzero(void * const pnt, const size_t len)
                (raw-memzero
                 (bind-required chosen
-                  (foreign-procedure "sodium_memzero" (uptr size_t) void))))
+                  (foreign-procedure "sodium_memzero" (uptr size_t) void)))
+               ;; void randombytes_buf(void * const buf, const size_t size)
+               (raw-randombytes-buf
+                (bind-required chosen
+                  (foreign-procedure "randombytes_buf" (uptr size_t) void)))
+               ;; int crypto_generichash(unsigned char *out, size_t outlen,
+               ;;                        const unsigned char *in, unsigned long long inlen,
+               ;;                        const unsigned char *key, size_t keylen)
+               (raw-generichash
+                (bind-required chosen
+                  (foreign-procedure "crypto_generichash" (uptr size_t uptr unsigned-64 uptr size_t)
+                                     int)))
+               ;; size_t crypto_generichash_bytes(void)
+               (raw-generichash-bytes
+                (bind-required chosen
+                  (foreign-procedure "crypto_generichash_bytes" () size_t)))
+               ;; size_t crypto_generichash_bytes_min(void)
+               (raw-generichash-bytes-min
+                (bind-required chosen
+                  (foreign-procedure "crypto_generichash_bytes_min" () size_t)))
+               ;; size_t crypto_generichash_bytes_max(void)
+               (raw-generichash-bytes-max
+                (bind-required chosen
+                  (foreign-procedure "crypto_generichash_bytes_max" () size_t)))
+               ;; size_t crypto_generichash_keybytes_min(void)
+               (raw-generichash-keybytes-min
+                (bind-required chosen
+                  (foreign-procedure "crypto_generichash_keybytes_min" () size_t)))
+               ;; size_t crypto_generichash_keybytes_max(void)
+               (raw-generichash-keybytes-max
+                (bind-required chosen
+                  (foreign-procedure "crypto_generichash_keybytes_max" () size_t)))
+               ;; int sodium_memcmp(const void *const b1_, const void *const b2_, size_t len)
+               (raw-memcmp
+                (bind-required chosen
+                  (foreign-procedure "sodium_memcmp" (uptr uptr size_t) int)))
+               (bytes (raw-generichash-bytes))
+               (bytes-min (raw-generichash-bytes-min))
+               (bytes-max (raw-generichash-bytes-max))
+               (keybytes-min (raw-generichash-keybytes-min))
+               (keybytes-max (raw-generichash-keybytes-max)))
           (list (cons 'path (car chosen)) (cons 'source (cdr chosen))
                 (cons 'version version) (cons 'major major) (cons 'minor minor)
                 (cons 'init init)
@@ -421,7 +470,15 @@
                 (cons 'sodium-library-version-major raw-major)
                 (cons 'sodium-library-version-minor raw-minor)
                 (cons 'sodium-init raw-init)
-                (cons 'sodium-memzero raw-memzero)))))))
+                (cons 'sodium-memzero raw-memzero)
+                (cons 'randombytes-buf raw-randombytes-buf)
+                (cons 'crypto-generichash raw-generichash)
+                (cons 'sodium-memcmp raw-memcmp)
+                (cons 'generichash-bytes bytes)
+                (cons 'generichash-bytes-min bytes-min)
+                (cons 'generichash-bytes-max bytes-max)
+                (cons 'generichash-keybytes-min keybytes-min)
+                (cons 'generichash-keybytes-max keybytes-max)))))))
 
   ;; answer : Symbol -> Any
   ;; KEY's value among the load's answers. Every element is a pair, so this
@@ -458,6 +515,45 @@
   ;; void sodium_memzero(void * const pnt, const size_t len): zeroes LEN bytes
   ;; at PNT. The wipe call-with-block hands free-foreign-block!.
   (define sodium-memzero (answer 'sodium-memzero))
+
+  ;; randombytes-buf : Positive-Integer Natural -> Void
+  ;; void randombytes_buf(void * const buf, const size_t size): writes SIZE
+  ;; random bytes at BUF. It aborts the process when no entropy source is
+  ;; available.
+  (define randombytes-buf (answer 'randombytes-buf))
+
+  ;; crypto-generichash : Positive-Integer Natural Positive-Integer Natural
+  ;;                      Positive-Integer Natural -> Integer
+  ;; int crypto_generichash(out, outlen, in, inlen, key, keylen): the BLAKE2b
+  ;; hash of INLEN bytes at IN, keyed by KEYLEN bytes at KEY, unkeyed for a
+  ;; KEYLEN of 0, written as OUTLEN bytes at OUT. 0; or -1 for an OUTLEN of 0
+  ;; or above 64, or a KEYLEN above 64, which leaves OUT as it was.
+  (define crypto-generichash (answer 'crypto-generichash))
+
+  ;; sodium-memcmp : Positive-Integer Positive-Integer Natural -> Integer
+  ;; int sodium_memcmp(b1, b2, len): 0 when the LEN bytes at B1 and B2 are
+  ;; equal, -1 when they differ, in constant time; 0 at a LEN of 0.
+  (define sodium-memcmp (answer 'sodium-memcmp))
+
+  ;; generichash-bytes : Natural
+  ;; crypto_generichash_bytes(), read once at the load: the default size.
+  (define generichash-bytes (answer 'generichash-bytes))
+
+  ;; generichash-bytes-min : Natural
+  ;; crypto_generichash_bytes_min(), read once at the load: the least size.
+  (define generichash-bytes-min (answer 'generichash-bytes-min))
+
+  ;; generichash-bytes-max : Natural
+  ;; crypto_generichash_bytes_max(), read once at the load: the greatest size.
+  (define generichash-bytes-max (answer 'generichash-bytes-max))
+
+  ;; generichash-keybytes-min : Natural
+  ;; crypto_generichash_keybytes_min(), read once at the load: the shortest key.
+  (define generichash-keybytes-min (answer 'generichash-keybytes-min))
+
+  ;; generichash-keybytes-max : Natural
+  ;; crypto_generichash_keybytes_max(), read once at the load: the longest key.
+  (define generichash-keybytes-max (answer 'generichash-keybytes-max))
 
   ;; --- the load's record -----------------------------------------------------------
 

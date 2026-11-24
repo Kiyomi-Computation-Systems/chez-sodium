@@ -1,6 +1,6 @@
 #!r6rs
 (library (chez-sodium private native)
-  (export a b c d e f g)
+  (export a b c d e f g h)
   (import (rnrs) (only (chezscheme) foreign-procedure))
   (define a (foreign-procedure "p_first" (string int int) int))
   (define b (foreign-procedure "p_middle" (int string int) int))
@@ -8,4 +8,5 @@
   (define d (foreign-procedure "p_result" (int int int) string))
   (define e (foreign-procedure "p_void_argument" (void) int))
   (define f (foreign-procedure "p_void_result" (int) void))
-  (define g (foreign-procedure "p_allowed" (size_t int uptr) int)))
+  (define g (foreign-procedure "p_allowed" (size_t int uptr unsigned-64) int))
+  (define h (foreign-procedure "p_size_result" () size_t)))

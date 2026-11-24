@@ -20,7 +20,15 @@
 ;;;                  fresh list, with fresh strings, at every call
 ;;;   the bindings   each of the five answers: the version string, major and
 ;;;                  minor, sodium_init (1 after the load, twice), and
-;;;                  sodium_memzero over exactly N bytes
+;;;                  sodium_memzero over exactly N bytes. The codes of the
+;;;                  three bound after them that a verb calls
+;;;                  (randombytes_buf, crypto_generichash, sodium_memcmp)
+;;;                  are test-native-codes'; the five size functions' values
+;;;                  are the sizes' rows, below
+;;;   the sizes      crypto_generichash's five sizes, read once at the load,
+;;;                  equal what the C oracle reads through the library and
+;;;                  through the header's macros, and brief 3.4's 32, 16, 64,
+;;;                  16 and 64
 ;;;   bytes          call-with-bytes: a bytevector's bytes, U+0000 and bytes
 ;;;                  past ASCII kept, in a counted block of at least one byte,
 ;;;                  never NULL for none, written 0 for none; freed on
@@ -52,8 +60,8 @@
 ;;                  size 1". test-blocks' W3 holds the same rule one level down
 ;;   the body       native.sls read as data, every form, define-syntax
 ;;;                  templates included: the load is one definition, its
-;;;                  steps in order; every foreign-procedure form is bound
-;;;                  eagerly, the whole second argument of bind-required and
+;;;                  steps in order; every foreign-procedure form (thirteen)
+;;;                  is bound eagerly, the whole second argument of bind-required and
 ;;;                  the whole init of its let* binding; the load's work is in
 ;;;                  that definition alone; foreign-block and
 ;;;                  free-foreign-block! appear only in call-with-block's
@@ -138,6 +146,16 @@
 (define sodium-library-version-minor (native-procedure 'sodium-library-version-minor))
 (define sodium-init (native-procedure 'sodium-init))
 (define sodium-memzero (native-procedure 'sodium-memzero))
+(define randombytes-buf (native-procedure 'randombytes-buf))
+(define crypto-generichash (native-procedure 'crypto-generichash))
+(define sodium-memcmp (native-procedure 'sodium-memcmp))
+;; The five sizes are numbers, fetched the same way: a failed fetch answers a
+;; procedure, which no size row expects.
+(define generichash-bytes (native-procedure 'generichash-bytes))
+(define generichash-bytes-min (native-procedure 'generichash-bytes-min))
+(define generichash-bytes-max (native-procedure 'generichash-bytes-max))
+(define generichash-keybytes-min (native-procedure 'generichash-keybytes-min))
+(define generichash-keybytes-max (native-procedure 'generichash-keybytes-max))
 (define call-in-section (native-procedure 'call-in-section))
 (define call-with-block (native-procedure 'call-with-block))
 (define call-with-bytes (native-procedure 'call-with-bytes))
@@ -300,10 +318,13 @@
 
 ;; No back door: the exports, written out whole. Neither foreign-block nor
 ;; free-foreign-block! is among them (ADR-0012).
-(test-equal "(chez-sodium private native) exports exactly the load's record, the five raw bindings, call-in-section and the block and byte helpers, and neither foreign-block nor free-foreign-block!"
+(test-equal "(chez-sodium private native) exports exactly the load's record, the eight raw bindings, the five sizes, call-in-section and the block and byte helpers, and neither foreign-block nor free-foreign-block!"
   (sorted-names '(loaded-libsodium sodium-version
                   sodium-version-string sodium-library-version-major sodium-library-version-minor
                   sodium-init sodium-memzero
+                  randombytes-buf crypto-generichash sodium-memcmp
+                  generichash-bytes generichash-bytes-min generichash-bytes-max
+                  generichash-keybytes-min generichash-keybytes-max
                   call-in-section call-with-block call-with-bytes foreign-bytes
                   c-string->bytevector c-string->string))
   (guard (e (#t (list 'raised (describe e))))
@@ -364,6 +385,52 @@
      (read-by-oracle field)
      (reported field)))
  oracle-fields)
+
+;; crypto_generichash's five sizes, native's against the oracle's line
+;; (NAME F M): F is the size function's answer through the library, M the
+;; header's macro. A size native read from another function, or twice, or
+;; wrote in Scheme, is not both.
+
+;; native-size : Symbol -> Any
+;; NAME's size as native answers it, or (raised TEXT).
+(define (native-size name)
+  (guard (e (#t (list 'raised (describe e))))
+    (case name
+      ((generichash-bytes) generichash-bytes)
+      ((generichash-bytes-min) generichash-bytes-min)
+      ((generichash-bytes-max) generichash-bytes-max)
+      ((generichash-keybytes-min) generichash-keybytes-min)
+      ((generichash-keybytes-max) generichash-keybytes-max)
+      (else 'no-such-size))))
+
+;; oracle-size : Symbol Natural -> Any
+;; The oracle's line (NAME F M)'s F (INDEX 1) or M (INDEX 2), or no-oracle.
+(define (oracle-size name index)
+  (let ((line (read-by-oracle name)))
+    (if (and (list? line) (= (length line) 3)) (list-ref line index) (list name 'no-oracle))))
+
+(for-each
+ (lambda (name)
+   (test-equal (string-append "native's " (symbol->string name)
+                              " is F of the oracle's line (" (symbol->string name) " F M): the size function's answer")
+     (oracle-size name 1)
+     (native-size name))
+   (test-equal (string-append "native's " (symbol->string name)
+                              " is M of the oracle's line (" (symbol->string name) " F M): the header's macro")
+     (oracle-size name 2)
+     (native-size name)))
+ oracle-size-fields)
+
+(test-equal "the five sizes are brief 3.4's 32, 16, 64, 16 and 64, written here: native's, and the oracle's F and M of each line"
+  '((generichash-bytes 32 32 32) (generichash-bytes-min 16 16 16) (generichash-bytes-max 64 64 64)
+    (generichash-keybytes-min 16 16 16) (generichash-keybytes-max 64 64 64))
+  (let loop ((names oracle-size-fields) (found '()))
+    (if (null? names)
+        (reverse found)
+        (loop (cdr names)
+              (cons (list (car names) (native-size (car names))
+                          (oracle-size (car names) 1) (oracle-size (car names) 2))
+                    found)))))
 
 ;; sodium_init's first answer in a process, 0, and its second, 1, written out
 ;; as the oracle reads them in a fresh process, not computed from native.
@@ -1085,7 +1152,7 @@
 ;; and which of step-names the init uses, so a step moved, dropped or swapped
 ;; for another's, or that stopped calling its binding or checking its answer,
 ;; changes the list too.
-(test-equal "E2 the load's let* steps, in order: choose, load, the three version bindings, the version, major and minor read, the floor, sodium_init's binding, call and check, and sodium_memzero's binding; each with the head of its init and the load's names it uses"
+(test-equal "E2 the load's let* steps, in order: choose, load, the three version bindings, the version, major and minor read, the floor, sodium_init's binding, call and check, sodium_memzero's binding, the eight bound after it in step 6's order, then the five size reads in step 7's order; each with the head of its init and the load's names it uses"
   '((chosen call-with-values)
     (libsodium-loaded guard chosen)
     (raw-version-string bind-required chosen)
@@ -1098,7 +1165,20 @@
     (raw-init bind-required chosen)
     (init raw-init raw-init)
     (init-checked check-init chosen init)
-    (raw-memzero bind-required chosen))
+    (raw-memzero bind-required chosen)
+    (raw-randombytes-buf bind-required chosen)
+    (raw-generichash bind-required chosen)
+    (raw-generichash-bytes bind-required chosen)
+    (raw-generichash-bytes-min bind-required chosen)
+    (raw-generichash-bytes-max bind-required chosen)
+    (raw-generichash-keybytes-min bind-required chosen)
+    (raw-generichash-keybytes-max bind-required chosen)
+    (raw-memcmp bind-required chosen)
+    (bytes raw-generichash-bytes)
+    (bytes-min raw-generichash-bytes-min)
+    (bytes-max raw-generichash-bytes-max)
+    (keybytes-min raw-generichash-keybytes-min)
+    (keybytes-max raw-generichash-keybytes-max))
   (if (and body-read? (the-let*))
       (map (lambda (binding)
              (let ((expr (cadr binding)))
@@ -1108,13 +1188,21 @@
            (bindings-of (the-let*)))
       native-body))
 
-(test-equal "E3 every foreign-procedure form in native.sls binds eagerly: five in all, each the whole second argument of (bind-required chosen ...) and directly the init of its let* binding, none inside a lambda"
+(test-equal "E3 every foreign-procedure form in native.sls binds eagerly: thirteen in all, each the whole second argument of (bind-required chosen ...) and directly the init of its let* binding, none inside a lambda"
   (list '((raw-version-string chosen "sodium_version_string")
           (raw-major chosen "sodium_library_version_major")
           (raw-minor chosen "sodium_library_version_minor")
           (raw-init chosen "sodium_init")
-          (raw-memzero chosen "sodium_memzero"))
-        5)
+          (raw-memzero chosen "sodium_memzero")
+          (raw-randombytes-buf chosen "randombytes_buf")
+          (raw-generichash chosen "crypto_generichash")
+          (raw-generichash-bytes chosen "crypto_generichash_bytes")
+          (raw-generichash-bytes-min chosen "crypto_generichash_bytes_min")
+          (raw-generichash-bytes-max chosen "crypto_generichash_bytes_max")
+          (raw-generichash-keybytes-min chosen "crypto_generichash_keybytes_min")
+          (raw-generichash-keybytes-max chosen "crypto_generichash_keybytes_max")
+          (raw-memcmp chosen "sodium_memcmp"))
+        13)
   (if (and body-read? (the-let*))
       (list (let loop ((bindings (bindings-of (the-let*))) (found '()))
               (if (null? bindings)
@@ -1159,14 +1247,22 @@
                     '(load-shared-object choose-libsodium check-version check-init bind-required)))
       native-body))
 
-(test-equal "E5 the answers are top-level definitions (define NAME (answer 'KEY)): the record's six, then the five raw bindings, each under its own key"
+(test-equal "E5 the answers are top-level definitions (define NAME (answer 'KEY)): the record's six, the load's five raw bindings, the verbs' three, then the five sizes, each under its own key"
   '((libsodium-path path) (libsodium-source source) (libsodium-version version)
     (libsodium-major major) (libsodium-minor minor) (libsodium-init init)
     (sodium-version-string sodium-version-string)
     (sodium-library-version-major sodium-library-version-major)
     (sodium-library-version-minor sodium-library-version-minor)
     (sodium-init sodium-init)
-    (sodium-memzero sodium-memzero))
+    (sodium-memzero sodium-memzero)
+    (randombytes-buf randombytes-buf)
+    (crypto-generichash crypto-generichash)
+    (sodium-memcmp sodium-memcmp)
+    (generichash-bytes generichash-bytes)
+    (generichash-bytes-min generichash-bytes-min)
+    (generichash-bytes-max generichash-bytes-max)
+    (generichash-keybytes-min generichash-keybytes-min)
+    (generichash-keybytes-max generichash-keybytes-max))
   (if body-read?
       (let loop ((forms native-body) (found '()))
         (if (null? forms)

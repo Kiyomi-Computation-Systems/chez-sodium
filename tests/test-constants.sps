@@ -270,9 +270,13 @@
 
 ;; --- the prototypes, against the header --------------------------------------------------
 
-(test-equal "prototypes: the table has a row for each of the five entry points, asked once each, in one compile"
-  (list 5 '("sodium_version_string" "sodium_library_version_major"
-            "sodium_library_version_minor" "sodium_init" "sodium_memzero"))
+(test-equal "prototypes: the table has a row for each of the thirteen entry points, asked once each, in one compile"
+  (list 13 '("sodium_version_string" "sodium_library_version_major"
+             "sodium_library_version_minor" "sodium_init" "sodium_memzero"
+             "randombytes_buf" "crypto_generichash" "crypto_generichash_bytes"
+             "crypto_generichash_bytes_min" "crypto_generichash_bytes_max"
+             "crypto_generichash_keybytes_min" "crypto_generichash_keybytes_max"
+             "sodium_memcmp"))
   (list (length conventions-table) (map car prototype-asks)))
 
 (test-equal "prototypes: the header declares each row's prototype exactly: the rows it does not, each by name"
@@ -356,19 +360,68 @@
     ("sodium_memzero" "void" ("void *const" "unsigned long long") 0)
     ("sodium_memzero" "void" ("int" "size_t") 0)
     ("sodium_memzero" "void" ("const void *" "size_t") 0)
-    ("sodium_memzero" "void" ("char *" "size_t") 0)))
+    ("sodium_memzero" "void" ("char *" "size_t") 0)
+    ;; randombytes_buf
+    ("randombytes_buf" "void" ("void * const" "unsigned long long") 0)
+    ("randombytes_buf" "void" ("void * const") 0)
+    ("randombytes_buf" "int" ("void * const" "const size_t") 0)
+    ("randombytes_buf" "void" ("const void *" "size_t") 0)
+    ;; crypto_generichash: size_t as unsigned long long, and the reverse
+    ("crypto_generichash" "int"
+     ("unsigned char *" "unsigned long long" "const unsigned char *" "unsigned long long"
+      "const unsigned char *" "size_t") 0)
+    ("crypto_generichash" "int"
+     ("unsigned char *" "size_t" "const unsigned char *" "size_t"
+      "const unsigned char *" "size_t") 0)
+    ("crypto_generichash" "int"
+     ("unsigned char *" "size_t" "const unsigned char *" "unsigned long long"
+      "const unsigned char *" "unsigned long long") 0)
+    ("crypto_generichash" "int"
+     ("unsigned char *" "size_t" "const unsigned char *" "unsigned long long"
+      "const unsigned char *") 0)
+    ("crypto_generichash" "int"
+     ("char *" "size_t" "const unsigned char *" "unsigned long long"
+      "const unsigned char *" "size_t") 0)
+    ("crypto_generichash" "void"
+     ("unsigned char *" "size_t" "const unsigned char *" "unsigned long long"
+      "const unsigned char *" "size_t") 0)
+    ;; the five sizes: int for size_t, an argument added, void for size_t
+    ("crypto_generichash_bytes" "int" () 0)
+    ("crypto_generichash_bytes" "size_t" ("int") 0)
+    ("crypto_generichash_bytes" "void" () 0)
+    ("crypto_generichash_bytes_min" "unsigned int" () 0)
+    ("crypto_generichash_bytes_max" "int" () 0)
+    ("crypto_generichash_keybytes_min" "long long" () 0)
+    ("crypto_generichash_keybytes_max" "size_t" ("void *") 0)
+    ;; sodium_memcmp
+    ("sodium_memcmp" "int" ("const void *const" "const void *const" "unsigned long long") 0)
+    ("sodium_memcmp" "int" ("const void *const" "size_t") 0)
+    ("sodium_memcmp" "int" ("const void *const" "const void *const" "int") 0)
+    ("sodium_memcmp" "void" ("const void *const" "const void *const" "size_t") 0)
+    ("sodium_memcmp" "int" ("const void *const" "int" "size_t") 0)
+    ("sodium_memcmp" "int" ("const char *" "const void *const" "size_t") 0)))
 
-(test-equal "the prototype check refuses each kind of wrong row, by name: a dropped pointee const, an extra and a missing parameter, a result int as unsigned int, long or void, a result void as int, size_t as int, unsigned int or unsigned long long (the opslimit trap), a pointer as int, a pointee const added, and a pointer to another type"
+(test-equal "the prototype check refuses each kind of wrong row, by name: a dropped pointee const, an extra and a missing parameter, a result int as unsigned int, long or void, a result void as int, size_t as int, unsigned int or unsigned long long (the opslimit trap) and unsigned long long as size_t, in randombytes_buf, crypto_generichash and the five sizes, a pointer as int, a pointee const added, and a pointer to another type, in sodium_memcmp too"
   (map (lambda (p) (cons (car p) (cadddr p))) plants)
   (verdicts-of (map (lambda (p) (plant (car p) (cadr p) (caddr p))) plants)))
 
-(test-equal "the prototype check answers 1 for each row written as the header has it, and for each qualifier dropped"
+(test-equal "the prototype check answers 1 for each of the thirteen rows written as the header has it, and for each qualifier dropped or added"
   '(("sodium_version_string" . 1) ("sodium_library_version_major" . 1)
     ("sodium_library_version_minor" . 1) ("sodium_init" . 1) ("sodium_memzero" . 1)
-    ("sodium_memzero" . 1) ("sodium_memzero" . 1))
+    ("randombytes_buf" . 1) ("crypto_generichash" . 1) ("crypto_generichash_bytes" . 1)
+    ("crypto_generichash_bytes_min" . 1) ("crypto_generichash_bytes_max" . 1)
+    ("crypto_generichash_keybytes_min" . 1) ("crypto_generichash_keybytes_max" . 1)
+    ("sodium_memcmp" . 1)
+    ("sodium_memzero" . 1) ("sodium_memzero" . 1) ("randombytes_buf" . 1)
+    ("crypto_generichash" . 1) ("sodium_memcmp" . 1))
   (verdicts-of (append conventions-table
                        (list (plant "sodium_memzero" "void" '("void *" "size_t"))
-                             (plant "sodium_memzero" "void" '("void * const" "const size_t"))))))
+                             (plant "sodium_memzero" "void" '("void * const" "const size_t"))
+                             (plant "randombytes_buf" "void" '("void *" "size_t"))
+                             (plant "crypto_generichash" "int"
+                                    '("unsigned char *const" "size_t" "const unsigned char *"
+                                      "unsigned long long" "const unsigned char *" "const size_t"))
+                             (plant "sodium_memcmp" "int" '("const void *" "const void *" "size_t"))))))
 
 ;; size_t and unsigned long are one type on LP64 Linux, which the C side
 ;; cannot see; the map below does, and fails the row.
@@ -421,11 +474,48 @@
                      'void 'plain '())))
         (map-problems (list (list "sodium_init" '("int" ()) '() 'void 'plain '())))))
 
-(test-equal "the map check passes each row written right: the five rows, and sodium_memzero in its qualifier-free spelling"
+(test-equal "the map check passes each row written right: the thirteen rows, and sodium_memzero in its qualifier-free spelling"
   '(() ())
   (list (map-problems conventions-table)
         (map-problems (list (list "sodium_memzero" '("void" ("void *" "size_t")) '(uptr size_t)
                                   'void 'plain '())))))
+
+;; The new rows' Chez types, each written wrong in turn, against the real
+;; prototypes of crypto_generichash, a size function and sodium_memcmp.
+(define generichash-prototype
+  '("int" ("unsigned char *" "size_t" "const unsigned char *" "unsigned long long"
+           "const unsigned char *" "size_t")))
+
+(test-equal "the map check names crypto_generichash's inlen written size_t, its outlen and keylen written unsigned-64, and its out written int, each by name"
+  '((("crypto_generichash" (uptr size_t uptr unsigned-64 uptr size_t) int
+      (uptr size_t uptr size_t uptr size_t) int))
+    (("crypto_generichash" (uptr size_t uptr unsigned-64 uptr size_t) int
+      (uptr unsigned-64 uptr unsigned-64 uptr size_t) int))
+    (("crypto_generichash" (uptr size_t uptr unsigned-64 uptr size_t) int
+      (uptr size_t uptr unsigned-64 uptr unsigned-64) int))
+    (("crypto_generichash" (uptr size_t uptr unsigned-64 uptr size_t) int
+      (int size_t uptr unsigned-64 uptr size_t) int)))
+  (map (lambda (arguments)
+         (map-problems
+          (list (list "crypto_generichash" generichash-prototype arguments 'int 'plain '()))))
+       '((uptr size_t uptr size_t uptr size_t)
+         (uptr unsigned-64 uptr unsigned-64 uptr size_t)
+         (uptr size_t uptr unsigned-64 uptr unsigned-64)
+         (int size_t uptr unsigned-64 uptr size_t))))
+
+(test-equal "the map check names a size function's size_t result written uptr, unsigned-64 and int, and sodium_memcmp's size_t written unsigned-64 and its result written size_t, each by name"
+  '((("crypto_generichash_bytes" () size_t () uptr))
+    (("crypto_generichash_bytes_max" () size_t () unsigned-64))
+    (("crypto_generichash_keybytes_min" () size_t () int))
+    (("sodium_memcmp" (uptr uptr size_t) int (uptr uptr unsigned-64) int))
+    (("sodium_memcmp" (uptr uptr size_t) int (uptr uptr size_t) size_t)))
+  (list (map-problems (list (list "crypto_generichash_bytes" '("size_t" ()) '() 'uptr 'plain '())))
+        (map-problems (list (list "crypto_generichash_bytes_max" '("size_t" ()) '() 'unsigned-64 'plain '())))
+        (map-problems (list (list "crypto_generichash_keybytes_min" '("size_t" ()) '() 'int 'plain '())))
+        (map-problems (list (list "sodium_memcmp" '("int" ("const void *const" "const void *const" "size_t"))
+                                  '(uptr uptr unsigned-64) 'int 'plain '())))
+        (map-problems (list (list "sodium_memcmp" '("int" ("const void *const" "const void *const" "size_t"))
+                                  '(uptr uptr size_t) 'size_t 'plain '())))))
 
 (test-end "constants")
 
