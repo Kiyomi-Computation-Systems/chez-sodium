@@ -126,6 +126,11 @@ record it comes from, and where a rule and its record disagree, the record wins.
   password, a hash string, `blake2b`'s input and key, `constant-time-bytevector=?`'s operands,
   and Tier 2's inputs and HMAC key. `shown-value` is for sizes, limits and preset names only
   ([ADR-0006]).
+- **A secret's refusal may state its bound, and nothing else.** `refuse-secret` takes the bound
+  as two exact naturals, LOW and HIGH, never text, and writes the sentence itself; anything
+  else in their place is its own refusal, by kind. R16 reaches every refusal that states one,
+  and finds neither the secret's text, its bytes as written, nor its length ([ADR-0006],
+  amended).
 - **Tests assert a condition's reason symbol, never its message** ([ADR-0006]).
 
 ## Sections and the cap
@@ -140,8 +145,8 @@ record it comes from, and where a rule and its record disagree, the record wins.
   `string->utf8`. Above that is an assertion violation, raised before C. A hash string over the
   cap fails the pre-check instead ([ADR-0007], [ADR-0009]).
 - **The cap is written once,** as `input-cap` in `(chez-sodium private cap)`, and checked for
-  every input and operand, whatever the verb does next: the compare checks both before it
-  compares their lengths. `blake2b`'s key and output are capped through libsodium's own bounds,
+  every input but `blake2b`'s key, and for every operand, whatever the verb does next: the
+  compare checks both before it compares their lengths. `blake2b`'s key and output are capped through libsodium's own bounds,
   which a row holds within the cap ([ADR-0007], amended).
 - **A size or key length is checked against libsodium's own bounds, before C,** since C accepts
   sizes and keys of 1 to 15 bytes ([ADR-0007], amended).

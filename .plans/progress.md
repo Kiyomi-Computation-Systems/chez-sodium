@@ -33,9 +33,10 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   - **CI:** five jobs. `main` finds Ubuntu 24.04's 1.0.18 by discovery and asserts it is the
     floor; `memory`; `nothreads`; `floor` and `current` build their pinned tarballs and run the
     suites against them.
-- **M2 is done and merged** (PRs #10 to #13, squashed onto `main` on 2026-11-23; [the M2
-  plan](2026-11-23-m2-plan.md); the close-outs below): the plan and the records, #10; the
-  bindings, #11; the verbs, #12; then the closing review's fixes, #13.
+- **M2 is done and merged** (PRs #10 to #13: #10 and #11 squashed onto `main` on 2026-11-23,
+  #12 on 2026-11-24, and #13 after it; [the M2 plan](2026-11-23-m2-plan.md); the close-outs
+  below): the plan and the records, #10; the bindings, #11; the verbs, #12; then the closing
+  review's fixes, #13.
   - **Three verbs,** `random-bytes`, `blake2b` and `constant-time-bytevector=?`, in
     `(chez-sodium private byte-verbs)` beside native, with the cap, `input-cap`, in
     `(chez-sodium private cap)`. `(chez-sodium)` exports them, and `&sodium-failed`'s three
@@ -113,7 +114,14 @@ its questions on 2026-11-23:
   and the import clauses whole. Those rows read `byte-verbs.sls` alone (M2S2-F1; M2-F5).
 - **Row 24 for the password verbs goes through the decoy:** each new decoy entry names its
   blocks through the weak `watch_set`, through its pointers' `volatile uintptr_t` copies, and
-  `test-decoy-source`'s list and `every-entry` gain the new entries (ADR-0011, amended; M2-F5).
+  `test-decoy-source`'s list and `(library-loading)`'s `every-entry` gain the new entries
+  (ADR-0011, amended; M2-F5).
+- **R16 for the password verbs reaches every refusal that states a bound,** each with a secret
+  that passes the type check, and finds neither its text, its bytes as written, nor its length.
+  A password is a string, so one passed where a bound goes must be refused by its kind
+  (M2C-F1).
+- **A new `tests/*.c` joins `test-decoy-source`'s every-file row,** and includes no local file
+  (M2C-F5).
 
 ## Owed to M4
 
@@ -131,7 +139,7 @@ its questions on 2026-11-23:
 
 ## Close-outs
 
-### 2026-11-23 — M2's closing review and its fixes (PR #13)
+### 2026-11-24 — M2's closing review and its fixes (PR #13)
 
 - **Reviewed:** M2's closing review, on Opus, read-only, over the plan and both slices, found no
   blocker, 1 major and 6 minors
@@ -153,11 +161,30 @@ its questions on 2026-11-23:
   - two plan-listed mutants are added to slice 2's log, each killed (M2-F3);
   - ADR-0007 and ADR-0011 gain slice 2's two review fixes, accepted by the owner (M2-F4);
   - three more items owed to M3 (M2-F5);
-  - the refusals' messages state their bounds, by the owner's choice, and `refuse-secret` takes
-    an optional non-secret detail (M2-F6);
+  - the refusals' messages state their bounds, by the owner's choice (M2-F6);
   - wording (M2-F7).
 - **Fixed** on `m2-closing` by one Sonnet fixer, on the code, and the caller, on the records.
   Every mutant is logged ([the closing fixes' log](m2-closing-mutation-log.md)).
+- **The fixes' second review,** on Opus, read-only, since they change rules, found no blocker,
+  2 majors and 6 minors
+  ([research/m2-closing-fix-review/](research/m2-closing-fix-review/README.md)). Each is fixed.
+  - **M2C-F1:** M2-F6's fix gave `refuse-secret` a free-text DETAIL, held by a comment alone.
+    Mutants that wrote the key's text, or the input's length, into the message passed every
+    suite, since R16 reached only the type refusals. The owner chose, on 2026-11-24, bounds as
+    numbers: `refuse-secret` takes LOW and HIGH, two exact naturals, and writes the sentence
+    itself; anything else there is its own refusal, by kind (which settles M2C-F6). R16 now
+    reaches every refusal that states a bound, with secrets of `hunter2` that pass the type
+    check, and finds neither their text, their bytes as written, nor their length.
+  - **M2C-F2:** `test-decoy-source` joined a directive's continuation with a space, where C
+    joins with nothing, and missed a CRLF continuation. A name or a `##` cut inside a `#define`
+    passed it. It now joins as C does.
+  - **The minors:** a splice that ends a comment or a string is refused, read from the raw line
+    (M2C-F3); a `%:` digraph is refused (M2C-F4); `"sodium.h"` in quotes is a local include,
+    and the include rule reads every `tests/*.c` (M2C-F5); this close-out's dates (M2C-F7); and
+    wording (M2C-F8).
+  - **Fixed** by two Sonnet fixers on disjoint files, the scanner and the bound, and the caller
+    on the records and R16's bytes needle. The caller rebuilt seven of their mutants by hand,
+    and each failed.
 
 ### 2026-11-23 — M2 slice 2: the verbs (PR #12)
 

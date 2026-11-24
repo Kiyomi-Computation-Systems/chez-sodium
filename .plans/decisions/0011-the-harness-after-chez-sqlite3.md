@@ -166,10 +166,10 @@ Accepted (the owner, 2026-11-23), from M2 slice 1's review, M2S1-F2.
   libsodium's gives Valgrind nothing of ours to read.
 - **Any other C program a suite runs starts through `gated-command`, or is named here.** The
   decoy's overflow row, which a C driver first ran, now runs in a gated Chez child.
-- **The wipe row has two children now,** the helper's and the verbs', where decision 1 and the
-  M1 amendment say "the wipe row's child". Each runs outside the gate, and sets `LD_PRELOAD` to
-  the interposer alone. Added after M2's closing review (M2-F4), accepted by the owner that
-  day.
+- **The wipe row has two children now,** the helper's and the verbs', where decision 1 says "the
+  wipe row's child" and the M1 amendment "the wipe child". Each runs outside the gate, and sets
+  `LD_PRELOAD` to the interposer alone. Added after M2's closing review (M2-F4), accepted by the
+  owner that day.
 
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md
 [ADR-0004]: 0004-a-threaded-chez.md

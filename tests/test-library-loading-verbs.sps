@@ -35,8 +35,8 @@
 ;;; control build under sizes-other. Against the real library each size
 ;;; function answers what its twins do, so no row there can tell the oracle's
 ;;; line for one from another's; here the five answers differ, and each line
-;;; is held to its own function. It is the last row that spawns, since its
-;;; switch is set in this process's environment, and every other child sets or
+;;; is held to its own function. Its switch is set in this process's
+;;; environment, which is safe in any order: every verb row's child sets or
 ;;; unsets its own.
 ;;;
 ;;; Under the memory gate each child runs under a Valgrind of its own

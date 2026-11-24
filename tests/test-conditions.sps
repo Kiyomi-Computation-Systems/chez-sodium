@@ -459,23 +459,79 @@
         (raised (lambda () (refuse-secret 'w 'r 123456 'x)))
         (raised (lambda () (refuse-secret (list #\p #\w) 'r 'p 'x)))))
 
-(test-equal "refuse-secret refuses a detail that is no string, from itself, showing it by shown-value: a number, a symbol and a list of them as they are, anything else by kind"
-  '((assertion-violation refuse-secret (detail 65536))
-    (assertion-violation refuse-secret (detail up-to))
-    (assertion-violation refuse-secret (detail (1 2)))
-    (assertion-violation refuse-secret (detail (kind bytevector)))
-    (assertion-violation refuse-secret (detail (kind vector))))
-  (list (raised (lambda () (refuse-secret 'w 'r 'p "v" 65536)))
-        (raised (lambda () (refuse-secret 'w 'r 'p "v" 'up-to)))
-        (raised (lambda () (refuse-secret 'w 'r 'p "v" '(1 2))))
-        (raised (lambda () (refuse-secret 'w 'r 'p "v" (string->utf8 "hunter2"))))
-        (raised (lambda () (refuse-secret 'w 'r 'p "v" (vector 1))))))
+;; A bound that is no exact natural is refused by refuse-secret itself, by its
+;; kind: a string, a float, a negative, a bytevector holding a secret, and #f,
+;; which is no "no bound" (the call has six arguments).
+(test-equal "refuse-secret refuses a low that is no exact natural, from itself, naming low, showing it by its kind alone: a string, a float, a negative, a bytevector and #f"
+  '((assertion-violation refuse-secret (low (kind string)))
+    (assertion-violation refuse-secret (low (kind number)))
+    (assertion-violation refuse-secret (low (kind number)))
+    (assertion-violation refuse-secret (low (kind bytevector)))
+    (assertion-violation refuse-secret (low (kind boolean))))
+  (list (raised (lambda () (refuse-secret 'w 'r 'p "v" "hunter2" 10)))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" 1.5 10)))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" -1 10)))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" (string->utf8 "hunter2") 10)))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" #f 10)))))
 
-(test-equal "refuse-secret with a detail, a string, refuses as without it: the irritants are the rule, the parameter and the kind, whatever the detail says"
-  '((assertion-violation w (r p (kind string)))
+(test-equal "refuse-secret refuses a high that is no exact natural, from itself, naming high, showing it by its kind alone: a string, a float, a negative, a bytevector and #f"
+  '((assertion-violation refuse-secret (high (kind string)))
+    (assertion-violation refuse-secret (high (kind number)))
+    (assertion-violation refuse-secret (high (kind number)))
+    (assertion-violation refuse-secret (high (kind bytevector)))
+    (assertion-violation refuse-secret (high (kind boolean))))
+  (list (raised (lambda () (refuse-secret 'w 'r 'p "v" 0 "hunter2")))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" 0 1.5)))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" 0 -1)))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" 0 (string->utf8 "hunter2"))))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" 0 #f)))))
+
+(test-equal "refuse-secret checks low before high: two bad bounds are refused as low"
+  '(assertion-violation refuse-secret (low (kind string)))
+  (raised (lambda () (refuse-secret 'w 'r 'p "v" "hunter2" "hunter2"))))
+
+(test-equal "refuse-secret refuses a low above the high as high, from itself, and a low equal to the high is no refusal of the bound"
+  '((assertion-violation refuse-secret (high (kind number)))
     (assertion-violation w (r p (kind string))))
-  (list (raised (lambda () (refuse-secret 'w 'r 'p "v" "at most 65536 bytes")))
-        (raised (lambda () (refuse-secret 'w 'r 'p "v" "")))))
+  (list (raised (lambda () (refuse-secret 'w 'r 'p "v" 11 10)))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" 10 10)))))
+
+(test-equal "refuse-secret checks who, rule and parameter before the bound"
+  '((assertion-violation refuse-secret (who (kind string)))
+    (assertion-violation refuse-secret (rule (kind string)))
+    (assertion-violation refuse-secret (parameter (kind number))))
+  (list (raised (lambda () (refuse-secret "v" 'r 'p 'x "hunter2" -1)))
+        (raised (lambda () (refuse-secret 'w "hunter2" 'p 'x "hunter2" -1)))
+        (raised (lambda () (refuse-secret 'w 'r 123456 'x "hunter2" -1)))))
+
+(test-equal "refuse-secret with a bound refuses as without it: the irritants are the rule, the parameter and the kind, whatever the bound says"
+  '((assertion-violation w (r p (kind string)))
+    (assertion-violation w (r p (kind string)))
+    (assertion-violation w (r p (kind string)))
+    (assertion-violation w (r p (kind string))))
+  (list (raised (lambda () (refuse-secret 'w 'r 'p "v")))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" 0 65536)))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" 16 64)))
+        (raised (lambda () (refuse-secret 'w 'r 'p "v" 0 0)))))
+
+;; A call with five arguments matches no clause: what Chez raises names the
+;; count and the procedure, and holds none of the arguments.
+(test-equal "refuse-secret called with five arguments raises Chez's own refusal, whose irritants and printed form hold no part of the arguments"
+  '(raised (clean clean clean clean clean))
+  (let ((outcome (guard (e (#t e))
+                   (refuse-secret 'whoever 'ruling 'param (string->utf8 "hunter2") 4242424)
+                   'no-raise)))
+    (if (condition? outcome)
+        (let ((text (string-append
+                     (describe outcome)
+                     (if (irritants-condition? outcome)
+                         (call-with-string-output-port
+                          (lambda (port) (write (condition-irritants outcome) port)))
+                         ""))))
+          (list 'raised
+                (map (lambda (part) (if (contains? text part) 'leaks 'clean))
+                     (list "hunter2" "4242424" "whoever" "ruling" "param"))))
+        (list 'no-raise outcome))))
 
 ;; --- &sodium-failed ------------------------------------------------------------------
 

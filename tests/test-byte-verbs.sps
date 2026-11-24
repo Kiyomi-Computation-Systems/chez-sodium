@@ -608,7 +608,9 @@
 ;; (kind K): a value shown by shown-value, a symbol or a number as itself,
 ;; would differ from them. This row holds the same, over every refusal at
 ;; once, and that no refusal's condition holds the secret anywhere, message
-;; included, by printing each and searching for the secret's text.
+;; included, by printing each and searching for the secret's text. It reaches
+;; the type refusals, and the refusals that state a bound: the cap, for the
+;; input, a and b, and the key's length range.
 
 ;; occurs-in? : String String -> Boolean
 (define (occurs-in? needle text)
@@ -643,6 +645,50 @@
                     'leaks))
                   conditions needles)))))
  secret-calls)
+
+;; hunter-bytes : Natural -> Bytevector
+;; N bytes, "hunter2" repeated: a bytevector that passes the type check, whose
+;; text and length a refusal must not print.
+(define (hunter-bytes n)
+  (let ((seed (string->utf8 "hunter2")) (out (make-bytevector n 0)))
+    (do ((i 0 (+ i 1))) ((= i n) out)
+      (bytevector-u8-set! out i (bytevector-u8-ref seed (mod i 7))))))
+
+;; Each refusal that states a bound: the secret's length is not the bound, and
+;; neither it, its text, nor its bytes as written may be printed. The empty key is refused with a
+;; bound too, but it has no text and its length, 0, is its rule, so it is not
+;; searched. The bound a message states (65536, 16, 64) is read off the
+;; printed condition first, so a printed condition is shown to carry it.
+(define bound-calls
+  (list (list "blake2b input of 65537 bytes" 65537 "65536"
+              (lambda (s) (blake2b s)))
+        (list "blake2b key of 15 bytes" 15 "16"
+              (lambda (s) (blake2b abc 32 s)))
+        (list "blake2b key of 65 bytes" 65 "64"
+              (lambda (s) (blake2b abc 32 s)))
+        (list "constant-time-bytevector=? a of 65537 bytes" 65537 "65536"
+              (lambda (s) (constant-time-bytevector=? s abc)))
+        (list "constant-time-bytevector=? b of 65537 bytes, a valid a" 65537 "65536"
+              (lambda (s) (constant-time-bytevector=? abc s)))))
+
+(for-each
+ (lambda (call)
+   (test-equal (string-append "R16 " (car call)
+                              ": refused, the printed refusal states the bound, and names neither the secret's text nor its length")
+     '(refused states-bound clean clean)
+     (let* ((n (cadr call))
+            (c (guard (e (#t e)) ((cadddr call) (hunter-bytes n)) 'no-raise)))
+       (if (assertion-violation? c)
+           (let ((text (describe c)))
+             (list 'refused
+                   (if (occurs-in? (caddr call) text) 'states-bound 'no-bound-stated)
+                   (if (or (occurs-in? "hunter2" text)
+                           (occurs-in? "104 117 110 116 101 114 50" text))
+                       'leaks
+                       'clean)
+                   (if (occurs-in? (number->string n) text) 'leaks 'clean)))
+           (list 'not-refused c)))))
+ bound-calls)
 
 ;; --- the cap and the exports ---------------------------------------------------------------------
 
@@ -935,8 +981,8 @@
                          (make-transcoder (utf-8-codec)))
    get-string-all))
 
-(test-equal "S5 input-cap is written in each verb's definition as many times as it checks a length: random-bytes 1, blake2b 1, the compare 2"
-  '((random-bytes 1) (blake2b 1) (constant-time-bytevector=? 2))
+(test-equal "S5 input-cap is written in each verb's definition once for each length it checks and once for each secret refusal that states it as the bound: random-bytes 1 (its message is written apart), blake2b 2, the compare 4"
+  '((random-bytes 1) (blake2b 2) (constant-time-bytevector=? 4))
   (map (lambda (name) (list name (count-of 'input-cap (tokens (definition-form name)))))
        verb-names))
 
