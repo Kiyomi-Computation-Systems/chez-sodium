@@ -1,0 +1,14 @@
+######## ../slice5/prefix-1.0.18/lib/libsodium.so.23
+key0: exit 0; answered 0 
+in0: exit 0; answered 0 
+key16: exit 134;  
+in3: exit 134;  
+cmp0: exit 0; answered 0 
+cmp4: exit 255; Exception: invalid memory reference.  Some debugging context lost 
+######## ../slice5/prefix-1.0.22/lib/libsodium.so.26
+key0: exit 0; answered 0 
+in0: exit 0; answered 0 
+key16: exit 134;  
+in3: exit 134;  
+cmp0: exit 0; answered 0 
+cmp4: exit 255; Exception: invalid memory reference.  Some debugging context lost 

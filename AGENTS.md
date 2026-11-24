@@ -4,9 +4,11 @@
 
 * **M1 is done: one verb, `sodium-version`.** M0 built the records, the container, the
   test harness, the memory gate and CI. M1 built the load, the block helper and CI's
-  `floor` and `current` lanes (its plan is `.plans/2026-11-22-m1-plan.md`). M2 comes
-  next: `random-bytes`, `blake2b` and `constant-time-bytevector=?`, built on M1's
-  helper. `.plans/progress.md` says where the project stands and what comes next.
+  `floor` and `current` lanes (its plan is `.plans/2026-11-22-m1-plan.md`). M2 is under
+  way: `random-bytes`, `blake2b` and `constant-time-bytevector=?`, built on M1's helper,
+  in `(chez-sodium private byte-verbs)` beside native (its plan is
+  `.plans/2026-11-23-m2-plan.md`). `.plans/progress.md` says where the project stands and
+  what comes next.
 * The plan is the brief, `.plans/2026-11-22-chez-sodium-project-brief.md`. Read it before
   any work.
   - Its §11 holds the owner's decisions; its §10 records that nothing is open.
@@ -201,7 +203,8 @@
   - Without it, an engine's expiry frees the block, and the resume is refused as a
     re-entry.
   - A collect-safe call inside it still lets other threads collect. Scheme's copy
-    loops inside it do not, so inputs are capped at 64 KiB.
+    loops inside it do not, so inputs are capped at 64 KiB: `input-cap`, written once,
+    in `(chez-sodium private cap)`.
 * No `lock-object` for data: every raising path would need an unlock, and a
   missed one is invisible (chez-sqlite3 ADR-0011).
 * Only one library holds `foreign-procedure`, and only one holds `foreign-alloc`,
@@ -244,8 +247,8 @@
   `unsigned-64` and `uptr` take −1 as 2⁶⁴−1. Check that each value fits its C type
   before the section (chez-sqlite3 ADR-0011, amended).
 * No pointer passed to libsodium is ever NULL, even with a length of 0: pass a block
-  of at least one byte. libsodium's headers mark its pointers `nonnull`, and a NULL
-  with a nonzero length aborts the process.
+  of at least one byte. A NULL with a nonzero length aborts the process, or crashes it,
+  whether or not the header marks the pointer `nonnull`; many are unmarked.
 * libsodium answers an opslimit as `size_t` and takes one as `unsigned long long`.
   Bind each by the type C names, in the convention table (brief §3.4, §11.7).
 * An array size in a C prototype documents a buffer; it binds nothing.
@@ -254,7 +257,8 @@
   a header becomes a rule (brief §4.1; review L-F7).
 * A decoy or oracle that includes `sodium.h` logs a pointer through a
   `volatile uintptr_t`. Testing a `nonnull` parameter against NULL is an error under
-  `-Wall -Werror`, and GCC may delete the test.
+  `-Wall -Werror`, and GCC may delete the test. The compile catches it only where the
+  header says `nonnull`, so `test-decoy-source` reads the decoy for every pointer.
 
 ## Closing ritual
 

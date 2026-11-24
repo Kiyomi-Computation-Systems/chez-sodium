@@ -1,0 +1,13 @@
+ok      1.0.18  grand hash c23a7800d98123bd10f506c61e29da5603d763b8bbad2e737f5e765a7bccd475  OK
+(1968 bytes concatenated) oneshot 1.0.18  grand hash c23a7800d98123bd10f506c61e29da5603d763b8bbad2e737f5e765a7bccd475  OK
+size    1.0.18  grand hash 2077ce4f941fa3714aebc3081b27aaafe6550b95ea7c9dcac4be32fc8cce024b  FAIL
+inlen   1.0.18  grand hash 6df508088d244b7fc048ed263871852a3ca07e0c21f3913b346f922c57132f8e  FAIL
+keylen  1.0.18  grand hash 109133d98abcb92c2bd4381c04e6929608969392a7a7544816ef526b52edd639  FAIL
+nokey   1.0.18  grand hash 538d73876cd70eed36537379b1f0894ced57f1068f147612a5c92c6d981a7f97  FAIL
+ok      1.0.22  grand hash c23a7800d98123bd10f506c61e29da5603d763b8bbad2e737f5e765a7bccd475  OK
+(1968 bytes concatenated) oneshot 1.0.22  grand hash c23a7800d98123bd10f506c61e29da5603d763b8bbad2e737f5e765a7bccd475  OK
+size    1.0.22  grand hash 2077ce4f941fa3714aebc3081b27aaafe6550b95ea7c9dcac4be32fc8cce024b  FAIL
+inlen   1.0.22  grand hash 6df508088d244b7fc048ed263871852a3ca07e0c21f3913b346f922c57132f8e  FAIL
+keylen  1.0.22  grand hash 109133d98abcb92c2bd4381c04e6929608969392a7a7544816ef526b52edd639  FAIL
+nokey   1.0.22  grand hash 538d73876cd70eed36537379b1f0894ced57f1068f147612a5c92c6d981a7f97  FAIL
+published result: c23a7800d98123bd10f506c61e29da5603d763b8bbad2e737f5e765a7bccd475

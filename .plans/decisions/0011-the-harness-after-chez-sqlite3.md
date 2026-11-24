@@ -4,6 +4,8 @@
   M1's plan, and accepted by the owner that day ([amendment](#amendment-2026-11-23-m1s-plan)).
   Its "Changing a floor" consequence points at [ADR-0003]'s amendment, "raising the floor",
   since 2026-11-23, after M1's closing review.
+  Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
+  review ([amendment](#amendment-2026-11-23-m2s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** development tooling, the suites and CI; no library change
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §7, §8.2, §9's M0, and
@@ -119,6 +121,34 @@ items 4 and 6, and §4.2, item 8.
   trap, so the rule is applied, not discovered.
 - **The wipe child's `LD_PRELOAD` is set alone** (measured: a parent under Valgrind holds
   `vgpreload_core` and `vgpreload_memcheck` in its own).
+
+## Amendment, 2026-11-23: M2's plan
+
+Accepted (the owner, 2026-11-23), proposed in [the M2 plan](../2026-11-23-m2-plan.md), §4.1, items 3
+and 9.
+
+- **Row 24's verb half runs against the decoy.** The interposer cannot wrap the real
+  `crypto_generichash`: Chez binds each name from the most recently loaded object, which is
+  libsodium, even with the interposer preloaded (probed in M2 slice 0's review). So each of the
+  decoy's M2 entries names every pointer it is handed to the interposer, with the length it is
+  handed, through a weak `watch_set`. It resolves in the wipe child, whose `LD_PRELOAD` is the
+  interposer alone; everywhere else it is NULL, and the decoy skips it.
+  - The interposer keeps every name in order, with its length, and a second child of
+    `test-wipe`, its library the decoy, asserts each verb call's whole list of (length verdict)
+    pairs, so a block left unnamed makes the list shorter.
+  - Every witnessed block holds a non-zero byte before its wipe: the decoy writes `A5` over every
+    output, under every switch, and the child's inputs each hold a non-zero byte.
+  - A block named with length 0 reads 1 whatever happens; `random-bytes 0` makes no block.
+  - Its standing control: each M2 entry, called through native's raw binding on blocks the child
+    frees unwiped, reads 2 for each.
+- **The decoy's pointer rule is held by `test-decoy-source`,** which reads every `tests/*.c` that
+  includes `sodium.h`, comments and strings stripped. In each definition of a function `sodium.h`
+  declares, each pointer parameter, written with a `*` or as an array, occurs once, as the value
+  of a `volatile uintptr_t`. The decoy's own helpers are outside it. A `-Werror` compile holds the
+  rule only for a `nonnull` parameter, and at 1.0.18 and 1.0.22 that is `randombytes_buf`'s `buf`
+  and `crypto_generichash`'s `out` alone, of M2's six pointers (measured).
+- **The decoy's call log is loud when full:** its last entry is `overflow`, and it takes no more,
+  so a row that reads "no C was called" from the log's growth cannot pass on a full log.
 
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md
 [ADR-0004]: 0004-a-threaded-chez.md

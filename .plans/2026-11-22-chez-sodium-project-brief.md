@@ -61,7 +61,7 @@ decision (§11.4).
 | `crypto_pwhash_str_needs_rehash`, `crypto_pwhash_strprefix` | `password-needs-rehash?` | at login, re-hash a hash that is not what `password-hash` would make now (§4.2) |
 | `crypto_pwhash_strbytes`, `_opslimit_*`, `_memlimit_*`, `_passwd_min`, `_passwd_max` | the limits | ranges, and the three presets: interactive, moderate, sensitive |
 | `randombytes_buf` | `random-bytes` | make an API key |
-| `crypto_generichash`, with its `_bytes*` and `_keybytes*` | `blake2b` | store an API key as its BLAKE2b hash |
+| `crypto_generichash`, with `_bytes`, `_bytes_min`, `_bytes_max`, `_keybytes_min` and `_keybytes_max` (ADR-0005, amended) | `blake2b` | store an API key as its BLAKE2b hash |
 | `sodium_memcmp` | `constant-time-bytevector=?` | general: compare a secret or a MAC in constant time. Techo v1 has no such compare (§11.4). |
 | `sodium_memzero` | none; used inside | wipe every block before it is freed (§6.3) |
 
@@ -147,10 +147,10 @@ Specified now so the design leaves room; built when Techo needs it.
 | `crypto_pwhash_str_needs_rehash` | `int (const char str[STRBYTES], unsigned long long opslimit, size_t memlimit)` | 0 when t and m/1024 match; 1 when either differs, lower or higher; -1 when it cannot parse the string, even a long one verify accepts. Ignores the algorithm, since it dispatches on the prefix, and ignores p and the salt and tag lengths (L-F6). |
 | `crypto_pwhash_strprefix` | `const char *(void)` | `"$argon2id$"` at 1.0.18 and 1.0.22: the default algorithm's prefix |
 | `crypto_pwhash_strbytes`, `_opslimit_{min,max,interactive,moderate,sensitive}`, `_memlimit_{min,max,interactive,moderate,sensitive}`, `_passwd_min`, `_passwd_max` | `size_t (void)` | At 1.0.18: ops 1 to 2³²−1; memory 8192 to 4398046510080 bytes; password 0 to 2³²−1 bytes; `strbytes` 128. The presets are interactive (2, 64 MiB), moderate (3, 256 MiB) and sensitive (4, 1 GiB). **An opslimit comes back as `size_t` and is passed as `unsigned long long`;** every value fits both. |
-| `randombytes_buf` | `void (void *buf, size_t size)` | Backed by `getrandom`, with no state, so safe across threads and `fork`. `nonnull` even at size 0. Aborts if no entropy source is available. Its bound, `randombytes_BYTES_MAX`, is a macro only. |
-| `crypto_generichash` | `int (unsigned char *out, size_t outlen, const unsigned char *in, unsigned long long inlen, const unsigned char *key, size_t keylen)` | 0; or -1 for an output of 0 or over 64 bytes, or a key over 64. **Accepts sizes and keys of 1 to 15 bytes**, below the published 16. A key of length 0 gives the unkeyed hash. A NULL key or input with a nonzero length aborts (L-F8). |
-| `crypto_generichash_bytes`, `_bytes_min`, `_bytes_max`, `_keybytes`, `_keybytes_min`, `_keybytes_max` | `size_t (void)` | 32, 16, 64; 32, 16, 64 |
-| `sodium_memcmp` | `int (const void *b1, const void *b2, size_t len)` | 0 equal, -1 different, in constant time; 0 at length 0 |
+| `randombytes_buf` | `void (void *buf, size_t size)` | Backed by `getrandom`, with no state, so safe across threads and `fork`. `nonnull` even at size 0. Aborts if no entropy source is available. Its bound, `randombytes_BYTES_MAX`, is a macro only: 2³²−1 at 1.0.18 and 1.0.22. |
+| `crypto_generichash` | `int (unsigned char *out, size_t outlen, const unsigned char *in, unsigned long long inlen, const unsigned char *key, size_t keylen)` | 0; or -1 for an output of 0 or over 64 bytes, or a key over 64. **Accepts sizes and keys of 1 to 15 bytes**, below the published 16. A key of length 0 gives the unkeyed hash, whatever its block holds. A -1 leaves `out` as it was. A NULL key or input with a nonzero length aborts (L-F8), though the header marks only `out` `nonnull` (M2 plan §5.1). |
+| `crypto_generichash_bytes`, `_bytes_min`, `_bytes_max`, `_keybytes`, `_keybytes_min`, `_keybytes_max` | `size_t (void)` | 32, 16, 64; 32, 16, 64. `_keybytes` is not bound: it has no use (ADR-0005, amended). |
+| `sodium_memcmp` | `int (const void *b1, const void *b2, size_t len)` | 0 equal, -1 different, in constant time, and never another answer; 0 at length 0. No `nonnull`; NULL with a nonzero length crashes (M2 plan §5.1). |
 | `sodium_memzero` | `void (void *pnt, size_t len)` | |
 | `crypto_hash_sha256` | `int (unsigned char *out, const unsigned char *in, unsigned long long inlen)` | |
 | `crypto_auth_hmacsha256_init`, `_update`, `_final`; `_statebytes` | `int (state *, const unsigned char *key, size_t keylen)`; `int (state *, const unsigned char *in, unsigned long long inlen)`; `int (state *, unsigned char *out)`; `size_t (void)` | The state is 208 bytes with 8-byte alignment, which a `malloc`'d block meets. `_final` wipes it. `key` is `nonnull` at 1.0.18. |
@@ -161,9 +161,10 @@ What this changes in the brief:
 - **A hash string may not, and its block ends in a 0.** libsodium reads it as a C
   string, so it would judge `"<good hash>\0junk"` as the good hash (§4.1).
 - **No pointer is ever NULL.**
-  - At runtime, libsodium accepts NULL with a length of 0, but the headers say
-    `nonnull`.
-  - NULL with a nonzero length aborts the process.
+  - At runtime, libsodium accepts NULL with a length of 0, but some headers say
+    `nonnull`: of M2's six pointers, `randombytes_buf`'s and `crypto_generichash`'s `out`
+    (M2 plan §5.1).
+  - NULL with a nonzero length aborts the process, or crashes it.
   - So every pointer is a block of at least one byte (§6.1).
 - **Every Tier 1 call is thread-safe once `sodium_init` has run.**
 
@@ -286,8 +287,9 @@ pattern:
     variable cannot silently mean no key (L-F8).
   - With no key, the binding passes a one-byte block with a length of 0, never NULL.
 - **`constant-time-bytevector=? a b`.**
-  - Different lengths answer `#f` at once. Equal lengths go to `sodium_memcmp` over the
-    whole length, in constant time.
+  - Different lengths answer `#f` at once, once each operand is within the cap (§4.4;
+    ADR-0007, amended). Equal lengths go to `sodium_memcmp` over the whole length, in
+    constant time.
   - Only the lengths leak. It is not an ordering.
   - It is general: Techo v1 does not use it.
 
@@ -332,10 +334,14 @@ Smaller than chez-sqlite3's tree, with the same shape and helpers.
   answer of 1 means libsodium was already initialised, and the load goes on.
 - **`below-floor` covers a version string the load cannot read:** NULL, or a string that
   is not three naturals (ADR-0003, amended).
-- **`&sodium-failed` has one case:** `crypto_pwhash_str` answering -1 for limits that
-  passed their range check, which means it could not get the memory. Its fields are
-  `function` and `code`, with the verb as its `&who` (ADR-0006, amended). It carries no
-  secret.
+- **`&sodium-failed` has two cases** (ADR-0006, amended):
+  - `crypto_pwhash_str` answering -1 for limits that passed their range check, which means
+    it could not get the memory;
+  - `crypto_generichash` answering -1 for a size and key that passed theirs, which no
+    release does: a decoy reaches it.
+
+  Its fields are `function` and `code`, with the verb as its `&who`. It carries no secret.
+  `crypto_generichash`'s case is any answer but 0 (ADR-0006, amended).
 - **What is not a condition** (L-F2). The documents say so:
   - `password-verify`'s -1 for no memory reads as `#f` (§4.1).
   - **In a container with a memory limit, a hash that asks for more than is left gets
@@ -573,7 +579,7 @@ it catches.
 | 14 | `constant-time-bytevector=?` | Equal pairs; pairs that differ only in the first byte, or only in the last; a prefix pair; different lengths; both empty. The decoy logs `sodium_memcmp`'s length as the whole length. | `bytevector=?`; a short length; comparing only the shorter length |
 | 15 | A caller's mistakes | For each verb: each wrong type; each size, key length or limit out of range; an input over the cap, other than a hash string (row 9); an empty key. Each raises `&assertion`, and the decoy's log shows no libsodium call. | a missing range check. C will not catch sizes of 1 to 15 bytes (P-F9) |
 | 16 | Secrets in conditions | Pass a secret-looking symbol, number and character list as each verb's secret parameters. No message or irritant holds any of it. | `shown-value` used on a secret |
-| 17 | Raised after the section | A decoy `crypto_pwhash_str` answers -1, under a guard for something else. The outer guard catches the `&sodium-failed` itself. | a raise from inside the extent (X-M2) |
+| 17 | Raised after the section | A decoy `crypto_pwhash_str` answers -1, and a decoy `crypto_generichash` answers -1 and 1 (ADR-0006, amended), each under a guard for something else. The outer guard catches the `&sodium-failed` itself. | a raise from inside the extent (X-M2) |
 | 18 | Engines | Each verb under an engine, at every fuel from 1 until it completes. Each run answers right, raises nothing, and leaves no live block. | §6.2's section missing (X-M1) |
 | 19 | Collect-safe | chez-sqlite3's FIFO pattern. Decoy `crypto_pwhash_str` and `_verify` block on a FIFO. Another thread's `collect-rendezvous` ends within a time bound while they block, then the test releases them. No high limit is used, and it runs under Valgrind. | either call bound as plain (X-M3) |
 | 20 | The load | Decoys reach `below-floor`, `missing-api` and `init-failed`, and a `sodium_init` that answers 1, which loads. A decoy whose version string and major/minor disagree shows that the string decides. `invalid-override`, `load-failed` and `not-found` are reached as chez-sqlite3 reaches them, without a decoy. | a floor read from the wrong numbers |

@@ -4,6 +4,8 @@
   types are brief §11.7. Decision 10's allow-lists amended 2026-11-23, after M1 slice 0's review,
   and accepted by the owner that day; recorded in this form after M1's closing review
   ([amendment](#amendment-2026-11-23-the-allow-lists)).
+  Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
+  review ([amendment](#amendment-2026-11-23-m2s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** chez-sodium: every binding to libsodium
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §2, §3.4, §6.1 and §6.4
@@ -100,6 +102,34 @@ in place; M1's closing review (M1-F9) restored its first text above and moved th
   joins the results with M2's first size function, and `unsigned-64` the arguments with
   `crypto_generichash`'s `inlen`.
 - **`test-conventions` holds it:** "the types its rows use are exactly the allowlists'".
+
+## Amendment, 2026-11-23: M2's plan
+
+Accepted (the owner, 2026-11-23), proposed in [the M2 plan](../2026-11-23-m2-plan.md), §4.1, items 7
+and 8. Item 7 was put to the owner beside the verbs' home, and confirmed with this amendment.
+
+- **Decision 2's sizes are read once, at the load.** Native's last step calls each of
+  `crypto_generichash`'s five size functions once and records its answer ([ADR-0002], amended),
+  and the verbs check their arguments against the recorded numbers, before their sections, in
+  Scheme. A size is fixed for a build of libsodium; a call at each verb would be a C call outside
+  the section, or five more inside it.
+- **Decision 2 now has a check, by behaviour.** The decoy's `sizes-other` answers 33, 8, 80, 9
+  and 81, which no release answers, and whose bounds lie outside the real ones. Through it,
+  `blake2b`'s default answer is 33 bytes; sizes 7 and 81 are refused, and 8 and 80 accepted; keys
+  of 8 and 82 bytes are refused, and 9 and 81 accepted. A size written in Scheme, in place of the
+  read one or beside it, fails one of these.
+- **Only `crypto_generichash`'s five sizes are read at the load** by this amendment. M3's
+  constants decide their own reading.
+- **The recorded sizes are held to the library on every lane:** the C oracle prints each size
+  function's answer and its header macro, and `test-native` holds native's numbers to both, and
+  to brief §3.4's (row 22). There is no constants half in `test-constants`.
+- **The context's "libsodium's headers mark its pointers `nonnull`" is too wide.** At 1.0.18 and
+  1.0.22, of M2's six pointers only `randombytes_buf`'s `buf` and `crypto_generichash`'s `out`
+  are marked, and `sodium_memzero`'s is not. A NULL with a nonzero length aborts or crashes
+  either way, so decision 5 stands (measured,
+  [research/m2-plan/](../research/m2-plan/README.md)).
+- **The allow-lists grow as the earlier amendment says:** `unsigned-64` joins the arguments with
+  `crypto_generichash`'s `inlen`, and `size_t` the results with the first size function.
 
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md

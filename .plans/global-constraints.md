@@ -31,7 +31,8 @@ record it comes from, and where a rule and its record disagree, the record wins.
 
 - **A function is bound only if Techo has a named use for it.** `constant-time-bytevector=?` is
   the one exception. Adding one takes a row in the brief's subset, a row in the convention table,
-  and a test on every supported libsodium ([ADR-0005]).
+  and a test on every supported libsodium. `crypto_generichash_keybytes` has none, and is not
+  bound ([ADR-0005], amended).
 - **No verb holds state between calls: no handles.** `hmac-sha256` is one call, and streaming
   SHA-256 is out ([ADR-0005]).
 - **The verbs' names are the brief's §4, with no prefix,** exported by `(chez-sodium)`. Every
@@ -40,6 +41,10 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **`(chez-sodium)` defines nothing:** it re-exports its private libraries' names, each `eq?` to
   its definition. It exports predicates and accessors, never a `&` name or a constructor
   ([ADR-0012]).
+- **The verbs live beside native,** which keeps the load, the raw bindings and the helpers:
+  `(chez-sodium private byte-verbs)` holds M2's three. It imports `require-threaded` first and
+  nothing from `(chezscheme)`, and holds its checks before its one `call-in-section`; rows read
+  both as data ([ADR-0012], amended).
 - **`check-seam` reads `src/` alone,** with chez-sqlite3's rules (c) to (i) and (k), and rule
   (m): only `native` imports `(chez-sodium private memory)`, and no library exports a name it
   imports from `memory` ([ADR-0012]).
@@ -52,7 +57,8 @@ record it comes from, and where a rule and its record disagree, the record wins.
 
 - **No C shim; nothing is compiled at install.** Every binding is a `foreign-procedure` in a
   `(chez-sodium private …)` library, and every constant is read through libsodium's own function
-  for it ([ADR-0001]).
+  for it. `crypto_generichash`'s five sizes are read once, at the load, and the decoy's
+  `sizes-other` holds that by behaviour ([ADR-0001], amended).
 - **A binding uses the type C names:** `size_t` for `size_t`, as argument and result;
   `unsigned-64` for `unsigned long long`; `uptr` for every pointer. An opslimit is read as
   `size_t` and passed as `unsigned-64` ([ADR-0001]).
@@ -84,12 +90,12 @@ record it comes from, and where a rule and its record disagree, the record wins.
   `libsodium.so.26`, then `libsodium.so.23`; never the bare `libsodium.so`. Discovery is a pure
   function of its inputs ([ADR-0002]).
 - **One load, in order, never fall through:** choose, load, bind the version entries, check the
-  floor, call `sodium_init`, bind the rest. No entry point is optional. The load runs once, and a
-  failure is remembered and raised again ([ADR-0002]).
+  floor, call `sodium_init`, bind the rest, read the sizes ([ADR-0002], amended). No entry point
+  is optional. The load runs once, and a failure is remembered and raised again ([ADR-0002]).
 - **`sodium_init` answering 0 or 1 loads,** and the load records the answer. Any other answer is
   `init-failed`, its detail the answer ([ADR-0002]).
-- **Each milestone binds its own verbs' entry points,** in the load's last step, each with its
-  convention row, its decoy entry, its `missing-api` row and row 22 ([ADR-0002]).
+- **Each milestone binds its own verbs' entry points** in step 6, "bind the rest", each with its
+  convention row, its decoy entry, its `missing-api` row and row 22 ([ADR-0002], amended).
 - **A refusal carries a reason symbol:** `invalid-override`, `not-found`, `load-failed`,
   `below-floor`, `missing-api` or `init-failed`. `not-found` lists every candidate it checked
   ([ADR-0002]).
@@ -100,8 +106,10 @@ record it comes from, and where a rule and its record disagree, the record wins.
 ## Conditions and secrets
 
 - **Every library condition is a `&chez-sodium-error`:** `&sodium-library-unavailable`, or
-  `&sodium-failed`, whose one case is `crypto_pwhash_str` answering -1 for limits that passed
-  their range check. `&sodium-failed`'s fields are `function` and `code` ([ADR-0006]).
+  `&sodium-failed`, whose two cases are `crypto_pwhash_str` answering -1 for limits that passed
+  their range check, and `crypto_generichash` answering anything but 0 for a size and key that
+  passed theirs.
+  `&sodium-failed`'s fields are `function` and `code` ([ADR-0006], amended).
 - **Every raise carries `&who`:** `chez-sodium` for the load's refusals, the public verb for a
   refusal raised through the public surface, the given WHO for a helper's, and its own name for
   an internal invariant's. A condition Chez raises is passed on as raised ([ADR-0006]).
@@ -131,6 +139,11 @@ record it comes from, and where a rule and its record disagree, the record wins.
   bytes.** A string counts its UTF-8 bytes, summed from its characters, never through
   `string->utf8`. Above that is an assertion violation, raised before C. A hash string over the
   cap fails the pre-check instead ([ADR-0007], [ADR-0009]).
+- **The cap is written once,** as `input-cap` in `(chez-sodium private cap)`, and checked for
+  every operand, whatever the verb does next: the compare checks both before it compares their
+  lengths ([ADR-0007], amended).
+- **A size or key length is checked against libsodium's own bounds, before C,** since C accepts
+  sizes and keys of 1 to 15 bytes ([ADR-0007], amended).
 - **No claims, positions or sweeps:** a stateless verb shares no state across sections
   ([ADR-0007]).
 - **`call-in-section` is the one section:** THUNK in one `critical-section`, a raise inside
@@ -223,8 +236,13 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **The wipe row's child sets `LD_PRELOAD` to the interposer alone,** never appended: under the
   gate a suite's own holds Valgrind's preloads ([ADR-0011]).
 - **No exit checks:** the block count is a suite's one check at its end ([ADR-0011]).
-- **A decoy reads each pointer it logs through a `volatile uintptr_t`,** and tests only that
-  ([ADR-0011]).
+- **A decoy reads each pointer it logs through a `volatile uintptr_t`,** and tests only that.
+  `test-decoy-source` holds it for every pointer parameter of every function `sodium.h` declares
+  that a `tests/*.c` defines, since a compile holds it only for a `nonnull` one. The decoy's log
+  ends in `overflow` when full ([ADR-0011], amended).
+- **Row 24 reaches a verb's blocks through the decoy,** whose entries name each block to the
+  wipe child's interposer through a weak `watch_set`; the child asserts each call's whole list
+  of blocks ([ADR-0011], amended).
 - **CI's workflow has one shape, which `make check-ci` holds and `make test` runs.** M0's shape
   is `main`, without `make build` and `check-dev`; `memory`; and `nothreads`. M1 adds `floor` and
   `current`. Actions are pinned by SHA ([ADR-0011]; chez-sqlite3 ADR-0005, amended).

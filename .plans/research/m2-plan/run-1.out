@@ -1,0 +1,58 @@
+######## headers of 1.0.18
+== prototypes.c -Wall -Werror -std=c11
+guile: warning: failed to install locale
+compiled
+randombytes_buf                              1
+crypto_generichash                           1
+crypto_generichash_bytes                     1
+crypto_generichash_bytes_min                 1
+crypto_generichash_bytes_max                 1
+crypto_generichash_keybytes                  1
+crypto_generichash_keybytes_min              1
+crypto_generichash_keybytes_max              1
+sodium_memcmp                                1
+crypto_generichash_bytes                     0
+crypto_generichash                           0
+== decoys, ternary, -Wall -Werror -shared -fPIC
+gh-in-ternary.c: exit 0 
+gh-key-ternary.c: exit 0 
+gh-out-ternary.c: exit 1 Werror=nonnull-compare 
+mc-b1-ternary.c: exit 0 
+mc-b2-ternary.c: exit 0 
+rb-buf-ternary.c: exit 1 Werror=nonnull-compare 
+== decoys, volatile, -Wall -Werror -shared -fPIC
+gh-in-volatile.c: exit 0 
+gh-key-volatile.c: exit 0 
+gh-out-volatile.c: exit 0 
+mc-b1-volatile.c: exit 0 
+mc-b2-volatile.c: exit 0 
+rb-buf-volatile.c: exit 0 
+######## headers of 1.0.22
+== prototypes.c -Wall -Werror -std=c11
+guile: warning: failed to install locale
+compiled
+randombytes_buf                              1
+crypto_generichash                           1
+crypto_generichash_bytes                     1
+crypto_generichash_bytes_min                 1
+crypto_generichash_bytes_max                 1
+crypto_generichash_keybytes                  1
+crypto_generichash_keybytes_min              1
+crypto_generichash_keybytes_max              1
+sodium_memcmp                                1
+crypto_generichash_bytes                     0
+crypto_generichash                           0
+== decoys, ternary, -Wall -Werror -shared -fPIC
+gh-in-ternary.c: exit 0 
+gh-key-ternary.c: exit 0 
+gh-out-ternary.c: exit 1 Werror=nonnull-compare 
+mc-b1-ternary.c: exit 0 
+mc-b2-ternary.c: exit 0 
+rb-buf-ternary.c: exit 1 Werror=nonnull-compare 
+== decoys, volatile, -Wall -Werror -shared -fPIC
+gh-in-volatile.c: exit 0 
+gh-key-volatile.c: exit 0 
+gh-out-volatile.c: exit 0 
+mc-b1-volatile.c: exit 0 
+mc-b2-volatile.c: exit 0 
+rb-buf-volatile.c: exit 0 
