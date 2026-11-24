@@ -48,6 +48,16 @@
   ;; value is eq? to it, so a key of #f is still a refusal.
   (define no-key (list 'no-key))
 
+  ;; cap-message : String
+  (define cap-message
+    (string-append "n is over the cap, " (number->string input-cap)))
+
+  ;; size-message : -> String
+  ;; blake2b's size refusal, with libsodium's range as native read it.
+  (define (size-message)
+    (string-append "size is from " (number->string generichash-bytes-min)
+                   " to " (number->string generichash-bytes-max)))
+
   ;; random-bytes : Natural -> Bytevector
   ;; N bytes from libsodium's generator, N from 0 to the input cap. At 0 it is
   ;; the empty bytevector, and calls no C. Refused before any block: an N that
@@ -59,7 +69,7 @@
       (assertion-violation 'random-bytes "n is not an exact natural"
                            'not-a-natural 'n (shown-value n)))
     (unless (<= n input-cap)
-      (assertion-violation 'random-bytes "n is over the cap"
+      (assertion-violation 'random-bytes cap-message
                            'over-the-cap 'n (shown-value n)))
     (if (= n 0)
         (make-bytevector 0)
@@ -90,21 +100,23 @@
        (unless (bytevector? input)
          (refuse-secret 'blake2b 'not-a-bytevector 'input input))
        (unless (<= (bytevector-length input) input-cap)
-         (refuse-secret 'blake2b 'over-the-cap 'input input))
+         (refuse-secret 'blake2b 'over-the-cap 'input input 0 input-cap))
        (unless (natural? size)
          (assertion-violation 'blake2b "size is not an exact natural"
                               'not-a-natural 'size (shown-value size)))
        (unless (and (>= size generichash-bytes-min) (<= size generichash-bytes-max))
-         (assertion-violation 'blake2b "size is out of range"
+         (assertion-violation 'blake2b (size-message)
                               'size-out-of-range 'size (shown-value size)))
        (unless (or (eq? key no-key) (bytevector? key))
          (refuse-secret 'blake2b 'not-a-bytevector 'key key))
        (unless (or (eq? key no-key) (> (bytevector-length key) 0))
-         (refuse-secret 'blake2b 'empty-key 'key key))
+         (refuse-secret 'blake2b 'empty-key 'key key
+                        generichash-keybytes-min generichash-keybytes-max))
        (unless (or (eq? key no-key)
                    (and (>= (bytevector-length key) generichash-keybytes-min)
                         (<= (bytevector-length key) generichash-keybytes-max)))
-         (refuse-secret 'blake2b 'key-length-out-of-range 'key key))
+         (refuse-secret 'blake2b 'key-length-out-of-range 'key key
+                        generichash-keybytes-min generichash-keybytes-max))
        (let* ((key-bytes (if (eq? key no-key) (make-bytevector 0) key))
               (outcome
                (call-in-section
@@ -137,11 +149,11 @@
     (unless (bytevector? a)
       (refuse-secret 'constant-time-bytevector=? 'not-a-bytevector 'a a))
     (unless (<= (bytevector-length a) input-cap)
-      (refuse-secret 'constant-time-bytevector=? 'over-the-cap 'a a))
+      (refuse-secret 'constant-time-bytevector=? 'over-the-cap 'a a 0 input-cap))
     (unless (bytevector? b)
       (refuse-secret 'constant-time-bytevector=? 'not-a-bytevector 'b b))
     (unless (<= (bytevector-length b) input-cap)
-      (refuse-secret 'constant-time-bytevector=? 'over-the-cap 'b b))
+      (refuse-secret 'constant-time-bytevector=? 'over-the-cap 'b b 0 input-cap))
     (if (not (= (bytevector-length a) (bytevector-length b)))
         #f
         (let ((code (call-in-section

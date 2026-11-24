@@ -83,21 +83,58 @@
   (define (refuse-field who field what value)
     (assertion-violation who (string-append "not " what) field (secret-shown value)))
 
-  ;; refuse-secret : Symbol Symbol Symbol Any -> Nothing
+  ;; refuse-secret : Symbol Symbol Symbol Any [Natural Natural] -> Nothing
   ;; WHO's refusal of VALUE, a secret parameter, under RULE: an assertion
   ;; violation whose irritants are RULE, PARAMETER and VALUE's kind, in that
   ;; order. WHO, RULE and PARAMETER must be symbols, else the refusal is
-  ;; refuse-secret's own.
-  (define (refuse-secret who rule parameter value)
+  ;; refuse-secret's own. LOW and HIGH, when given, are the bound the message
+  ;; states, in bytes: each an exact natural, LOW no more than HIGH, else the
+  ;; refusal is refuse-secret's own, irritants (low (kind K)) or (high (kind
+  ;; K)), K the kind of what was given. The message is written here from the
+  ;; two numbers; nothing of VALUE reaches it, and a bound never changes the
+  ;; irritants.
+  (define refuse-secret
+    (case-lambda
+      ((who rule parameter value) (refuse-secret* who rule parameter value no-bound no-bound))
+      ((who rule parameter value low high)
+       (refuse-secret* who rule parameter value low high))))
+
+  ;; no-bound : Any
+  ;; What refuse-secret passes for LOW and HIGH when the caller gave none. No
+  ;; caller's value is eq? to it, so a bound of #f is still a refusal.
+  (define no-bound (list 'no-bound))
+
+  ;; exact-natural? : Any -> Boolean
+  (define (exact-natural? x)
+    (and (integer? x) (exact? x) (>= x 0)))
+
+  ;; refuse-secret* : Symbol Symbol Symbol Any Any Any -> Nothing
+  ;; refuse-secret's body: LOW and HIGH are no-bound when there is no bound.
+  (define (refuse-secret* who rule parameter value low high)
+    (define bound? (not (eq? low no-bound)))
     (unless (symbol? who)
       (refuse-field 'refuse-secret 'who "a symbol" who))
     (unless (symbol? rule)
       (refuse-field 'refuse-secret 'rule "a symbol" rule))
     (unless (symbol? parameter)
       (refuse-field 'refuse-secret 'parameter "a symbol" parameter))
+    (when bound?
+      (unless (exact-natural? low)
+        (refuse-field 'refuse-secret 'low "an exact natural" low))
+      (unless (and (exact-natural? high) (<= low high))
+        (refuse-field 'refuse-secret 'high "an exact natural, no less than low" high)))
     (assertion-violation who
-                         (string-append (symbol->string parameter) " is refused: "
-                                        (symbol->string rule) ", shown by its kind alone")
+                         (string-append
+                          (symbol->string parameter) " is refused: "
+                          (symbol->string rule) ", shown by its kind alone"
+                          (cond ((not bound?) "")
+                                ((= low 0)
+                                 (string-append "; " (symbol->string parameter)
+                                                " is at most " (number->string high) " bytes"))
+                                (else
+                                 (string-append "; " (symbol->string parameter) " is "
+                                                (number->string low) " to "
+                                                (number->string high) " bytes"))))
                          rule parameter (secret-shown value)))
 
   ;; checked-accessor : Symbol Symbol (Any -> Boolean) String (Any -> Any) -> (Any -> Any)

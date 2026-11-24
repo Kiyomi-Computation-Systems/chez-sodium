@@ -77,9 +77,13 @@ below.
   M alike, since `_BYTES` and `_KEYBYTES` are both 32, the two minimums 16 and the two maximums
   64, at both releases. The review killed none of four more: `bytes`' F read from the unbound
   `crypto_generichash_keybytes`, `keybytes-min`'s F from `_bytes_min`, and two more M's. So the
-  oracle holds the numbers, not which function or macro gave them. The F twins are killed
-  instead by the decoy's `sizes-other` rows, where the five answers differ (the decoy builder's
-  "Review fixes", below); the M twins cannot be killed by value.
+  oracle holds the numbers, not which function or macro gave them. The M twins cannot be killed
+  by value.
+- **Corrected again after M2's closing review (M2-F1):** this entry first said the decoy's
+  `sizes-other` rows killed the F twins. They do not: those rows hold native's sizes, through
+  `refusal-probe --sizes`, and kill native's twins; nothing ran the oracle against the decoy,
+  and the oracle's F twins passed every suite that runs it. The closing review's fixes add an
+  oracle child under `sizes-other`, which kills them (`.plans/m2-closing-mutation-log.md`).
 
 ### test-native-codes: planted wrong expectations, 30 mutants, all KILLED (1 row each, 2 for abc-32)
 - The expected hashes come from CPython 3.10's `hashlib.blake2b` on the host, never from

@@ -7,7 +7,8 @@
   Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
   review ([amendment](#amendment-2026-11-23-m2s-plan)). Amended 2026-11-23 after M2 slice 1's
   review, and accepted by the owner that day
-  ([amendment](#amendment-2026-11-23-a-c-program-that-calls-no-libsodium-function)).
+  ([amendment](#amendment-2026-11-23-a-c-program-that-calls-no-libsodium-function)); its last
+  point added after M2's closing review, and accepted by the owner that day.
 - **Date:** 2026-11-22
 - **Scope:** development tooling, the suites and CI; no library change
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §7, §8.2, §9's M0, and
@@ -160,11 +161,15 @@ Accepted (the owner, 2026-11-23), from M2 slice 1's review, M2S1-F2.
   of each bound function and prints the `_Generic` verdicts, which are fixed at compile time. It
   links libsodium and calls no libsodium function. It has run so since M1's slice 2, and no
   record named it.
-- **It stays outside, the second exception after the wipe row's child.** The gate takes a
+- **It stays outside, the second exception after the wipe row's children.** The gate takes a
   child's log only from Chez or `libsodium-oracle`, and a program that calls nothing of
   libsodium's gives Valgrind nothing of ours to read.
 - **Any other C program a suite runs starts through `gated-command`, or is named here.** The
   decoy's overflow row, which a C driver first ran, now runs in a gated Chez child.
+- **The wipe row has two children now,** the helper's and the verbs', where decision 1 says "the
+  wipe row's child" and the M1 amendment "the wipe child". Each runs outside the gate, and sets
+  `LD_PRELOAD` to the interposer alone. Added after M2's closing review (M2-F4), accepted by the
+  owner that day.
 
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md
 [ADR-0004]: 0004-a-threaded-chez.md

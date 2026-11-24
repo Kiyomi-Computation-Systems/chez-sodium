@@ -281,3 +281,18 @@ Clean: all three suites 3 passes (M1 child, dead-block, decoy child).
 
 ### Gate and floors
 `make test-memory` on test-public, test-never-loads, test-wipe: 3 of 3. test-public 7s (0 gated children), test-never-loads 15s (2 gated children, the condition children), test-wipe 7s (0: its children run outside Valgrind). `make check-test-fails`: 13 of 13. Plain and floor: test-public 8, test-never-loads 8, test-wipe 3.
+
+## Added after M2's closing review (M2-F3)
+
+Two mutants plan §6 lists for slice 2 were missing from this log. The closing review ran both, in
+whole copies of the tree, and both are killed:
+
+- **"The shorter length compared":** the compare's length test made `#f`, and `sodium_memcmp`
+  given the shorter of the two lengths. `test-byte-verbs` fails R14's prefix and empty-operand
+  rows, "lengths 1 and 65536", R18's "operands of other lengths", and S3.
+  `test-library-loading-verbs` fails "verbs on control: …" and "verbs on control under
+  \"memcmp-other\": …".
+- **"An extra export":** `input-cap` exported from `(chez-sodium)`. `test-public` fails
+  "(chez-sodium) exports exactly the version, the three byte verbs and the condition predicates
+  and accessors, and nothing private", and `test-never-loads` fails "the condition exports of
+  (chez-sodium), its exports less the verbs, are exactly the names the condition children check".

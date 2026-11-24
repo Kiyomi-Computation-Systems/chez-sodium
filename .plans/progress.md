@@ -33,10 +33,20 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   - **CI:** five jobs. `main` finds Ubuntu 24.04's 1.0.18 by discovery and asserts it is the
     floor; `memory`; `nothreads`; `floor` and `current` build their pinned tarballs and run the
     suites against them.
-- **M2 is under way:** `random-bytes`, `blake2b` and `constant-time-bytevector=?`, built on M1's
-  helper (brief §9; [the M2 plan](2026-11-23-m2-plan.md)). Slice 0, the plan and the records, is
-  PR #10; slice 1, the bindings, is PR #11, stacked on it; slice 2, the verbs, is PR #12,
-  stacked on #11. Then M2's closing review.
+- **M2 is done and merged** (PRs #10 to #13: #10 and #11 squashed onto `main` on 2026-11-23,
+  #12 on 2026-11-24, and #13 after it; [the M2 plan](2026-11-23-m2-plan.md); the close-outs
+  below): the plan and the records, #10; the bindings, #11; the verbs, #12; then the closing
+  review's fixes, #13.
+  - **Three verbs,** `random-bytes`, `blake2b` and `constant-time-bytevector=?`, in
+    `(chez-sodium private byte-verbs)` beside native, with the cap, `input-cap`, in
+    `(chez-sodium private cap)`. `(chez-sodium)` exports them, and `&sodium-failed`'s three
+    names, since `blake2b` raises it for any answer of `crypto_generichash` but 0.
+  - **Thirteen entry points** bound, and `crypto_generichash`'s five sizes read once, at the load.
+  - **The harness:** `make test` runs 31 suites; the decoy has four switches for the verbs, and
+    `test-decoy-source` holds its pointer rule against an honest mistake, and refuses by name
+    each form it cannot read; row 24 reaches each verb's blocks through it.
+- **Next: M3,** the password verbs, collect-safe, with brief §4.2's rules (brief §9). Its plan
+  starts from "Owed to M3" below.
 
 ## Answered for M1
 
@@ -96,6 +106,23 @@ its questions on 2026-11-23:
   - Row 19 references the library once before its first fork: a library first reached on two
     threads at once refuses the second (ADR-0007, amended; M1-F10).
 - Rows 11 (the password half), 15, 16, 18, 22 and 24 for the password verbs (plan §1).
+- **How M3's constants are read:** `crypto_pwhash_strbytes`, the ops and memory bounds and
+  presets, and `crypto_pwhash_strprefix`, at the load, in a step after step 7, or at each call.
+  ADR-0001's M2 amendment reads only `crypto_generichash`'s sizes at the load, and leaves the
+  rest to M3 (M2's closing review, M2-F5).
+- **The shape rows for the password verbs,** as `test-byte-verbs`' S1 to S5 hold the byte verbs:
+  one `call-in-section` per verb, every check before it, the whole list of symbols inside it,
+  and the import clauses whole. Those rows read `byte-verbs.sls` alone (M2S2-F1; M2-F5).
+- **Row 24 for the password verbs goes through the decoy:** each new decoy entry names its
+  blocks through the weak `watch_set`, through its pointers' `volatile uintptr_t` copies, and
+  `test-decoy-source`'s list and `(library-loading)`'s `every-entry` gain the new entries
+  (ADR-0011, amended; M2-F5).
+- **R16 for the password verbs holds each refusal that states a bound to one print** for three
+  secrets under its rule: two strings of one UTF-8 length and one of another, non-ASCII among
+  them, as the byte verbs' differential rows do. A password is a string, so one passed where a
+  bound goes must be refused by its kind (M2C-F1; M2C3-F1).
+- **A new `tests/*.c` joins `test-decoy-source`'s every-file row,** and includes no local file
+  (M2C-F5).
 
 ## Owed to M4
 
@@ -113,6 +140,116 @@ its questions on 2026-11-23:
 
 ## Close-outs
 
+### 2026-11-24 — M2's closing review and its fixes (PR #13)
+
+- **Reviewed:** M2's closing review, on Opus, read-only, over the plan and both slices, found no
+  blocker, 1 major and 6 minors
+  ([research/m2-closing-review/](research/m2-closing-review/README.md)).
+  - It reran every suite at 1.0.22 and at the floor, `check-test-fails`, `check-dev`,
+    `make build`, `check-memory-gate`, the gate over M2's suites, and `make check-guix` on the
+    host.
+  - It met the verbs through `(chez-sodium)`: under engines abandoned at every fuel; on eight
+    threads at once, 2,000 rounds each, every answer right and every count zero; and beside
+    another thread's collection, which waited at most 5.4 ms behind 64 KiB compares.
+  - It planted 14 mutants in whole copies; 11 were killed, and 3 survived.
+- **The major (M2-F1):** slice 1's log and close-out said `sizes-other` kills the oracle's
+  equal-valued F twins. Those rows hold native's sizes, and nothing ran the oracle against the
+  decoy. Both texts are corrected, and a gated oracle child under `sizes-other` now kills the
+  twins.
+- **The minors:**
+  - `test-decoy-source` refuses a `##`, a line splice outside a directive, and a local include,
+    by name (M2-F2);
+  - two plan-listed mutants are added to slice 2's log, each killed (M2-F3);
+  - ADR-0007 and ADR-0011 gain slice 2's two review fixes, accepted by the owner (M2-F4);
+  - three more items owed to M3 (M2-F5);
+  - the refusals' messages state their bounds, by the owner's choice (M2-F6);
+  - wording (M2-F7).
+- **Fixed** on `m2-closing` by one Sonnet fixer, on the code, and the caller, on the records.
+  Every mutant is logged ([the closing fixes' log](m2-closing-mutation-log.md)).
+- **The fixes' second review,** on Opus, read-only, since they change rules, found no blocker,
+  2 majors and 6 minors
+  ([research/m2-closing-fix-review/](research/m2-closing-fix-review/README.md)). Each is fixed.
+  - **M2C-F1:** M2-F6's fix gave `refuse-secret` a free-text DETAIL, held by a comment alone.
+    Mutants that wrote the key's text, or the input's length, into the message passed every
+    suite, since R16 reached only the type refusals. The owner chose, on 2026-11-24, bounds as
+    numbers: `refuse-secret` takes LOW and HIGH, two exact naturals, and writes the sentence
+    itself; anything else there is its own refusal, by kind (which settles M2C-F6). R16 now
+    reaches the refusals that state a bound, with secrets of `hunter2` that pass the type
+    check, and finds neither their text, their bytes as written, nor their length.
+  - **M2C-F2:** `test-decoy-source` joined a directive's continuation with a space, where C
+    joins with nothing, and missed a CRLF continuation. A name or a `##` cut inside a `#define`
+    passed it. It joins with nothing now, and reads a CRLF continuation.
+  - **The minors:** a splice that ends a comment or a string outside a directive is refused,
+    read from the raw line (M2C-F3); a `%:` digraph is refused (M2C-F4); `"sodium.h"` in quotes is a local include,
+    and the include rule reads every `tests/*.c` (M2C-F5); this close-out's dates (M2C-F7); and
+    wording (M2C-F8).
+  - **Fixed** by two Sonnet fixers on disjoint files, the scanner and the bound, and the caller
+    on the records and R16's bytes needle. The caller rebuilt seven of their mutants by hand,
+    and each failed.
+- **The third review,** on Opus, read-only, over the second round alone, found no blocker,
+  2 majors and 7 minors
+  ([research/m2-closing-third-review/](research/m2-closing-third-review/README.md)). No code
+  showed a secret. Each is fixed.
+  - **M2C3-F1:** R16 searched for three spellings of a secret, and mutants that printed a
+    prefix, the excess over the cap, or a byte as the bound passed every suite. R16 now holds
+    each bound refusal's print the same for three secrets under one rule: two contents of one
+    length, and another length.
+  - **M2C3-F2:** `test-decoy-source` stripped comments before it joined lines, the reverse of
+    C's order, so a comment that wraps inside a `#define`, a splice inside a comment or a
+    string in a directive, a split `%:` or a lone CR hid a name. It now reads line ends,
+    splices, comments and literals in C's order, and refuses a lone CR.
+  - **The minors:** a literal prefix or a digit separator is refused (M2C3-F3); a `<...>`
+    include by an absolute path or `..` (M2C3-F4); every file refusal runs over every
+    `tests/*.c` (M2C3-F5); the records (M2C3-F6); the arity rows pass a string secret, and
+    call with 7 (M2C3-F7); a row holds WHO before RULE before PARAMETER (M2C3-F8); and R16's
+    control reads the whole message, not its words (M2C3-F9).
+  - **Fixed** by two Sonnet fixers on disjoint files, and the caller on the records.
+- **The review loop stops here, by the owner's choice of 2026-11-24.** The plan has each round
+  of rule-changing fixes reviewed again on Opus. Each round cost about 300k tokens, and the
+  scanner kept yielding new forms written to deceive it. So there is no fourth review: the
+  caller rebuilt all 17 of the third review's mutants by hand, and each failed. The scanner's
+  header says what it guards against: an honest mistake in a decoy, not a file written to
+  deceive it.
+
+### 2026-11-23 — M2 slice 2: the verbs (PR #12)
+
+- **Written first by the caller:** a stub `byte-verbs` exporting the three names, each present
+  and wrong. `test-byte-verbs` failed 110 of its rows against it, by name.
+- **Built** on `m2-slice-2` by two Sonnet builders, on disjoint files in one tree:
+  - **the verbs:**
+    - `cap` and `byte-verbs`;
+    - `test-byte-verbs`: rows 1, 13 to 16 and 18, and the shape rows S1 to S5;
+    - `verb-probe` and `test-library-loading-verbs`: the decoy's halves of rows 13 to 15 and
+      17, `memcmp-other` and `sizes-other`;
+    - the known answers' fixture, from the BLAKE2 reference at `ed1974e`;
+  - **the public library and the wipe:**
+    - `(chez-sodium)`'s six new exports, held by `test-public`;
+    - `test-never-loads`' condition children, which check the three `sodium-failed` names
+      (M1-F6);
+    - the interposer's ordered names, the decoy's weak `watch_set`, and `test-wipe`'s second
+      child: row 24 for each verb.
+
+  The weak `watch_set` was measured first: NULL in a plain child, resolved under the
+  interposer alone, at both releases. 79 mutants on the verbs are logged, none surviving both
+  suites, with the public half's beside them ([its mutation log](m2-slice-2-mutation-log.md)).
+- **Reviewed:** one Opus review found no blocker, 2 majors and 10 minors, each fixed
+  ([research/m2-slice-2-review/](research/m2-slice-2-review/README.md)).
+  - **The majors:**
+    - a check moved into a let-bound lambda and called inside the section passed every row.
+      Now S3 lists every symbol inside each section, whole, and S2 refuses a `lambda` outside
+      it;
+    - row 17's watched mutant was the wrong one. Its own, a raise inside the extent with no
+      section, is now logged, killed by row 17; the plan's literal one is logged under row 18
+      and the shape rows.
+  - **Among the minors:** `refuse-secret`'s message names the parameter and the rule; S5 counts
+    each verb's `input-cap`, and holds libsodium's greatest size and key length within it; the
+    fixture's size and first and last hash are written in the suite.
+- **CI's run** 45304409226 passed all five jobs. Under its gate, `test-byte-verbs` took 12 s,
+  `test-library-loading-verbs` 49 s and `test-wipe` 11 s, of 450; the slowest suite was
+  `test-check-ci`, at 154 s.
+- **Merged** after #10 and #11 by squash, bottom up, each after a merge commit that keeps its own
+  tree, and each merge's tree equal to the head CI passed (`traps.md`).
+
 ### 2026-11-23 — M2 slice 1: the bindings (PR #11)
 
 - **Written first by the caller:** native's eight bindings in step 6, step 7's five size reads,
@@ -125,9 +262,11 @@ its questions on 2026-11-23:
   - **the decoy:** its eight entries, four switches and loud overflow; the missing-entry split;
     and `test-decoy-source`.
 
-  Every mutant is logged, each killed but the oracle's equal-valued twins: `sizes-other` kills
-  the size functions' twins, and no value can tell the macros' apart
-  ([its mutation log](m2-slice-1-mutation-log.md)).
+  Every mutant is logged, each killed but the oracle's equal-valued twins
+  ([its mutation log](m2-slice-1-mutation-log.md)). No value at either release tells a size's
+  macro from its twin's. This close-out first said `sizes-other` killed the size functions'
+  twins too; it held native's sizes, not the oracle's, and M2's closing review found the oracle's
+  twins surviving (M2-F1). Its fixes add an oracle child under `sizes-other`.
 - **Reviewed:** one Opus review found no blocker, 2 majors and 8 minors, each fixed
   ([research/m2-slice-1-review/](research/m2-slice-1-review/README.md)).
   - **The majors:**

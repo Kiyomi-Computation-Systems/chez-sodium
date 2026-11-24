@@ -49,8 +49,8 @@
  *   generichash-other  crypto_generichash answers 1, a second code
  *   memcmp-other       sodium_memcmp answers 1 for equal operands, -1 for
  *                      different ones (the control's are 0 and -1); at
- *                      length 0 it answers 0, and with exactly one NULL
- *                      operand at a nonzero length -1, under every switch
+ *                      length 0 it answers 0, and with a NULL operand, one
+ *                      or both, at a nonzero length -1, under every switch
  *   anything else      the control's behaviour, an empty value included
  *
  * The call log. Loading the library writes its first entry, decoy(SWITCH):
@@ -360,10 +360,10 @@ size_t crypto_generichash_keybytes_max(void)
 
 #ifndef DECOY_LACKS_sodium_memcmp
 /* At length 0 it answers 0, under every switch. At a nonzero length, with
-   exactly one NULL address, it answers -1, under every switch: an operand
-   that cannot be read is no match. Only two readable operands are compared,
-   byte by byte: 0 when equal, -1 when they differ, and under memcmp-other 1
-   and -1. */
+   a NULL address, either or both, it answers -1, under every switch: an
+   operand that cannot be read is no match. Only two readable operands are
+   compared, byte by byte: 0 when equal, -1 when they differ, and under
+   memcmp-other 1 and -1. */
 int sodium_memcmp(const void *const b1, const void *const b2, size_t len)
 {
   volatile uintptr_t p1 = (uintptr_t) b1;

@@ -6,6 +6,8 @@
   ([amendment](#amendment-2026-11-23-slice-0s-review)).
   Amended 2026-11-23 in M2's plan, and accepted by the owner that day, after M2 slice 0's
   review ([amendment](#amendment-2026-11-23-m2s-plan)).
+  Amended 2026-11-24 after the second review of M2's closing fixes, the design the owner's
+  choice that day ([amendment](#amendment-2026-11-24-a-secrets-refusal-states-its-bound-as-numbers)).
 - **Date:** 2026-11-22
 - **Scope:** every condition chez-sodium raises, and every refusal of a caller's mistake
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §5
@@ -143,6 +145,29 @@ and §4.2, item 2, with the owner's answer of 2026-11-23.
   `(RULE PARAMETER (kind K))`; `n` and `size` are shown by `shown-value`. Each verb checks its
   parameters left to right, each one's type before its range, and refuses the first mistake.
   `over-the-cap` and `not-a-natural` are M3's too.
+
+## Amendment, 2026-11-24: a secret's refusal states its bound as numbers
+
+The design is the owner's choice of 2026-11-24, from M2's closing review, M2-F6, and the second
+review of its fixes, M2C-F1 ([research](../research/m2-closing-fix-review/README.md)).
+
+- **A secret's refusal may state its bound, and nothing else of the call.** The owner chose on
+  2026-11-23 that the refusals' messages state their bounds. A refusal over the cap says the
+  cap, and one of `blake2b`'s key says libsodium's range, read from native.
+- **The bound is two exact naturals, LOW and HIGH, never text.** `refuse-secret` takes them as
+  its fifth and sixth arguments and writes the sentence itself: "PARAMETER is LOW to HIGH
+  bytes", or "PARAMETER is at most HIGH bytes" when LOW is 0. Anything else in their place, a string
+  included, is `refuse-secret`'s own refusal, by kind: `(low (kind K))` or `(high (kind K))`.
+  The irritants are unchanged, `(RULE PARAMETER (kind K))`.
+- **A free-text detail was rejected.** The first fix took a string, and only a comment kept the
+  value out of it. Mutants that wrote the key's text or the input's length there passed every
+  suite. M3's secrets are strings, so a swapped argument would have printed a password whole.
+- **R16 holds a bound refusal's print independent of the secret.** For every refusal that
+  states a bound but the empty key's, whose one value has no text and whose length is its rule,
+  it prints the condition for three secrets that pass the type check: one, another of the same
+  length with other bytes, and one of another length under the same rule. The three prints are
+  the same, so no spelling of the secret's text, bytes or length can reach them. It also finds
+  none of the first secret's text, its bytes as written, or its length.
 
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md
 [ADR-0007]: 0007-one-critical-section-per-verb.md

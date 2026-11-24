@@ -22,8 +22,12 @@
 ;;;   R15  every refusal, by ADR-0006's rule symbols, its who and irritants
 ;;;        whole, both ends of each cap and range, and the order the checks
 ;;;        run in
-;;;   R16  a secret parameter is shown by its kind alone: a symbol, a number
-;;;        and a list of characters, each as (kind K)
+;;;   R16  a secret parameter is shown by its kind alone: the type rows, a
+;;;        symbol, a number and a list of characters, each as (kind K); the
+;;;        bound rows, each refusal that states a bound printing its whole
+;;;        message and neither the secret's text nor its length; and the
+;;;        differential rows, each such refusal printing the same for other
+;;;        bytes of one length and for another length under the same rule
 ;;;   R18  each verb under an engine at every fuel from 1 until it completes
 ;;;   S    the verbs' bodies read as data: one call-in-section each, every
 ;;;        refusal before it, and every symbol inside it listed whole, so a
@@ -39,9 +43,9 @@
 ;;; #f for something that can raise: constant-time-bytevector=?'s #f is
 ;;; asserted as (no-raise #f). Nothing here depends on an order of evaluation:
 ;;; effects run through for-each, let* and named lets, and map is used only
-;;; where its calls do not depend on one another. Every engine row follows a reference to each library at
-;;; the top of the suite: a library first reached inside an engine that is then
-;;; abandoned stays wedged.
+;;; where its calls do not depend on one another. Every engine row follows a
+;;; reference to each library at the top of the suite: a library first reached
+;;; inside an engine that is then abandoned stays wedged.
 (import (rnrs)
         (rnrs eval)
         (srfi :64)
@@ -438,7 +442,7 @@
   (refusal 'random-bytes 'over-the-cap 'n 65537)
   (lambda () (random-bytes 65537)))
 
-(check "R15 random-bytes the greatest fixnum is refused, over-the-cap, before any block"
+(check "R15 random-bytes the greatest fixnum is refused, over-the-cap, by the cap check"
   (refusal 'random-bytes 'over-the-cap 'n (greatest-fixnum))
   (lambda () (random-bytes (greatest-fixnum))))
 
@@ -608,7 +612,10 @@
 ;; (kind K): a value shown by shown-value, a symbol or a number as itself,
 ;; would differ from them. This row holds the same, over every refusal at
 ;; once, and that no refusal's condition holds the secret anywhere, message
-;; included, by printing each and searching for the secret's text.
+;; included, by printing each and searching for the secret's text. It reaches
+;; the type refusals, and the refusals that state a bound: the cap, for the
+;; input, a and b, and the key's length range. The rows after it hold that the
+;; printed bound refusals do not depend on the secret at all.
 
 ;; occurs-in? : String String -> Boolean
 (define (occurs-in? needle text)
@@ -643,6 +650,87 @@
                     'leaks))
                   conditions needles)))))
  secret-calls)
+
+;; hunter-bytes : Natural -> Bytevector
+;; N bytes, "hunter2" repeated: a bytevector that passes the type check, whose
+;; text and length a refusal must not print.
+(define (hunter-bytes n)
+  (let ((seed (string->utf8 "hunter2")) (out (make-bytevector n 0)))
+    (do ((i 0 (+ i 1))) ((= i n) out)
+      (bytevector-u8-set! out i (bytevector-u8-ref seed (mod i 7))))))
+
+;; Each refusal that states a bound: the secret's length is not the bound, and
+;; neither it, its text, nor its bytes as written may be printed. The empty key
+;; is refused with a bound too, but it has no text and its length, 0, is its
+;; rule, so it is not searched. The printed condition must hold the condition's
+;; whole message, so a print that lost the message cannot pass for a clean one.
+(define bound-calls
+  (list (list "blake2b input of 65537 bytes" 65537
+              (lambda (s) (blake2b s)))
+        (list "blake2b key of 15 bytes" 15
+              (lambda (s) (blake2b abc 32 s)))
+        (list "blake2b key of 65 bytes" 65
+              (lambda (s) (blake2b abc 32 s)))
+        (list "constant-time-bytevector=? a of 65537 bytes" 65537
+              (lambda (s) (constant-time-bytevector=? s abc)))
+        (list "constant-time-bytevector=? b of 65537 bytes, a valid a" 65537
+              (lambda (s) (constant-time-bytevector=? abc s)))))
+
+(for-each
+ (lambda (call)
+   (test-equal (string-append "R16 " (car call)
+                              ": refused, the printed refusal holds the condition's whole message, and names neither the secret's text nor its length")
+     '(refused states-message clean clean)
+     (let* ((n (cadr call))
+            (c (guard (e (#t e)) ((caddr call) (hunter-bytes n)) 'no-raise)))
+       (if (assertion-violation? c)
+           (let ((text (describe c)))
+             (list 'refused
+                   (if (occurs-in? (condition-message c) text) 'states-message 'message-missing)
+                   (if (or (occurs-in? "hunter2" text)
+                           (occurs-in? "104 117 110 116 101 114 50" text))
+                       'leaks
+                       'clean)
+                   (if (occurs-in? (number->string n) text) 'leaks 'clean)))
+           (list 'not-refused c)))))
+ bound-calls)
+
+;; printed-refusal : (-> Any) -> (U String (List 'not-refused Any))
+;; THUNK's refusal as printed, message and irritants; else not-refused and
+;; what it answered or raised.
+(define (printed-refusal thunk)
+  (let ((c (guard (e (#t e)) (thunk) 'no-raise)))
+    (if (assertion-violation? c) (describe c) (list 'not-refused c))))
+
+;; Each refusal that states a bound prints the same for every secret under the
+;; same rule. Three secrets per row: hunter-bytes of N, the same length with
+;; other bytes, and hunter-bytes of M, another length that breaks the same
+;; rule. A needle finds one encoding of the secret; this holds that no
+;; encoding is printed, in the message or an irritant: a prefix, a byte, an
+;; excess over the bound, hex. The empty key has one value only, so it cannot
+;; vary: its length, 0, is its rule.
+(define bound-twins
+  (list (list "blake2b input of 65537 and 65538 bytes" (lambda (s) (blake2b s)) 65537 65538)
+        (list "blake2b key of 15 and 14 bytes" (lambda (s) (blake2b abc 32 s)) 15 14)
+        (list "blake2b key of 65 and 66 bytes" (lambda (s) (blake2b abc 32 s)) 65 66)
+        (list "constant-time-bytevector=? a of 65537 and 65538 bytes"
+              (lambda (s) (constant-time-bytevector=? s abc)) 65537 65538)
+        (list "constant-time-bytevector=? b of 65537 and 65538 bytes"
+              (lambda (s) (constant-time-bytevector=? abc s)) 65537 65538)))
+
+(for-each
+ (lambda (row)
+   (test-equal (string-append "R16 " (car row)
+                              ": the printed refusal is the same for other bytes of the same length, and for another length under the same rule")
+     '(refused same same)
+     (let* ((call (cadr row)) (n (caddr row)) (m (cadddr row))
+            (p (printed-refusal (lambda () (call (hunter-bytes n)))))
+            (q (printed-refusal (lambda () (call (make-bytevector n 0)))))
+            (r (printed-refusal (lambda () (call (hunter-bytes m))))))
+       (list (if (string? p) 'refused p)
+             (if (equal? p q) 'same (list 'differs q))
+             (if (equal? p r) 'same (list 'differs r))))))
+ bound-twins)
 
 ;; --- the cap and the exports ---------------------------------------------------------------------
 
@@ -935,8 +1023,8 @@
                          (make-transcoder (utf-8-codec)))
    get-string-all))
 
-(test-equal "S5 input-cap is written in each verb's definition as many times as it checks a length: random-bytes 1, blake2b 1, the compare 2"
-  '((random-bytes 1) (blake2b 1) (constant-time-bytevector=? 2))
+(test-equal "S5 input-cap is written in each verb's definition once for each length it checks and once for each secret refusal that states it as the bound: random-bytes 1 (its message is written apart), blake2b 2, the compare 4"
+  '((random-bytes 1) (blake2b 2) (constant-time-bytevector=? 4))
   (map (lambda (name) (list name (count-of 'input-cap (tokens (definition-form name)))))
        verb-names))
 

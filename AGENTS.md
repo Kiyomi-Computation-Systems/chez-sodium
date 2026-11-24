@@ -2,13 +2,14 @@
 
 ## Where the project stands
 
-* **M1 is done: one verb, `sodium-version`.** M0 built the records, the container, the
-  test harness, the memory gate and CI. M1 built the load, the block helper and CI's
-  `floor` and `current` lanes (its plan is `.plans/2026-11-22-m1-plan.md`). M2 is under
-  way: `random-bytes`, `blake2b` and `constant-time-bytevector=?`, built on M1's helper,
-  in `(chez-sodium private byte-verbs)` beside native (its plan is
-  `.plans/2026-11-23-m2-plan.md`). `.plans/progress.md` says where the project stands and
-  what comes next.
+* **M2 is done: four verbs, `sodium-version` and the three byte verbs.** M0 built the
+  records, the container, the test harness, the memory gate and CI. M1 built the load,
+  the block helper and CI's `floor` and `current` lanes (its plan is
+  `.plans/2026-11-22-m1-plan.md`). M2 built `random-bytes`, `blake2b` and
+  `constant-time-bytevector=?` on M1's helper, in `(chez-sodium private byte-verbs)`
+  beside native (its plan is `.plans/2026-11-23-m2-plan.md`). M3 comes next: the
+  password verbs, collect-safe, with brief §4.2's rules. `.plans/progress.md` says where
+  the project stands and what comes next.
 * The plan is the brief, `.plans/2026-11-22-chez-sodium-project-brief.md`. Read it before
   any work.
   - Its §11 holds the owner's decisions; its §10 records that nothing is open.
