@@ -45,16 +45,24 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   - **The harness:** `make test` runs 31 suites; the decoy has four switches for the verbs, and
     `test-decoy-source` holds its pointer rule against an honest mistake, and refuses by name
     each form it cannot read; row 24 reaches each verb's blocks through it.
-- **M3 is under way** ([the M3 plan](2026-11-24-m3-plan.md)): the password verbs, collect-safe,
-  with brief §4.2's rules (brief §9).
-  - **Slice 0, the plan and the records,** merged as #14. The owner accepted every
-    recommendation on 2026-11-24.
-  - **Slice 1, the bindings, the writers and the pure core,** merged as #15.
-  - **Slice 2, the verbs,** is #16, on `m3-slice-2`.
-  - **M3's closing review** found no blocker, no major and 6 minors. Its fixes are on
-    `m3-closing`, in a PR stacked on #16, as the owner asked on 2026-11-24.
-  - **Next:** the owner merges #16, then the closing PR, bottom up; Techo's session is told M3's
-    commit; then M4.
+- **M3 is done and merged** (PRs #14 to #17, squashed onto `main` on 2026-11-24; [the M3
+  plan](2026-11-24-m3-plan.md); the close-outs below): the plan and the records, #14; the bindings,
+  the writers and the pure core, #15; the verbs, #16; then the closing review's fixes, #17, stacked
+  on #16 as the owner asked.
+  - **Four names,** `password-hash`, `password-verify`, `password-needs-rehash?` and
+    `make-password-limits`, in `(chez-sodium private password-verbs)` beside native, on a pure
+    core, `(chez-sodium private password-text)`. `(chez-sodium)` exports them.
+  - **Thirty entry points** bound, two of them `__collect_safe`, and the fourteen password
+    constants read once, at the load.
+  - **The harness:** `make test` runs 41 suites.
+    - The decoy holds every password switch.
+    - Row 19 holds collect-safe by behaviour, on a FIFO, from inside the verb's section.
+    - Row 4 holds the verbs both ways against the C oracle.
+    - `test-no-memory` holds the no-memory codes, its children gated, under `ulimit -v`.
+  - **Techo's question,** whether verify can tell short memory from a wrong password, is
+    answered: no change in M3, and Techo's session was told.
+- **Next: M4,** `docs/`, `docs/reference.md` with `test-reference`, the site, `CHANGELOG.md` and
+  release 0.1.0 (brief §9). Its plan starts from "Owed to M4" below.
 
 ## Answered for M1
 
@@ -235,6 +243,7 @@ its questions on 2026-11-24, accepting every recommendation:
 - **In the container:** `make test` 41 of 41, `check-test-fails` 13, `test-memory` 41 of 41 (the
   slowest 114 s of 450), `check-memory-gate` 59 cases, `make build`, `check-dev` and `check-seam`.
 - **CI's run** 45526362780 passed all five jobs on the first fixes, `89a891e`.
+- **On the host,** `make check-guix` passes: "ALL CHECKS PASSED", with 41 of 41 suites inside.
 
 ### 2026-11-24 — M3 slice 2: the verbs (PR #16)
 
