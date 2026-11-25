@@ -12,6 +12,7 @@
   closing review, and accepted by the owner that day.
   Amended 2026-11-24 in M3's plan, and accepted by the owner that day
   ([amendment](#amendment-2026-11-24-m3s-plan)).
+  Its last points added after M3's slice reviews and closing review.
 - **Date:** 2026-11-22
 - **Scope:** every public verb
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §4.4, §6.2, §11.3 and
@@ -194,9 +195,11 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
   - **`limits`:** a preset (`'interactive`, `'moderate` or `'sensitive`) or a
     `Password-limits`.
   - **`make-password-limits ops memory-kib`:** checks its ranges when it is called. `ops` runs
-    from `_opslimit_min` to `_opslimit_max`, and `memory-kib` from `_memlimit_min` / 1024 to
-    `_memlimit_max` / 1024, each a whole number of KiB at every release measured. The owner
-    chose this on 2026-11-24.
+    from `_opslimit_min` to `_opslimit_max`, and `memory-kib` from `_memlimit_min` / 1024,
+    rounded up, to `_memlimit_max` / 1024, rounded down, so every KiB accepted is within
+    libsodium's range. Each is a whole number of KiB at every release measured, and the decoy's
+    `pwhash-limits-odd`, whose bounds are not, holds the rounding (M3C-F1). The owner chose this
+    on 2026-11-24.
   - **`hash`:** a string. The pre-check answers the rest ([ADR-0009]).
 - **The hash string is capped through the pre-check:** one over the cap is answered, never
   refused.

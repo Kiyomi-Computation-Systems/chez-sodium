@@ -203,7 +203,7 @@ What this changes in the brief:
   - In KiB, nothing is floored.
   - The ranges are checked by `make-password-limits`, when it is called: ops from
     `_opslimit_min` to `_opslimit_max`; memory from `_memlimit_min` to `_memlimit_max`,
-    divided by 1024 (ADR-0009, amended).
+    divided by 1024, the least rounded up and the greatest rounded down (ADR-0009, amended).
 - **A password's UTF-8 length runs from 0 to the cap,** then from `_passwd_min` to
   `_passwd_max`, each checked before C (ADR-0007, amended).
 - **`password-verify` answers `#f` in three cases, which libsodium does not tell apart:**
@@ -600,10 +600,13 @@ it catches.
 ### 8.2 Limits in tests
 
 - **Password rows hash at libsodium's minimum**, read from `_opslimit_min` and
-  `_memlimit_min`. The exceptions are row 5's cheap pair and row 7's one default hash.
+  `_memlimit_min`. The exceptions are row 5's cheap pair, row 7's one default hash, row 22's
+  code rows at the few cheap limits each code needs, and the no-memory rows (ADR-0011,
+  amended).
   Under Valgrind, a minimum hash takes about 0.4 ms, and an interactive one about 0.7 s
   (M3 plan §5.1; the review's 5 ms and 0.8 s were (P)'s).
-- **No row needs a high limit.** The collect-safe row uses a decoy.
+- **Only the no-memory rows use a high limit:** two hashes at `'sensitive`, in gated children
+  under a memory cap. The collect-safe row uses a decoy.
 
 ### 8.3 Versions to run on
 

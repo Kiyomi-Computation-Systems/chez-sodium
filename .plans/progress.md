@@ -45,14 +45,24 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   - **The harness:** `make test` runs 31 suites; the decoy has four switches for the verbs, and
     `test-decoy-source` holds its pointer rule against an honest mistake, and refuses by name
     each form it cannot read; row 24 reaches each verb's blocks through it.
-- **M3 is under way** ([the M3 plan](2026-11-24-m3-plan.md)): the password verbs, collect-safe,
-  with brief §4.2's rules (brief §9).
-  - **Slice 0, the plan and the records,** merged as #14. The owner accepted every
-    recommendation on 2026-11-24.
-  - **Slice 1, the bindings, the writers and the pure core,** merged as #15.
-  - **Slice 2, the verbs,** is on `m3-slice-2`.
-  - **Next: M3's closing review,** and its fixes in a PR stacked on slice 2's, as the owner asked
-    on 2026-11-24.
+- **M3 is done and merged** (PRs #14 to #17, squashed onto `main` on 2026-11-24; [the M3
+  plan](2026-11-24-m3-plan.md); the close-outs below): the plan and the records, #14; the bindings,
+  the writers and the pure core, #15; the verbs, #16; then the closing review's fixes, #17, stacked
+  on #16 as the owner asked.
+  - **Four names,** `password-hash`, `password-verify`, `password-needs-rehash?` and
+    `make-password-limits`, in `(chez-sodium private password-verbs)` beside native, on a pure
+    core, `(chez-sodium private password-text)`. `(chez-sodium)` exports them.
+  - **Thirty entry points** bound, two of them `__collect_safe`, and the fourteen password
+    constants read once, at the load.
+  - **The harness:** `make test` runs 41 suites.
+    - The decoy holds every password switch.
+    - Row 19 holds collect-safe by behaviour, on a FIFO, from inside the verb's section.
+    - Row 4 holds the verbs both ways against the C oracle.
+    - `test-no-memory` holds the no-memory codes, its children gated, under `ulimit -v`.
+  - **Techo's question,** whether verify can tell short memory from a wrong password, is
+    answered: no change in M3, and Techo's session was told.
+- **Next: M4,** `docs/`, `docs/reference.md` with `test-reference`, the site, `CHANGELOG.md` and
+  release 0.1.0 (brief §9). Its plan starts from "Owed to M4" below.
 
 ## Answered for M1
 
@@ -165,11 +175,75 @@ its questions on 2026-11-24, accepting every recommendation:
   - a hash string is stored exactly: a stray space or newline verifies `#f` for ever;
   - the calling thread's interrupts wait while a hash runs: about 55 ms at `'interactive`,
     seconds at `'sensitive` (M3S2-F4).
+  - an unknown account is checked against a real hash made at the current limits, never a
+    string the pre-check refuses, which answers at once and tells accounts apart by time;
+  - custom limits go to both `password-hash` and `password-needs-rehash?`, or every login
+    rehashes;
+  - the binding never normalises a password: NFC and NFD forms do not verify against each other;
+  - the login pattern's rehash can raise `&sodium-failed` after a `#t` verify, and a failed
+    rehash need not fail the login (M3C-F4).
 - **The docs rule of `check-floors`** waits for `docs/`.
 - **The install-line checks of `test-manifest`** wait for the first release, which writes the
   install lines.
 
 ## Close-outs
+
+### 2026-11-24 — M3's closing review and its fixes (PR #17)
+
+- **Reviewed:** one Opus review, read-only, of the whole milestone, from `cd64dc6` to `394cb8c`.
+  It found no blocker, no major and 6 minors ([research/m3-closing-review/](research/m3-closing-review/README.md)).
+  - Of its 22 mutants, 19 failed rows.
+  - The survivors: the memory range's rounding, twice, and the child's kill of its watchdog. The
+    caller reproduced both.
+  - It ran `make check-guix` on the host, which passed.
+- **Fixed** on `m3-closing`, stacked on #16, by three Sonnet fix agents on disjoint files, and by
+  the caller:
+  - **the rounding:** a new decoy switch, `pwhash-limits-odd`, whose memory bounds are no whole
+    KiB, and a new suite, `test-library-loading-password-limits`, which both rounding mutants
+    fail (M3C-F1);
+  - **the no-memory codes, by the owner's choice of 2026-11-24:**
+    - a new suite, `test-no-memory`, whose children run the real library under
+      `ulimit -v 524288`;
+    - a `'sensitive` hash there raises `&sodium-failed` with code -1;
+    - a real `'sensitive` hash's right password verifies `#f` there and `#t` outside it;
+    - first outside the gate, as an exception the owner chose on the premise that Valgrind
+      cannot run under `ulimit -v`. The re-review measured that premise false (M3C2-F1), and the
+      owner then chose to gate every child (M3C-F2; ADR-0011, amended);
+  - **the records brought up to the code:**
+    - the watchdog's shape;
+    - the allow-lists;
+    - ADR-0009, decision 3, restated;
+    - the FIFO rules in the constraints;
+    - the limits rule's exceptions;
+    - row 22's tripwire;
+    - the rounding's direction (M3C-F3);
+  - **M4's list** gains four notes for Techo's login (M3C-F4);
+  - **the watchdog:** each child prints that its watchdog is gone, and the rows assert it. The
+    watchdog exits once its child is gone. The mutexes are held inside critical sections
+    (M3C-F5);
+  - **the comments** (M3C-F6).
+
+  Every mutant is logged ([its mutation log](m3-closing-mutation-log.md)).
+- **Re-reviewed,** as the plan asks where a fix changes a rule. One Opus review of the fixes found
+  no blocker, 1 major and 3 minors ([research/m3-closing-fix-review/](research/m3-closing-fix-review/README.md)).
+  - **The major:** the third exception rested on a premise the gate's own Valgrind refutes.
+    Valgrind runs Chez inside the cap, with 0 errors. The caller had relayed the premise to the
+    owner unmeasured, and reproduced the measurement. The owner then chose to gate every child:
+    every `test-no-memory` child starts through `gated-command`, inside its cap, and asserts its
+    counts and the Valgrind line. There is no third exception.
+  - **The minors:**
+    - the watchdog check reads `/proc`, not the pid file, and the parent check is recorded as held
+      by no row;
+    - brief §8.2, ADR-0011 and the constraints now name row 22's cheap limits and the no-memory
+      rows;
+    - the tripwire's wording;
+    - the comments.
+  - **The owner chose to stop the review loop after this round.** The caller verified each fix by
+    hand, rerunning a mutant of each against the fixed suites.
+- **In the container:** `make test` 41 of 41, `check-test-fails` 13, `test-memory` 41 of 41 (the
+  slowest 114 s of 450), `check-memory-gate` 59 cases, `make build`, `check-dev` and `check-seam`.
+- **CI's run** 45526362780 passed all five jobs on the first fixes, `89a891e`.
+- **On the host,** `make check-guix` passes: "ALL CHECKS PASSED", with 41 of 41 suites inside.
 
 ### 2026-11-24 — M3 slice 2: the verbs (PR #16)
 
@@ -215,6 +289,7 @@ its questions on 2026-11-24, accepting every recommendation:
   oracle 11 s. The slowest suite is still `test-check-ci`, at 117 s, of 450. In the container: `make
   test` 39 of 39, `check-test-fails` 13, `test-memory` 39 of 39, `check-memory-gate` 59 cases,
   `make build` and `check-dev`.
+- **CI's run** 45508209141 passed all five jobs.
 
 ### 2026-11-24 — M3 slice 1: the bindings, the writers and the pure core (PR #15)
 

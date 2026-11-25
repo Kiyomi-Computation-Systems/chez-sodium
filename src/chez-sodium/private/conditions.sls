@@ -5,8 +5,10 @@
 ;;;
 ;;;   &chez-sodium-error           the root, fieldless, under &error
 ;;;   &sodium-library-unavailable  libsodium was refused (ADR-0002)
-;;;   &sodium-failed               libsodium answered a failure for a call
-;;;                                that passed its range checks (ADR-0006)
+;;;   &sodium-failed               libsodium gave no result for a call that
+;;;                                passed its range checks: it answered a
+;;;                                failure, or left no readable string
+;;;                                (ADR-0006)
 ;;;
 ;;; A raise may compound one with &who, &message and &irritants, so that the
 ;;; default handler prints readable text. Tests assert the reason symbol,

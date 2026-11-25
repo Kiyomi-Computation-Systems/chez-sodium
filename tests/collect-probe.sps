@@ -19,13 +19,24 @@
 ;;;      rendezvous can stop it. It polls, bounded, for the decoy's marker,
 ;;;      sleeps 1 s, then 10 s, leaves a file, and opens the FIFO read-write.
 ;;;      Were the marker never to appear, it still opens the FIFO once, and
-;;;      ends: it never outlives this process;
+;;;      ends. It also ends, without opening the FIFO, at its next check once
+;;;      this process is gone: a kill from outside leaves it at most one nap,
+;;;      10 s, behind;
 ;;;   4. it forks a thread that calls the verb, which holds its whole extent in
 ;;;      one critical section, and blocks in C;
 ;;;   5. it polls for the decoy's marker, then pauses 1 s, so the call is in C;
 ;;;   6. it runs collect-rendezvous, records the milliseconds it took, and opens
 ;;;      the FIFO read-write, which releases the call;
-;;;   7. it waits, bounded, for the thread's answer, and kills the watchdog.
+;;;   7. it waits, bounded, for the thread's answer, kills the watchdog, and
+;;;      looks in /proc for any live process whose command line names this
+;;;      call's watchdog.sh path, which is unique to the call. It never reads
+;;;      the pid file the kill used, so a wrong pid cannot pass for a dead
+;;;      watchdog.
+;;;
+;;; No row holds the watchdog's early exit, the parent check that ends it once
+;;; this process is gone. A row would have to kill a child from outside after
+;;; its marker, then find no watchdog 12 s later: a cost of 12 s or more per
+;;; run, and more under the gate.
 ;;;
 ;;; Its directory and the watchdog go on every exit path of the run: its end, a
 ;;; refusal and a raise. Only a kill from outside leaves the directory, under
@@ -46,13 +57,14 @@
 ;;;   (verb . VERB)
 ;;;   (released-by . collector|watchdog|nobody)   who opened the FIFO first
 ;;;   (rendezvous-ms . N)                         collect-rendezvous's time
+;;;   (watchdog-gone . #t|#f)                     whether no process names the watchdog
 ;;;   (answer . ANSWER)                           what the call answered, or
 ;;;                                               (raised TEXT), or hung
 ;;;   (counts . ALIST)                            the library's native counts
 ;;;   (valgrind . yes|no)                         whether memcheck runs it
 (import (rnrs)
         (only (chezscheme) collect-rendezvous critical-section current-time display-condition time-second time-nanosecond
-              foreign-alloc foreign-free foreign-procedure foreign-set! fork-thread
+              foreign-alloc foreign-free directory-list foreign-procedure foreign-set! fork-thread
               get-process-id getenv make-mutex make-time mkdir putenv sleep system with-mutex)
         (chez-sodium private counters)
         (chez-sodium private native)
@@ -189,9 +201,9 @@
 (call-with-output-file watchdog-script
   (lambda (port)
     (display (string-append
-              "fifo=$1 entered=$2 fired=$3\n"
+              "fifo=$1 entered=$2 fired=$3 parent=$4\n"
               "trap 'kill $s 2>/dev/null; exit 0' TERM\n"
-              "nap() { sleep $1 & s=$!; wait $s; }\n"
+              "nap() { sleep $1 & s=$!; wait $s; kill -0 \"$parent\" 2>/dev/null || exit 0; }\n"
               "i=0\n"
               "while [ ! -e \"$entered\" ] && [ $i -lt 900 ]; do nap 0.1; i=$((i+1)); done\n"
               "if [ -e \"$entered\" ]; then nap 1; nap 10; : > \"$fired\"; fi\n"
@@ -201,14 +213,50 @@
 ;; start-watchdog! : -> Void
 ;; The watchdog, in a shell of its own, with its pid in a file.
 (define (start-watchdog!)
-  (system (string-append "sh '" watchdog-script "' '" fifo "' '" entered "' '" fired
-                         "' </dev/null >/dev/null 2>&1 & echo $! > '" watchdog-pid-file "'")))
+  (system (string-append "sh '" watchdog-script "' '" fifo "' '" entered "' '" fired "' "
+                         (number->string (get-process-id))
+                         " </dev/null >/dev/null 2>&1 & echo $! > '" watchdog-pid-file "'")))
 
 ;; stop-watchdog! : -> Void
 (define (stop-watchdog!)
   (when (file-exists? watchdog-pid-file)
     (system (string-append "kill $(cat '" watchdog-pid-file "') 2>/dev/null; true"))
     (pause 100)))
+
+;; contains? : Bytevector Bytevector -> Boolean
+(define (contains? hay needle)
+  (let ((n (bytevector-length hay)) (m (bytevector-length needle)))
+    (let loop ((i 0))
+      (cond ((> (+ i m) n) #f)
+            ((let match ((j 0))
+               (or (= j m)
+                   (and (= (bytevector-u8-ref hay (+ i j)) (bytevector-u8-ref needle j))
+                        (match (+ j 1)))))
+             #t)
+            (else (loop (+ i 1)))))))
+
+;; names-watchdog? : String -> Boolean
+;; Whether process PID's command line names this call's watchdog script.
+(define (names-watchdog? pid)
+  (guard (e (#t #f))
+    (let ((cmdline (call-with-port
+                    (open-file-input-port (string-append "/proc/" pid "/cmdline"))
+                    get-bytevector-all)))
+      (and (bytevector? cmdline)
+           (contains? cmdline (string->utf8 watchdog-script))))))
+
+;; watchdog-gone? : -> Boolean
+;; Whether no live process but this one names this call's watchdog script. It
+;; looks in /proc and never reads the pid file the kill used, so a wrong pid
+;; cannot hide a watchdog that lives.
+(define (watchdog-gone?)
+  (let ((self (number->string (get-process-id))))
+    (not (exists (lambda (name)
+                   (and (positive? (string-length name))
+                        (for-all char-numeric? (string->list name))
+                        (not (string=? name self))
+                        (names-watchdog? name)))
+                 (directory-list "/proc")))))
 
 ;; --- the run -----------------------------------------------------------------------
 
@@ -223,7 +271,7 @@
    (lambda ()
      (let ((a (guard (e (#t (list 'raised (text-of e))))
                 (call-verb))))
-       (with-mutex lock (set! answer-box (list 'answer a))))))
+       (critical-section (with-mutex lock (set! answer-box (list 'answer a)))))))
 
   (let* ((entered? (wait-until (lambda () (file-exists? entered)) 6000)))
     ;; Step 5: once the marker is there, 1 s.
@@ -237,15 +285,16 @@
                'no-rendezvous)))
       (release!)
       ;; Step 7: the answer, bounded; then the watchdog dies.
-      (let* ((answered? (wait-until (lambda () (with-mutex lock answer-box)) 3000))
+      (let* ((answered? (wait-until (lambda () (critical-section (with-mutex lock answer-box))) 3000))
              (released-by (cond ((not entered?) 'nobody)
                                 ((file-exists? fired) 'watchdog)
                                 (else 'collector))))
         (stop-watchdog!)
         (show (cons 'verb verb-name))
+        (show (cons 'watchdog-gone (watchdog-gone?)))
         (show (cons 'released-by released-by))
         (show (cons 'rendezvous-ms rendezvous-ms))
-        (show (cons 'answer (if answered? (cadr (with-mutex lock answer-box)) 'hung)))
+        (show (cons 'answer (if answered? (cadr (critical-section (with-mutex lock answer-box))) 'hung)))
         (show (cons 'counts (native-counts)))
         (show (cons 'valgrind (if (under-valgrind?) 'yes 'no))))))
   (cleanup!))

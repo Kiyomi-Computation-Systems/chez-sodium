@@ -11,6 +11,8 @@
   point added after M2's closing review, and accepted by the owner that day.
   Amended 2026-11-24 in M3's plan, and accepted by the owner that day
   ([amendment](#amendment-2026-11-24-m3s-plan)).
+  Its last points added after M3's slice reviews, its closing review and that review's
+  re-review; gating the no-memory children is the owner's choice of 2026-11-24.
 - **Date:** 2026-11-22
 - **Scope:** development tooling, the suites and CI; no library change
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §7, §8.2, §9's M0, and
@@ -56,7 +58,8 @@ where the text means the library. Only what differs is written here.
      `_memlimit_min`, so the one job stays fast. The exceptions are one cheap pair that is
      neither the minimum nor a preset, `(make-password-limits 2 16)`, and one hash at the
      default. No row needs a high limit: the collect-safe row blocks a decoy on a FIFO
-     (brief §8.2).
+     (brief §8.2). M3 adds row 22's code rows and the no-memory rows to these (amended,
+     below).
    - **The wipe row's child runs outside Valgrind,** whose allocator bypasses the row's
      `free()` interposer ([ADR-0008]). Its `LD_PRELOAD` is set to the interposer alone, never
      appended: under the gate, a suite's own `LD_PRELOAD` holds Valgrind's preloads.
@@ -190,6 +193,9 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
   - `pwhash-str-unreadable`: it answers 0 and leaves `out` all `A5` ([ADR-0006], amended);
   - `pwhash-str-empty`: it answers 0 with a 0 at `out`'s first byte, an empty string, added after
     slice 2's review;
+  - `pwhash-limits-odd`: `pwhash-limits-other`'s values, but memory from 16385 to 1048575 bytes,
+    neither a whole KiB, so `test-library-loading-password-limits` holds the memory range's
+    rounding, added after M3's closing review;
   - `verify-other`: verify answers 1 for a match;
   - `strprefix-null`: a NULL prefix;
   - `pwhash-blocks`: row 19's FIFO.
@@ -203,8 +209,13 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
     does it run `collect-rendezvous`, and release the FIFO. Without the wait the rendezvous can
     end before the call is in C, and a plain binding passes: slice 0's review saw it pass 8 runs
     of 8 (M3S0-F1).
-  - The child starts the watchdog once the marker appears; it releases the FIFO after 10 s. The
-    rendezvous must end within 5 s.
+  - The child starts the watchdog before it forks, outside the process, so no rendezvous can
+    stop it: a shell that polls for the marker, bounded, then waits 1 s and 10 s and releases
+    the FIFO, and exits early once the child is gone. The rendezvous must end within 5 s. The
+    suite bounds each child with `timeout 180`, outside Valgrind, and each child prints whether
+    its watchdog is gone before it exits, which the rows assert (M3S2-F3, M3C-F5). The control's
+    row asserts only that the watchdog released it: a collection the child's own allocation
+    starts can do the waiting first.
   - Every writer, the collector and the watchdog, opens the FIFO read-write, `: 1<>"$FIFO"`. A
     write-only open blocks until a reader comes, and the decoy reads once, so the second writer
     would block for ever (slice 1's review, M3S1-F4, probed). The child kills the watchdog
@@ -225,6 +236,32 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
   children. It also gains the constants' lines.
 - **Row 24's password half:** the second wipe child runs each password verb at the decoy's
   limits.
+- **The no-memory codes are held by `test-no-memory`, under the gate.** Brief §3.4 states that
+  `crypto_pwhash_str` and `_verify` answer -1 when libsodium cannot get the memory, and row 22
+  confirms every code it states (M3C-F2).
+  - **Every child starts through `gated-command`,** the capped ones inside `sh -c 'ulimit -v
+    524288; exec "$@"'`, so the cap sits outside Valgrind. Each asserts its counts and the
+    Valgrind line as the gate asked.
+  - **Under the cap,** a hash at `'sensitive` raises `&sodium-failed` with code -1, and a real
+    `'sensitive` hash's right password verifies `#f`. Outside the cap, it verifies `#t`.
+  - **The measurement:** Valgrind 3.27.0 with the gate's options runs Chez inside the cap, with
+    0 errors, at 1.0.18 and 1.0.22. Under Valgrind, `'interactive` needs about 256 MiB, so
+    512 MiB keeps about 2x headroom (M3C2-F1).
+  - **The history.** The owner first chose a third exception to the gate's child rule, on the
+    premise that Valgrind cannot run under `ulimit -v`. The closing review's fix had stated
+    that premise; no one had measured it. The re-review measured it false. The owner then chose
+    on 2026-11-24 to gate every child, and there is no third exception.
+- **Rows that hash above the minimum, beside decision 1's pair and default hash:**
+  - row 22's code rows, at the few cheap limits each code needs: (3, 8 KiB), (1, 32 KiB),
+    (1, 64 KiB), (2, 16 KiB) and (2, 16 KiB + 1 byte);
+  - the no-memory rows, the only rows at a high limit, `'sensitive`. The hash and the verify that
+    run outside the cap each take about 1 GiB, and about 26 s under the gate; the capped ones
+    fail at once.
+- **Row 22's tripwire.** `test-native-codes` holds a byte of 0x80 or more in a salt (it uses 0xC3)
+  to the answer measured at each release, 0 at 1.0.18 and -1 at 1.0.22, and fails on any other.
+  So a new release on any lane needs that answer measured first: `current`'s pin bumped, a
+  `channels.scm` bump that moves Guix's libsodium, or a distribution's package (M3C-F3,
+  M3C2-F3).
 
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md

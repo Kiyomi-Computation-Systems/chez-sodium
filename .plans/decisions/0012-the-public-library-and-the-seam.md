@@ -8,6 +8,7 @@
   review ([amendment](#amendment-2026-11-23-m2s-plan)).
   Amended 2026-11-24 in M3's plan, and accepted by the owner that day
   ([amendment](#amendment-2026-11-24-m3s-plan)).
+  Its last points added after M3's slice reviews and closing review.
 - **Date:** 2026-11-23
 - **Scope:** the public library, and what `make check-seam` holds under `src/`
 - **Settles:** the M1 plan §4.2, items 1 and 7
@@ -118,11 +119,13 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
   libsodium.
   - `test-never-loads`' loaders row holds that: it gains `password-verbs` alone, and a
     `password-text` that imported native would join it (M3S0-F2).
-- **No Scheme copy of a secret, read as data.** A row reads `password-text.sls` and
-  `password-verbs.sls` and refuses `string->utf8`, `utf8->string`, `string->list`,
-  `list->string`, `substring`, `string-copy`, `string->bytevector` and `bytevector-copy`, and
-  `string-append` but inside a top-level `-message` definition of no parameters. The value rows
-  cannot see a copy: `string->utf8`'s length is the right count (M3S0-F6).
+- **No Scheme copy of a secret, read as data.** Rows read `password-text.sls`,
+  `password-verbs.sls` and native's two writers, and hold the whole set of symbols each may
+  reference to an allow-list written in the suite: `test-password-text`'s, `test-password-verbs`'
+  S6, and `test-native`'s E13. `string-append` appears only inside a top-level `-message`
+  definition of no parameters (S7). The value rows cannot see a copy: `string->utf8`'s length is
+  the right count (M3S0-F6). A deny-list of the copying procedures came first, and let
+  `make-string` and `string-set!` through (M3S1-F2).
 - **Native gains the writers, `call-with-c-string` and `call-with-utf8`, and
   `foreign-ascii-string`.** Only native reads and writes foreign memory (rule (f)), and every
   block is made by `call-with-block` (decision 7).

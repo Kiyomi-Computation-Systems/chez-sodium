@@ -4,6 +4,7 @@
   bound `crypto_pwhash_strprefix` are brief §11.5; the default limits are brief §11.7.
   Amended 2026-11-24 in M3's plan, and accepted by the owner that day
   ([amendment](#amendment-2026-11-24-m3s-plan)).
+  Its last points added after M3's slice reviews and closing review.
 - **Date:** 2026-11-22
 - **Scope:** `password-needs-rehash?`, the limits, and the hash-string checks it shares with
   `password-verify`
@@ -131,7 +132,12 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
   that copies it into its block answers the change as data, and needs-rehash reads it as a hash
   that is not current (slice 0's review, M3S0-F5).
 - **`make-password-limits` checks decision 4's ranges when it is called.** The owner chose this
-  on 2026-11-24. A `Password-limits` is always in range.
+  on 2026-11-24. A `Password-limits` is always in range. The memory range runs from
+  `_memlimit_min` / 1024, rounded up, to `_memlimit_max` / 1024, rounded down.
+- **Decision 3, restated:** `password-needs-rehash?` raises only for a caller's mistake, before
+  C: a hash that is not a string, `not-a-string`, or limits that are no preset and no
+  `Password-limits`, `not-password-limits`. Limits out of range are `make-password-limits`'
+  refusal, when they are made (M3C-F3).
 - **Decision 5's pre-check is `readable-hash-string?`:** every character is U+0021 to U+007E, so
   there is no U+0000, and there are at most `input-cap` characters. The empty string fails it.
 
