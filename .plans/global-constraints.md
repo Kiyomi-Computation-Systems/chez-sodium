@@ -23,6 +23,9 @@ record it comes from, and where a rule and its record disagree, the record wins.
   ([ADR-0011]; chez-sqlite3 ADR-0008).
 - **The libsodium floor is raised only by a record.** CI tests the floor, Guix's version and the
   latest point release, and `current` moves at each point release ([ADR-0003]).
+- **Bumping `current`'s pin needs row 22's 0x80 answer measured at the new release first:**
+  `test-native-codes`' tripwire fails on any release but 1.0.18 and 1.0.22 ([ADR-0011],
+  amended).
 - **CI builds libsodium from a point-release tarball,** never `-stable` or `LATEST`, pinned by a
   SHA-256 the project computed and checked once against the `.minisig` with libsodium's
   published minisign key, and falls back to `releases/old/` ([ADR-0003]).
@@ -243,8 +246,10 @@ record it comes from, and where a rule and its record disagree, the record wins.
   failure, hang, or empty glob. `make check-test-fails` proves each of those ([ADR-0011];
   chez-sqlite3 ADR-0007).
 - **Password rows hash at libsodium's minimum limits,** read from `_opslimit_min` and
-  `_memlimit_min`, but for one cheap pair that is neither the minimum nor a preset, and one hash
-  at the default. No row needs a high limit ([ADR-0011]).
+  `_memlimit_min`, but for one cheap pair that is neither the minimum nor a preset, one hash at
+  the default, and row 22's code rows at the few cheap limits each code needs. Only the
+  no-memory rows hash at a high limit, `'sensitive`, in children outside the gate ([ADR-0011],
+  amended).
 
 ## Memory and CI
 
@@ -264,7 +269,11 @@ record it comes from, and where a rule and its record disagree, the record wins.
   chez-sqlite3 ADR-0005, amended); and `test-constants`' prototype check, a C program that calls
   no libsodium function ([ADR-0011], amended). Any other C program a suite runs is gated. Row
   19's FIFO writer and watchdog are shells, which run no Scheme and no libsodium. Row 19 waits
-  for the decoy's marker before its rendezvous, or a plain binding passes ([ADR-0011],
+  for the decoy's marker before its rendezvous, or a plain binding passes. Every writer opens
+  its FIFO read-write; each call has a FIFO and a marker of its own; the watchdog starts before
+  the fork, outside the process; and the suite bounds each child with `timeout`. The third
+  exception: `test-no-memory`'s children run the real library outside the gate, under
+  `ulimit -v`, which Valgrind cannot run under, and assert `(valgrind . no)` ([ADR-0011],
   amended).
 - **The C oracle is a program named `libsodium-oracle`.** The gate's rule for child logs names
   it ([ADR-0011]).

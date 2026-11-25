@@ -2,7 +2,7 @@
 ;;; (library-loading): what the suites that load libsodium end to end
 ;;; share, tests/test-library-loading-*.sps (ADR-0002, ADR-0003, ADR-0006,
 ;;; ADR-0011). Their cost is their children, each under a Valgrind of its
-;;; own under the memory gate, so the rows are split among twelve suites, each
+;;; own under the memory gate, so the rows are split among thirteen suites, each
 ;;; running at most 14 children, to keep each well under MEMORY_TIMEOUT
 ;;; (ADR-0011):
 ;;;
@@ -30,6 +30,8 @@
 ;;;   -passwords   the password verbs' calls the same way: what reaches C, each
 ;;;                refusal's empty growth, the other answers of the password
 ;;;                calls, and the constants as the decoy gives them
+;;;   -password-limits  the memory range make-password-limits answers, rounded
+;;;                inward, under a decoy whose memlimits are no whole KiB
 ;;;
 ;;;   the probe         spawn a child through env and gated-command, and
 ;;;                     read what tests/refusal-probe.sps printed, as data

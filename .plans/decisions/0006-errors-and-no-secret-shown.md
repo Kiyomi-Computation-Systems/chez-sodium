@@ -10,6 +10,7 @@
   choice that day ([amendment](#amendment-2026-11-24-a-secrets-refusal-states-its-bound-as-numbers)).
   Amended 2026-11-24 in M3's plan, and accepted by the owner that day
   ([amendment](#amendment-2026-11-24-m3s-plan)).
+  Its last points added after M3's slice reviews.
 - **Date:** 2026-11-22
 - **Scope:** every condition chez-sodium raises, and every refusal of a caller's mistake
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §5

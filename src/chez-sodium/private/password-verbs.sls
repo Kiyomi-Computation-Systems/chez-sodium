@@ -24,8 +24,11 @@
 ;;; encodes, slices or lists a string. A test reads this file as data to hold
 ;;; each of these (tests/test-password-verbs.sps).
 ;;;
-;;; Every number a verb checks against is native's, read from libsodium once at
-;;; the load. None is written here.
+;;; Every limit, size and prefix a verb checks against is libsodium's, read by
+;;; native once at the load, or the input cap's, from cap. None of them is
+;;; written here. The numbers that are written here are units and bounds of
+;;; arithmetic: 1024 bytes to the KiB, the 1023 that rounds a least memory up
+;;; to a whole KiB, and refuse-secret's lower bound of 0 for the cap.
 (library (chez-sodium private password-verbs)
   (export password-hash password-verify password-needs-rehash? make-password-limits)
   (import (chez-sodium private require-threaded)

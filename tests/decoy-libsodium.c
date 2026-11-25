@@ -60,6 +60,10 @@
  *                      64 MiB, 256 MiB and 1 GiB; 0 to 4294967295;
  *                      "$argon2id$"). crypto_pwhash_str writes a string of
  *                      140 characters, longer than the control's 128 bytes
+ *   pwhash-limits-odd  every constant pwhash-limits-other answers, but the
+ *                      memlimits: crypto_pwhash_memlimit_min answers 16385
+ *                      and crypto_pwhash_memlimit_max 1048575 bytes, neither
+ *                      a whole KiB
  *   pwhash-str-fails   crypto_pwhash_str answers -1
  *   pwhash-str-other   crypto_pwhash_str answers 1, a second code
  *   pwhash-str-unreadable
@@ -198,6 +202,7 @@ enum decoy_switch {
   GENERICHASH_OTHER,
   MEMCMP_OTHER,
   PWHASH_LIMITS_OTHER,
+  PWHASH_LIMITS_ODD,
   PWHASH_STR_FAILS,
   PWHASH_STR_OTHER,
   PWHASH_STR_UNREADABLE,
@@ -225,6 +230,7 @@ static const struct {
   {"generichash-other", GENERICHASH_OTHER},
   {"memcmp-other", MEMCMP_OTHER},
   {"pwhash-limits-other", PWHASH_LIMITS_OTHER},
+  {"pwhash-limits-odd", PWHASH_LIMITS_ODD},
   {"pwhash-str-fails", PWHASH_STR_FAILS},
   {"pwhash-str-other", PWHASH_STR_OTHER},
   {"pwhash-str-unreadable", PWHASH_STR_UNREADABLE},
@@ -461,10 +467,10 @@ int sodium_memcmp(const void *const b1, const void *const b2, size_t len)
 _Static_assert(sizeof CONTROL_HASH - 1 == 93, "the control's hash string is 93 characters");
 _Static_assert(sizeof OTHER_HASH - 1 == 140, "pwhash-limits-other's hash string is 140 characters");
 
-/* limits_other: whether the constants are pwhash-limits-other's. */
+/* limits_other: whether the constants are pwhash-limits-other's (pwhash-limits-odd keeps all but the two memlimits). */
 static int limits_other(void)
 {
-  return mode == PWHASH_LIMITS_OTHER;
+  return mode == PWHASH_LIMITS_OTHER || mode == PWHASH_LIMITS_ODD;
 }
 
 /* string_length: the strlen of the C string at P, read through a volatile
@@ -701,6 +707,8 @@ size_t crypto_pwhash_opslimit_sensitive(void)
 size_t crypto_pwhash_memlimit_min(void)
 {
   called("crypto_pwhash_memlimit_min()");
+  if (mode == PWHASH_LIMITS_ODD)
+    return 16385;
   return limits_other() ? 16384 : 8192;
 }
 #endif
@@ -709,6 +717,8 @@ size_t crypto_pwhash_memlimit_min(void)
 size_t crypto_pwhash_memlimit_max(void)
 {
   called("crypto_pwhash_memlimit_max()");
+  if (mode == PWHASH_LIMITS_ODD)
+    return (size_t) 1048575;
   return limits_other() ? (size_t) 1048576 : (size_t) 4398046510080ULL;
 }
 #endif

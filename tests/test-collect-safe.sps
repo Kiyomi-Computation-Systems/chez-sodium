@@ -123,7 +123,8 @@
 
 ;; summary : String Natural -> (U (List ...) Any)
 ;; What a child answered, boiled down to what the rows assert: its status, its
-;; stderr, the verb it ran, who released the call, #t when the rendezvous took
+;; stderr, the verb it ran, who released the call, whether the child found the
+;; watchdog gone after it killed it, #t when the rendezvous took
 ;; under BOUND ms as UNDER? says (UNDER? #f: at least BOUND), the call's answer,
 ;; the counts and the Valgrind line. A child that raised, or printed no data, is its raise.
 (define (summary verb bound under?)
@@ -134,7 +135,7 @@
           (display (string-append "  " verb ": rendezvous " (if (number? ms) (number->string ms) "?")
                                   " ms\n"))
           (list (car answer) (caddr answer)
-                (fact lines 'verb) (fact lines 'released-by)
+                (fact lines 'verb) (fact lines 'released-by) (fact lines 'watchdog-gone)
                 (if (integer? ms) (eq? (< ms bound) under?) 'no-time)
                 (fact lines 'answer)
                 (cons 'counts (fact lines 'counts)) (cons 'valgrind (fact lines 'valgrind))))
@@ -142,7 +143,7 @@
 
 ;; expected : String Symbol Any -> Expected
 (define (expected verb released-by answer)
-  (list 0 "" verb released-by #t answer no-native-objects valgrind-line))
+  (list 0 "" verb released-by #t #t answer no-native-objects valgrind-line))
 
 ;; --- the rows ----------------------------------------------------------------------------
 

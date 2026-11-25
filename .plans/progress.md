@@ -50,9 +50,11 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   - **Slice 0, the plan and the records,** merged as #14. The owner accepted every
     recommendation on 2026-11-24.
   - **Slice 1, the bindings, the writers and the pure core,** merged as #15.
-  - **Slice 2, the verbs,** is on `m3-slice-2`.
-  - **Next: M3's closing review,** and its fixes in a PR stacked on slice 2's, as the owner asked
-    on 2026-11-24.
+  - **Slice 2, the verbs,** is #16, on `m3-slice-2`.
+  - **M3's closing review** found no blocker, no major and 6 minors. Its fixes are on
+    `m3-closing`, in a PR stacked on #16, as the owner asked on 2026-11-24.
+  - **Next:** the owner merges #16, then the closing PR, bottom up; Techo's session is told M3's
+    commit; then M4.
 
 ## Answered for M1
 
@@ -165,11 +167,55 @@ its questions on 2026-11-24, accepting every recommendation:
   - a hash string is stored exactly: a stray space or newline verifies `#f` for ever;
   - the calling thread's interrupts wait while a hash runs: about 55 ms at `'interactive`,
     seconds at `'sensitive` (M3S2-F4).
+  - an unknown account is checked against a real hash made at the current limits, never a
+    string the pre-check refuses, which answers at once and tells accounts apart by time;
+  - custom limits go to both `password-hash` and `password-needs-rehash?`, or every login
+    rehashes;
+  - the binding never normalises a password: NFC and NFD forms do not verify against each other;
+  - the login pattern's rehash can raise `&sodium-failed` after a `#t` verify, and a failed
+    rehash need not fail the login (M3C-F4).
 - **The docs rule of `check-floors`** waits for `docs/`.
 - **The install-line checks of `test-manifest`** wait for the first release, which writes the
   install lines.
 
 ## Close-outs
+
+### 2026-11-24 — M3's closing review and its fixes (PR #17)
+
+- **Reviewed:** one Opus review, read-only, of the whole milestone, from `cd64dc6` to `394cb8c`.
+  It found no blocker, no major and 6 minors ([research/m3-closing-review/](research/m3-closing-review/README.md)).
+  - Of its 22 mutants, 19 failed rows.
+  - The survivors: the memory range's rounding, twice, and the child's kill of its watchdog. The
+    caller reproduced both.
+  - It ran `make check-guix` on the host, which passed.
+- **Fixed** on `m3-closing`, stacked on #16, by three Sonnet fix agents on disjoint files, and by
+  the caller:
+  - **the rounding:** a new decoy switch, `pwhash-limits-odd`, whose memory bounds are no whole
+    KiB, and a new suite, `test-library-loading-password-limits`, which both rounding mutants
+    fail (M3C-F1);
+  - **the no-memory codes, by the owner's choice of 2026-11-24:**
+    - a new suite, `test-no-memory`, whose children run the real library outside the gate under
+      `ulimit -v 524288`;
+    - a `'sensitive` hash there raises `&sodium-failed` with code -1;
+    - a real `'sensitive` hash's right password verifies `#f` there and `#t` outside it;
+    - this is the gate's third recorded exception (M3C-F2; ADR-0011, amended);
+  - **the records brought up to the code:**
+    - the watchdog's shape;
+    - the allow-lists;
+    - ADR-0009, decision 3, restated;
+    - the FIFO rules in the constraints;
+    - the limits rule's exceptions;
+    - row 22's tripwire;
+    - the rounding's direction (M3C-F3);
+  - **M4's list** gains four notes for Techo's login (M3C-F4);
+  - **the watchdog:** each child prints that its watchdog is gone, and the rows assert it. The
+    watchdog exits once its child is gone. The mutexes are held inside critical sections
+    (M3C-F5);
+  - **the comments** (M3C-F6).
+
+  Every mutant is logged ([its mutation log](m3-closing-mutation-log.md)).
+- **In the container:** `make test` 41 of 41, `check-test-fails` 13, `test-memory` 41 of 41 (the
+  slowest 114 s of 450), `check-memory-gate` 59 cases, `make build`, `check-dev` and `check-seam`.
 
 ### 2026-11-24 — M3 slice 2: the verbs (PR #16)
 
@@ -215,6 +261,7 @@ its questions on 2026-11-24, accepting every recommendation:
   oracle 11 s. The slowest suite is still `test-check-ci`, at 117 s, of 450. In the container: `make
   test` 39 of 39, `check-test-fails` 13, `test-memory` 39 of 39, `check-memory-gate` 59 cases,
   `make build` and `check-dev`.
+- **CI's run** 45508209141 passed all five jobs.
 
 ### 2026-11-24 — M3 slice 1: the bindings, the writers and the pure core (PR #15)
 

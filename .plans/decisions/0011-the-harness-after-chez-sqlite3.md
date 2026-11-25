@@ -11,6 +11,8 @@
   point added after M2's closing review, and accepted by the owner that day.
   Amended 2026-11-24 in M3's plan, and accepted by the owner that day
   ([amendment](#amendment-2026-11-24-m3s-plan)).
+  Its last points added after M3's slice reviews and closing review; the gate's third
+  exception, the no-memory children, is the owner's choice of 2026-11-24.
 - **Date:** 2026-11-22
 - **Scope:** development tooling, the suites and CI; no library change
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §7, §8.2, §9's M0, and
@@ -190,6 +192,9 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
   - `pwhash-str-unreadable`: it answers 0 and leaves `out` all `A5` ([ADR-0006], amended);
   - `pwhash-str-empty`: it answers 0 with a 0 at `out`'s first byte, an empty string, added after
     slice 2's review;
+  - `pwhash-limits-odd`: `pwhash-limits-other`'s values, but memory from 16385 to 1048575 bytes,
+    neither a whole KiB, so `test-library-loading-password-limits` holds the memory range's
+    rounding, added after M3's closing review;
   - `verify-other`: verify answers 1 for a match;
   - `strprefix-null`: a NULL prefix;
   - `pwhash-blocks`: row 19's FIFO.
@@ -203,8 +208,13 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
     does it run `collect-rendezvous`, and release the FIFO. Without the wait the rendezvous can
     end before the call is in C, and a plain binding passes: slice 0's review saw it pass 8 runs
     of 8 (M3S0-F1).
-  - The child starts the watchdog once the marker appears; it releases the FIFO after 10 s. The
-    rendezvous must end within 5 s.
+  - The child starts the watchdog before it forks, outside the process, so no rendezvous can
+    stop it: a shell that polls for the marker, bounded, then waits 1 s and 10 s and releases
+    the FIFO, and exits early once the child is gone. The rendezvous must end within 5 s. The
+    suite bounds each child with `timeout 180`, outside Valgrind, and each child prints whether
+    its watchdog is gone before it exits, which the rows assert (M3S2-F3, M3C-F5). The control's
+    row asserts only that the watchdog released it: a collection the child's own allocation
+    starts can do the waiting first.
   - Every writer, the collector and the watchdog, opens the FIFO read-write, `: 1<>"$FIFO"`. A
     write-only open blocks until a reader comes, and the decoy reads once, so the second writer
     would block for ever (slice 1's review, M3S1-F4, probed). The child kills the watchdog
@@ -225,6 +235,18 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
   children. It also gains the constants' lines.
 - **Row 24's password half:** the second wipe child runs each password verb at the decoy's
   limits.
+- **A third exception to the gate's child rule: the no-memory children.** The owner chose this on
+  2026-11-24, after M3's closing review (M3C-F2). Brief §3.4 states that `crypto_pwhash_str` and
+  `_verify` answer -1 when libsodium cannot get the memory, and row 22 confirms every code it
+  states; Valgrind cannot run under `ulimit -v`. So `test-no-memory`'s children run the real
+  library outside the gate, under a `ulimit -v` too small for `'sensitive`, and each asserts
+  `(valgrind . no)`. A hash at `'sensitive` there raises `&sodium-failed` with code -1, and a
+  real `'sensitive` hash's right password verifies `#f` there and `#t` outside it. Their hashes
+  are the only rows at a high limit; they run plain, a couple of seconds and 1 GiB each.
+- **Row 22's tripwire:** `test-native-codes` holds the byte of 0x80 in a salt to the answer
+  measured at each release, 0 at 1.0.18 and -1 at 1.0.22, and fails on any other release. So
+  bumping `current`'s pin, or a lane on another release, needs that answer measured first
+  (M3C-F3).
 
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md

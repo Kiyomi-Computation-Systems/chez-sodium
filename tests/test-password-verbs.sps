@@ -6,8 +6,9 @@
 ;;;
 ;;; password-verbs' body is native's load, which a guard in a program cannot
 ;;; catch from an import, so this suite reaches each verb through eval, under a
-;;; guard: a library that cannot load fails every row that needs it by name,
-;;; where an import would kill the suite before its first line. A top-level
+;;; guard: with a library that cannot load, every row is still named and the rows
+;;; that need the library fail, where an import would kill the suite before its
+;;; first line. A top-level
 ;;; definition that uses a verb holds a fallback value when the verb cannot
 ;;; run, so none raises, and the rows built on it fail by name.
 ;;;
@@ -30,7 +31,8 @@
 ;;;        bound prints the same for other contents and lengths
 ;;;   R18  each verb under an engine at every fuel from 1 until it completes;
 ;;;        and each verb that holds a string, with another thread's write
-;;;        simulated at each expiry: changed-during-call
+;;;        simulated at each expiry: password-hash and password-verify give
+;;;        changed-during-call, and password-needs-rehash? answers #t
 ;;;   S    the library read as data: one call-in-section per verb, every check
 ;;;        before it, every symbol inside it listed whole, the import clause
 ;;;        whole, and the set of every symbol the library references, so no
@@ -820,10 +822,10 @@
   '(make-password-limits password-hash password-needs-rehash? password-verify)
   (sorted-exports verbs-lib))
 
-(test-equal "a Password-limits is no pair, no vector and no list of its numbers"
-  '(#f #f #f)
+(test-equal "a Password-limits is made, and is no pair, no vector and no list of its numbers"
+  '(#t #f #f #f)
   (let ((limits (limits-of 2 16)))
-    (list (pair? limits) (vector? limits) (equal? limits '(2 16)))))
+    (list (not (symbol? limits)) (pair? limits) (vector? limits) (equal? limits '(2 16)))))
 
 (check "a Password-limits is opaque: record? answers #f"
   (answered #f)

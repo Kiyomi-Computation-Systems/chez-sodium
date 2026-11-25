@@ -19,13 +19,16 @@
 ;;;      rendezvous can stop it. It polls, bounded, for the decoy's marker,
 ;;;      sleeps 1 s, then 10 s, leaves a file, and opens the FIFO read-write.
 ;;;      Were the marker never to appear, it still opens the FIFO once, and
-;;;      ends: it never outlives this process;
+;;;      ends. It also ends, without opening the FIFO, at its next check once
+;;;      this process is gone: a kill from outside leaves it at most one nap,
+;;;      10 s, behind;
 ;;;   4. it forks a thread that calls the verb, which holds its whole extent in
 ;;;      one critical section, and blocks in C;
 ;;;   5. it polls for the decoy's marker, then pauses 1 s, so the call is in C;
 ;;;   6. it runs collect-rendezvous, records the milliseconds it took, and opens
 ;;;      the FIFO read-write, which releases the call;
-;;;   7. it waits, bounded, for the thread's answer, and kills the watchdog.
+;;;   7. it waits, bounded, for the thread's answer, kills the watchdog, and
+;;;      checks with kill -0 that its pid is gone.
 ;;;
 ;;; Its directory and the watchdog go on every exit path of the run: its end, a
 ;;; refusal and a raise. Only a kill from outside leaves the directory, under
@@ -46,6 +49,7 @@
 ;;;   (verb . VERB)
 ;;;   (released-by . collector|watchdog|nobody)   who opened the FIFO first
 ;;;   (rendezvous-ms . N)                         collect-rendezvous's time
+;;;   (watchdog-gone . #t|#f)                     whether the watchdog's pid is gone
 ;;;   (answer . ANSWER)                           what the call answered, or
 ;;;                                               (raised TEXT), or hung
 ;;;   (counts . ALIST)                            the library's native counts
@@ -189,9 +193,9 @@
 (call-with-output-file watchdog-script
   (lambda (port)
     (display (string-append
-              "fifo=$1 entered=$2 fired=$3\n"
+              "fifo=$1 entered=$2 fired=$3 parent=$4\n"
               "trap 'kill $s 2>/dev/null; exit 0' TERM\n"
-              "nap() { sleep $1 & s=$!; wait $s; }\n"
+              "nap() { sleep $1 & s=$!; wait $s; kill -0 \"$parent\" 2>/dev/null || exit 0; }\n"
               "i=0\n"
               "while [ ! -e \"$entered\" ] && [ $i -lt 900 ]; do nap 0.1; i=$((i+1)); done\n"
               "if [ -e \"$entered\" ]; then nap 1; nap 10; : > \"$fired\"; fi\n"
@@ -201,14 +205,20 @@
 ;; start-watchdog! : -> Void
 ;; The watchdog, in a shell of its own, with its pid in a file.
 (define (start-watchdog!)
-  (system (string-append "sh '" watchdog-script "' '" fifo "' '" entered "' '" fired
-                         "' </dev/null >/dev/null 2>&1 & echo $! > '" watchdog-pid-file "'")))
+  (system (string-append "sh '" watchdog-script "' '" fifo "' '" entered "' '" fired "' "
+                         (number->string (get-process-id))
+                         " </dev/null >/dev/null 2>&1 & echo $! > '" watchdog-pid-file "'")))
 
 ;; stop-watchdog! : -> Void
 (define (stop-watchdog!)
   (when (file-exists? watchdog-pid-file)
     (system (string-append "kill $(cat '" watchdog-pid-file "') 2>/dev/null; true"))
     (pause 100)))
+
+;; watchdog-gone? : -> Boolean
+;; Whether kill -0 finds no process at the watchdog's pid.
+(define (watchdog-gone?)
+  (not (zero? (system (string-append "kill -0 $(cat '" watchdog-pid-file "') 2>/dev/null")))))
 
 ;; --- the run -----------------------------------------------------------------------
 
@@ -223,7 +233,7 @@
    (lambda ()
      (let ((a (guard (e (#t (list 'raised (text-of e))))
                 (call-verb))))
-       (with-mutex lock (set! answer-box (list 'answer a))))))
+       (critical-section (with-mutex lock (set! answer-box (list 'answer a)))))))
 
   (let* ((entered? (wait-until (lambda () (file-exists? entered)) 6000)))
     ;; Step 5: once the marker is there, 1 s.
@@ -237,15 +247,16 @@
                'no-rendezvous)))
       (release!)
       ;; Step 7: the answer, bounded; then the watchdog dies.
-      (let* ((answered? (wait-until (lambda () (with-mutex lock answer-box)) 3000))
+      (let* ((answered? (wait-until (lambda () (critical-section (with-mutex lock answer-box))) 3000))
              (released-by (cond ((not entered?) 'nobody)
                                 ((file-exists? fired) 'watchdog)
                                 (else 'collector))))
         (stop-watchdog!)
         (show (cons 'verb verb-name))
+        (show (cons 'watchdog-gone (watchdog-gone?)))
         (show (cons 'released-by released-by))
         (show (cons 'rendezvous-ms rendezvous-ms))
-        (show (cons 'answer (if answered? (cadr (with-mutex lock answer-box)) 'hung)))
+        (show (cons 'answer (if answered? (cadr (critical-section (with-mutex lock answer-box))) 'hung)))
         (show (cons 'counts (native-counts)))
         (show (cons 'valgrind (if (under-valgrind?) 'yes 'no))))))
   (cleanup!))
