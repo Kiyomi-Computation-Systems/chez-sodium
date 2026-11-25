@@ -5,7 +5,7 @@
 ;;; A verb copies its input into a block with a Scheme loop, inside one
 ;;; critical section, which holds off every other thread's collection for as
 ;;; long as it runs. The cap keeps that wait short. Every verb that takes a
-;;; byte input checks it before its section (ADR-0007, decision 5).
+;;; byte input checks it before its section (ADR-0007).
 ;;;
 ;;; It is pure: it loads no libsodium, so a library that needs the number does
 ;;; not need the verbs.

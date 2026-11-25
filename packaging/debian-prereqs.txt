@@ -1,8 +1,8 @@
 # Debian/Ubuntu packages to build and test chez-sodium in CI, on
 # ubuntu-24.04.
 #
-# Every job of .github/workflows/ci.yml installs from this file: one step
-# reads every uncommented line, installs them together with
+# Every job of .github/workflows/ci.yml but site installs from this file: one
+# step reads every uncommented line, installs them together with
 # `apt-get install -y --no-install-recommends`, and fails when the file
 # yields no package. A package a job needs and this file lacks fails that
 # job: add it here.

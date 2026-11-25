@@ -3,8 +3,8 @@
 ;;; as pure functions of a string.
 ;;;
 ;;; A UTF-8 length counted without encoding, the pre-check of a hash string,
-;;; and the shape of a hash that password-hash would make now. They load no
-;;; libsodium and touch no foreign memory, so the suite runs without one.
+;;; and the shape of a hash made with today's algorithm and parallelism. They
+;;; load no libsodium and touch no foreign memory, so the suite runs without one.
 ;;;
 ;;; Each is called only on a string: the verbs check types before they call
 ;;; here, so nothing here raises for a wrong type. A hash string is a secret,

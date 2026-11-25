@@ -2,7 +2,7 @@
 ;;; The return codes of the verbs' three entry points, through native's raw
 ;;; bindings on blocks from native's call-with-block, against the library
 ;;; this suite loads (CHEZ_SODIUM_LIBRARY when set, else discovery's):
-;;; crypto_generichash, sodium_memcmp and randombytes_buf. Every code the brief states is
+;;; crypto_generichash, sodium_memcmp and randombytes_buf. Every code a verb relies on is
 ;;; confirmed here by a row against the real library before any verb relies
 ;;; on it.
 ;;;
@@ -36,7 +36,9 @@
 ;;;                  p=2 at 64 KiB: 0 and p=4 at 8 KiB -1; a byte of 0x80 or
 ;;;                  more in the salt: 0 at 1.0.18, -1 at 1.0.22; the three
 ;;;                  presets' hand-written strings, a 3x3 table of 0 and 1;
-;;;                  a salt of 21 characters or a tag of 42 -1
+;;;                  a salt of 21 characters -1, and a tag of 42 whose last
+;;;                  character leaves spare bits set -1 (one ending in g, w,
+;;;                  A or Q: 0)
 ;;;
 ;;; The no-memory codes, which need a limit on the process's address space,
 ;;; are not here: the memory gate's Valgrind cannot run under one.
@@ -562,7 +564,9 @@
   (and (member version '("1.0.18" "1.0.22")) #t))
 
 ;; The hand-written preset strings: each at its own limits is 0 and at the
-;; other two 1, a 3x3 table. A salt of 21 characters or a tag of 42 is -1.
+;; other two 1, a 3x3 table. A salt of 21 characters is -1, and so is a tag of
+;; 42 whose last character leaves spare bits set; one ending in g, w, A or Q
+;; is 0.
 (define salt22 "QUJDREVGR0hJSktMTU5PUA")
 (define tag43 "YWRnam1wc3Z5fH+ChYiLjpGUl5qdoKOmqayvsrW4u74")
 

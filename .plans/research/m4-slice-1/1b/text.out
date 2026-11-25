@@ -1,0 +1,44 @@
+ok: docs/quickstart.md one H1, its first line: # Quick start
+ok: docs/quickstart.md watched spans: (password-hash password-verify random-bytes sodium-version)
+ok: docs/quickstart.md link ../README.org
+ok: docs/quickstart.md link ../README.org
+ok: docs/quickstart.md link finding-libsodium.md#when-it-is-refused
+ok: docs/quickstart.md link passwords.md
+ok: docs/quickstart.md link tokens.md
+ok: docs/quickstart.md link finding-libsodium.md
+ok: docs/quickstart.md link reference.md
+ok: docs/passwords.md one H1, its first line: # Passwords
+ok: docs/passwords.md watched spans: (make-password-limits password-hash password-needs-rehash? password-verify sodium-failed?)
+ok: docs/passwords.md link finding-libsodium.md#it-loads-once
+ok: docs/tokens.md one H1, its first line: # Tokens
+ok: docs/tokens.md watched spans: (blake2b constant-time-bytevector=? random-bytes sodium-failed?)
+ok: docs/tokens.md link passwords.md#what-is-wiped
+ok: docs/tokens.md link reference.md#blake2b
+ok: docs/finding-libsodium.md one H1, its first line: # Finding libsodium
+ok: docs/finding-libsodium.md watched spans: (sodium-library-unavailable-candidates sodium-library-unavailable-detail sodium-library-unavailable-path sodium-library-unavailable-reason sodium-library-unavailable-source sodium-library-unavailable?)
+ok: docs/finding-libsodium.md link ../README.org
+ok: docs/finding-libsodium.md link quickstart.md#which-libsodium-did-it-load
+ok: README.org link docs/quickstart.md
+ok: README.org link docs/quickstart.md
+ok: README.org link docs/quickstart.md
+ok: README.org link docs/passwords.md
+ok: README.org link docs/tokens.md
+ok: README.org link docs/finding-libsodium.md
+ok: README.org link docs/reference.md
+ok: README.org link CONTRIBUTING.md
+ok: README.org link SECURITY.md
+ok: README.org link LICENSE
+ok: README.org's Documentation list is (site pages)': ((quickstart.md . Quick start) (passwords.md . Passwords) (tokens.md . Tokens) (finding-libsodium.md . Finding libsodium) (reference.md . Reference))
+ok: reasons table: (invalid-override not-found load-failed below-floor missing-api init-failed)
+ok: row label: Linux, when Chez runs on Guix's C library, as Guix's Chez does
+ok: guix on ta6le: ($GUIX_ENVIRONMENT/lib/libsodium.so.26 $GUIX_ENVIRONMENT/lib/libsodium.so.23 $GUIX_PROFILE/lib/libsodium.so.26 $GUIX_PROFILE/lib/libsodium.so.23 ~/.guix-home/profile/lib/libsodium.so.26 ~/.guix-home/profile/lib/libsodium.so.23 ~/.guix-profile/lib/libsodium.so.26 ~/.guix-profile/lib/libsodium.so.23 /run/current-system/profile/lib/libsodium.so.26 /run/current-system/profile/lib/libsodium.so.23)
+ok: guix on tarm64le: ($GUIX_ENVIRONMENT/lib/libsodium.so.26 $GUIX_ENVIRONMENT/lib/libsodium.so.23 $GUIX_PROFILE/lib/libsodium.so.26 $GUIX_PROFILE/lib/libsodium.so.23 ~/.guix-home/profile/lib/libsodium.so.26 ~/.guix-home/profile/lib/libsodium.so.23 ~/.guix-profile/lib/libsodium.so.26 ~/.guix-profile/lib/libsodium.so.23 /run/current-system/profile/lib/libsodium.so.26 /run/current-system/profile/lib/libsodium.so.23)
+ok: guix sources: (guix-environment guix-profile guix-home guix-user-profile guix-system)
+ok: row label: Other Linux
+ok: fhs on ta6le: (/usr/local/lib/libsodium.so.26 /usr/local/lib/libsodium.so.23 /usr/lib/x86_64-linux-gnu/libsodium.so.26 /usr/lib/x86_64-linux-gnu/libsodium.so.23 /usr/lib64/libsodium.so.26 /usr/lib64/libsodium.so.23 /usr/lib/libsodium.so.26 /usr/lib/libsodium.so.23)
+ok: fhs on tarm64le: (/usr/local/lib/libsodium.so.26 /usr/local/lib/libsodium.so.23 /usr/lib/aarch64-linux-gnu/libsodium.so.26 /usr/lib/aarch64-linux-gnu/libsodium.so.23 /usr/lib64/libsodium.so.26 /usr/lib64/libsodium.so.23 /usr/lib/libsodium.so.26 /usr/lib/libsodium.so.23)
+ok: fhs sources: (system)
+ok: the override's span: (override)
+ok: sources, each once, in order: (override guix-environment guix-profile guix-home guix-user-profile guix-system system)
+failures: 0
+exit 0

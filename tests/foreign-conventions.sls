@@ -1,7 +1,7 @@
 #!r6rs
 ;;; (foreign-conventions): the calling conventions and types chez-sodium's
 ;;; foreign procedures must carry, and a reader that finds the ones they do
-;;; (ADR-0001, decision 10). Test-only: it lives in tests/, and
+;;; (ADR-0001). Test-only: it lives in tests/, and
 ;;; tests/test-conventions.sps is its suite. tests/test-constants.sps holds
 ;;; each row's C prototype to sodium.h.
 ;;;
@@ -13,7 +13,7 @@
 ;;;                        the only types a binding may write: the argument
 ;;;                        list is every type a row uses as an argument or
 ;;;                        as a non-void result, and the result list every
-;;;                        result type, and void (ADR-0001, amended)
+;;;                        result type, and void (ADR-0001)
 ;;;   scan-tree            every foreign-procedure form under a directory,
 ;;;                        read as data, each with the library it sits in
 ;;;   violations           the scan held against a table: what a suite
@@ -64,10 +64,10 @@
   ;;   CONVENTION  collect-safe or plain (convention-forms)
   ;;   RECORDS     (Listof String): each begins with the record it cites
   ;; In ADR-0002's order. Every call is plain but crypto_pwhash_str and
-  ;; crypto_pwhash_str_verify, which are collect-safe (ADR-0001, decision 7). No binding takes
+  ;; crypto_pwhash_str_verify, which are collect-safe (ADR-0001). No binding takes
   ;; a Scheme object: every argument is an integer or the address of a block we
   ;; allocated, and a string libsodium returns is an address we read ourselves
-  ;; (ADR-0001, decisions 3 and 4).
+  ;; (ADR-0001).
   (define conventions-table
     '(("sodium_version_string" ("const char *" ()) () uptr plain
        ("ADR-0001 decision 3: a returned string is an address, read by our own code"
@@ -253,7 +253,7 @@
   ;; binding it holds would otherwise pass. The argument list is every type a
   ;; row uses as an argument or as a non-void result, and the result list every
   ;; result type, and void: unsigned-64 is an argument only, and void a result
-  ;; only (ADR-0001, amended).
+  ;; only (ADR-0001).
   (define allowed-argument-types '(int uptr size_t unsigned-64))
   (define allowed-result-types '(int uptr size_t void))
 

@@ -16,7 +16,7 @@
 ;;;
 ;;; Also the helpers that name a caller's value by its kind, and
 ;;; refuse-secret, which refuses a secret parameter by that kind alone
-;;; (ADR-0006, decision 6).
+;;; (ADR-0006).
 (library (chez-sodium private conditions)
   (export &chez-sodium-error make-chez-sodium-error chez-sodium-error?
 

@@ -205,7 +205,7 @@
   (guard (e (#t 'limits-failed))
     (make-password-limits ops kib)))
 
-;; The minimum limits: the one every row hashes at but rows 5 and 7's.
+;; The minimum limits: the one every row hashes at but those that name other limits.
 (define min-limits (limits-of ops-min kib-min))
 
 ;; hash-at : String Any -> (U String (List Symbol String))

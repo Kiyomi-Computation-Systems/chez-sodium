@@ -27,3 +27,32 @@ builder then used `--check`, which downloads nothing.
 with no download), and `make site-deps` offline from chez-sqlite3's fetched archive. In the
 container, `make check-site-deps`, `make test` 41 of 41, `make check-test-fails` 13 cases, and
 `make check-suites`.
+
+## The builders
+
+Each builder kept its own log, in [research/m4-slice-1/](research/m4-slice-1/):
+
+| Builder | What | Model | Its log |
+|---|---|---|---|
+| 1a | `docs/reference.md`, `test-reference`, the signature comments | Sonnet | [1a.md](research/m4-slice-1/1a.md): six mutants, each failing a named row |
+| 1b | README.org and the four pages | Opus | [1b.md](research/m4-slice-1/1b.md): its self-checks, each watched failing on 23 planted faults, and their scripts in `1b/` |
+| 1c | `test-docs` | Sonnet | [1c.md](research/m4-slice-1/1c.md): 47 suite mutants, 53 on stand-in pages, 6 on the real pages; one survives a plain run and fails under the gate |
+| 1d | `check-floors`' docs inputs, the clone check | Sonnet | [1d.md](research/m4-slice-1/1d.md) |
+| 1e | the comment pass | Sonnet | [1e.md](research/m4-slice-1/1e.md): the datum check watched failing, then 18 files the same |
+| 1f | the generator, its suites, `check-suites`, `check-test-fails` | Sonnet | [1f.md](research/m4-slice-1/1f.md) |
+| 1g | the `site` job, `pages.yml`, `check-ci` | Sonnet | [1g.md](research/m4-slice-1/1g.md): 12 workflow mutants and 16 rule drops |
+| 1h | `CONTRIBUTING.md`, `SECURITY.md`, the templates | Sonnet | no check of its own: `check-floors` reads the first two, and the links were checked by script |
+
+## The caller's mutants, at the join
+
+Each in a whole copy of the joined tree under `build/m4v/`, against a clean copy, `base`, which
+passed every suite run here.
+
+| Guards | Mutation | Result | Clean rerun |
+|---|---|---|---|
+| `test-docs`' export spans | `password-verify` → `password-verfy` in a span of `docs/passwords.md` | 1 row fails: "every code span of the prose that is one name of a prefix of the library is an export…" | 127 of 127 |
+| `test-docs`' run blocks and the twin | the quick start's run block's `;; => (#t #f)` → `(#t #t)` | 2 rows fail: "docs/quickstart.md:92: the runnable example gives the result it states", and the README twin row | 127 of 127 |
+| `test-manifest`'s clone check | README.org's clone line given `--branch v0.0.0` at 0.0.0 | 1 row fails: "README.org and docs/ hold the clone lines Akku.manifest's version calls for…" | 107 of 107 |
+| `test-reference` | `random-bytes : Natural -> Bytevector` → `Nat` in the page | 1 row fails: "each entry's line is its export's source signature comment, character for character…" | 23 of 23 |
+| `check-ci` | the `site` job's `timeout-minutes: 10` → 11 | "job site has timeout-minutes 11, not 10", FAILED | "has the one shape check-ci reads" |
+| `check-site` | `docs/tokens.md`'s `# Tokens` → `# API keys` | "a page's H1 is not its nav label, in docs/tokens.md" | all green |

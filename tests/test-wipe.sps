@@ -1,5 +1,5 @@
 #!r6rs
-;;; The suite for row 24: every block the library frees reads all zeros at the
+;;; The suite for the wipe: every block the library frees reads all zeros at the
 ;;; free (ADR-0008).
 ;;;
 ;;; It compiles tests/free-watch.c, an interposer of free(), and starts a

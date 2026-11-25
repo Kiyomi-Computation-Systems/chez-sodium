@@ -1,6 +1,6 @@
 #!r6rs
 ;;; (floors): chez-sodium's version floors, and the check that holds the
-;;; README, the workflows and the CI scripts to them (ADR-0011).
+;;; README, the workflows, the CI scripts and the docs to them (ADR-0011).
 ;;;
 ;;; packaging/floors.sexp is the one file that writes the Chez and libsodium
 ;;; floors: one datum, ((chez "M.m.p") (sodium "M.m.p")), the keys exactly
@@ -10,7 +10,9 @@
 ;;; tests/test-require-threaded.sps, which reads the floors from here. CI
 ;;; states no floor either: scripts/ci/build-chez.sh and floor.sh read them
 ;;; from the file, and `make check-floors` holds every file in CI's workflow
-;;; directory and its scripts directory to it (below).
+;;; directory and its scripts directory to it (below). Nor does a page:
+;;; `make check-floors` holds every file under docs/, and every line of
+;;; README.org but its Requirements' list lines, to it too.
 ;;;
 ;;;   floors-problems   what is wrong with the floors file's text
 ;;;   check-floors      what is wrong with the floors file, the README or the
@@ -18,6 +20,7 @@
 ;;;   workflows-problems what is wrong with the workflow directory's files
 ;;;   ci-workflow       the workflow, by name, that the directory must hold
 ;;;   scripts-problems  what is wrong with the CI scripts directory's files
+;;;   docs-problems     what is wrong with the docs directory's files
 ;;;   parse-floors      the floors file's text as a Floors, or a raise
 ;;;   read-floors       the checked-in floors file as a Floors
 ;;;   floor-text        a floor by name, as text
@@ -85,11 +88,21 @@
 ;;; directly in it, since CI reads every floor through it. The rules about
 ;;; double quotes are YAML's, and a script is shell: they do not apply.
 ;;;
+;;; What the docs must be. A page names a floor by a link to README.org's
+;;; Requirements, so a floor moves in one place. Every file under the docs
+;;; directory is held, in subdirectories too, a code block's lines as any
+;;; other, and its path below the directory as a line: no line may hold either
+;;; floor's version text. The directory must hold a file. The rules about
+;;; double quotes are YAML's, and do not apply, and a page's lines are read as
+;;; written: a backslash at a line's end joins nothing. CHANGELOG.md is no
+;;; page: an entry records what its release needed.
+;;;
 ;;; The text is searched, not parsed, so a version inside a longer number is
 ;;; also the floor's text.
 (library (floors)
   (export floors-path check-floors floors-problems parse-floors read-floors file-text
-          floor-text floor-numbers requirement-lines workflows-problems ci-workflow scripts-problems)
+          floor-text floor-numbers requirement-lines workflows-problems ci-workflow scripts-problems
+          docs-problems)
   (import (rnrs)
           (only (chezscheme) display-condition parameterize print-graph))
 
@@ -700,4 +713,37 @@
           (let ((floors (car (cadr (read-data ftext)))))
             (append (if rtext (readme-problems rpath rtext fpath floors) '())
                     (if workflows (workflows-problems fpath wdir workflows floors) '())))
-          problems))))
+          problems)))
+  ;; docs-who : String
+  ;; What the messages about a page that holds a floor say may write it, and
+  ;; where it is read from.
+  (define docs-who
+    "no page may write: a page links to README.org's Requirements, which state it from")
+
+  ;; docs-problems : String String (Listof (List String (U String #f))) Floors -> (Listof String)
+  ;; What is wrong with PAGES, every file under the docs directory DDIR, each
+  ;; as its path and its text, against FLOORS, from the floors file at FPATH.
+  ;; A text that is #f is a file the caller could not read, which it names:
+  ;; its lines are not compared, its name is. In order: a directory with no
+  ;; file, named alone; then, file by file in the order of their paths,
+  ;; whatever order they come in, the floor complaints (floor-complaints)
+  ;; about its name, then about each of its lines, as written: a code block's
+  ;; lines are lines like any other, and no line is joined to the next.
+  (define (docs-problems fpath ddir pages floors)
+    (let ((rows (floor-rows floors))
+          (sorted (list-sort (lambda (a b) (string<? (car a) (car b))) pages)))
+      (if (null? pages)
+          (list (string-append ddir ": it holds no file, but must hold the docs' pages"))
+          (apply append
+                 (map (lambda (entry)
+                        (append
+                         (name-problems ddir (car entry) fpath rows docs-who)
+                         (if (cadr entry)
+                             (let loop ((rest (split (cadr entry) #\newline)) (n 1))
+                               (if (null? rest)
+                                   '()
+                                   (append (floor-complaints (car entry) (string-append "line " (number->string n))
+                                                             (car rest) fpath rows docs-who)
+                                           (loop (cdr rest) (+ n 1)))))
+                             '())))
+                      sorted))))))

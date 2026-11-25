@@ -5,7 +5,7 @@
 ;;; no block of its own: native binds libsodium and makes every block, and this
 ;;; library reads foreign memory only through native's foreign-bytes.
 ;;;
-;;; Each verb has the same shape (ADR-0007, decisions 1 to 4 and 7):
+;;; Each verb has the same shape (ADR-0007):
 ;;;
 ;;;   1. its arguments are checked, left to right, each one's type before its
 ;;;      range, and the first mistake is refused, before any block exists. A
@@ -62,8 +62,9 @@
   ;; N bytes from libsodium's generator, N from 0 to the input cap. At 0 it is
   ;; the empty bytevector, and calls no C. Refused before any block: an N that
   ;; is no exact natural, from random-bytes, irritants (not-a-natural n V), and
-  ;; an N over the cap, (over-the-cap n V), V by shown-value. randombytes_buf
-  ;; aborts the process when the system has no source of entropy.
+  ;; an N over the cap, (over-the-cap n V), V by shown-value. With no source of
+  ;; entropy at all the process aborts at the load, when sodium_init stirs the
+  ;; generator; randombytes_buf aborts only if the source fails later.
   (define (random-bytes n)
     (unless (natural? n)
       (assertion-violation 'random-bytes "n is not an exact natural"
@@ -80,7 +81,8 @@
                (randombytes-buf out n)
                (foreign-bytes out n)))))))
 
-  ;; blake2b : Bytevector [Natural] [Bytevector] -> Bytevector   ; input, size, key
+  ;; blake2b : Bytevector [Natural] [Bytevector] -> Bytevector
+  ;;   input, size, key
   ;; The BLAKE2b hash of INPUT, SIZE bytes long, keyed by KEY when given: a
   ;; fresh bytevector. SIZE runs from libsodium's least to its greatest and
   ;; defaults to its recommended size; a key runs from its shortest to its

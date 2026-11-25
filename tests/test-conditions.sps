@@ -416,7 +416,7 @@
        secret-values))
 
 ;; The three a refusal shown by value would print as they are: a symbol, a
-;; number and a list of chars (brief section 8.1, row 16).
+;; number and a list of chars.
 (test-equal "refuse-secret shows a symbol, a number and a list of chars as their kinds, never as they are"
   '((assertion-violation hmac-sha256 (key-not-a-bytevector key (kind symbol)))
     (assertion-violation hmac-sha256 (key-not-a-bytevector key (kind number)))

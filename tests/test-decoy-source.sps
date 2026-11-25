@@ -1,5 +1,5 @@
 #!r6rs
-;;; The decoy's pointer rule, read from its source (ADR-0011, amended).
+;;; The decoy's pointer rule, read from its source (ADR-0011).
 ;;;
 ;;; A stand-in libsodium that includes sodium.h reads every pointer it is
 ;;; given through a volatile uintptr_t, and only that copy is tested, logged

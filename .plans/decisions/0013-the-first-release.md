@@ -2,6 +2,8 @@
 
 - **Status:** Accepted (the owner, 2026-11-25), proposed in [the M4 plan](../2026-11-25-m4-plan.md),
   §2 and §4. The owner answered the plan's four questions that day, each with its recommendation.
+  Decision 2 widened, and decision 14 added, in M4's slice 1, at the owner's requests that day:
+  the pages say what chez-sodium is not, and the repository gains contributor files.
 - **Date:** 2026-11-25
 - **Scope:** `docs/`, README.org, `test-reference`, `test-docs`, the docs site and its CI, the
   comment pass, CHANGELOG.md, `Akku.manifest`'s version, and the release's steps
@@ -37,6 +39,10 @@
    - `docs/` holds a quick start, which is the site's home, passwords, tokens, finding libsodium,
      and the reference, in that order. `site/pages.sls` writes the order once, and README.org's
      Documentation list holds it;
+   - **README.org and the quick start say what chez-sodium is, and what it is not:** a small,
+     deliberate part of libsodium, for password hashing first, and no encryption, signatures, key
+     exchange, AEAD, streams, password-based key derivation, guarded memory or encoding helpers
+     (brief §3.3). The owner asked for this on 2026-11-25;
    - README.org follows the siblings' order: what it is, the AI disclosure, Status, Requirements,
      Installing, a taste, the pages and the site, and the licence. Its Status names the platform
      and the libraries CI runs, and no version. It links nothing under `.plans/`;
@@ -109,7 +115,12 @@
     - Techo told the tag's commit.
 
     Before the tag, `main` is protected, with every CI job required, `strict`, and a "release tags"
-    ruleset refuses the update and deletion of `v*`, with no bypass.
+    ruleset refuses the update and deletion of `v*`, with no bypass. Private vulnerability
+    reporting is on, since `SECURITY.md` points to it.
+14. **Contributor files, in the siblings' shape:** `CONTRIBUTING.md`, `SECURITY.md`, a bug-report
+    and a feature-request template, and a pull-request template. README.org links the first two.
+    `check-floors` reads both, so neither restates a floor. The owner asked for this on
+    2026-11-25, during slice 1.
 
 ### Rejected
 

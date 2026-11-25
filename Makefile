@@ -273,28 +273,31 @@ check-seam: ## Fail unless every library under src/ keeps to the seam: the famil
 	@scripts/require-tools "$(GOAL)" $(CHEZ)
 	@$(CHEZ) --program tests/check-seam.sps src
 
-# Holds README.org, and every file under .github/workflows and scripts/ci, to
-# packaging/floors.sexp, the one file that writes the floors (ADR-0011,
-# tests/check-floors.sps): the list lines of README.org's Requirements section
-# must state them, and no other line of README.org may; no workflow line or CI
-# script line may write either floor's version, since CI reads them through
-# scripts/ci/floor.sh. It needs no deps: (floors) imports only (rnrs) and a few
-# of Chez's own bindings.
-check-floors: ## Fail unless README.org's Requirements state the floors in packaging/floors.sexp, and nothing else in README.org, no workflow and no CI script does
+# Holds README.org, every file under .github/workflows, scripts/ci and docs,
+# and CONTRIBUTING.md and SECURITY.md, to packaging/floors.sexp, the one file
+# that writes the floors (ADR-0011, tests/check-floors.sps): the list lines of
+# README.org's Requirements section must state them, and no other line of
+# README.org may; no workflow line or CI script line may write either floor's
+# version, since CI reads them through scripts/ci/floor.sh; and no page and no
+# contributor's file may, since each names the floors by a link to README.org.
+# It needs no deps: (floors) imports only (rnrs) and a few of Chez's own
+# bindings.
+check-floors: ## Fail unless README.org's Requirements state the floors in packaging/floors.sexp, and nothing else in README.org, no workflow, no CI script, no page of docs/, CONTRIBUTING.md or SECURITY.md does
 	@scripts/require-tools "$(GOAL)" $(CHEZ)
-	@$(CHEZ) --libdirs tests --program tests/check-floors.sps packaging/floors.sexp README.org .github/workflows scripts/ci
+	@$(CHEZ) --libdirs tests --program tests/check-floors.sps packaging/floors.sexp README.org .github/workflows scripts/ci docs CONTRIBUTING.md SECURITY.md
 
 # Holds .github/workflows/ci.yml to the one shape tests/check-ci.sh reads
-# (ADR-0011): its triggers, its five jobs and every key in them, each check
+# (ADR-0011): its triggers, its six jobs and every key in them, each check
 # as a step's whole run line, no if: but on the caches' own steps, no variable
 # that steers a check but the floor and current lanes' two, and no key spelled
-# so that a text check would miss it. make
+# so that a text check would miss it. It holds pages.yml, the docs site's
+# deploy, line for line to the copy tests/check-ci.sh keeps. make
 # test runs it, so every make test, the container's self-test and CI's main
 # job among them, holds the workflow. tests/test-check-ci.sps plants each fault
 # in a copy of the real file. It reads text with sh and awk, and needs no deps.
 # The recipe sets CHECK_CI_ROOT empty, which check-ci reads as unset, so a
 # host's own value never points the execute-bit rule at another tree.
-check-ci: ## Fail unless .github/workflows holds ci.yml alone, in the one shape tests/check-ci.sh reads
+check-ci: ## Fail unless .github/workflows holds ci.yml, in the one shape tests/check-ci.sh reads, and pages.yml, as its copy, and nothing else
 	@CHECK_CI_ROOT= sh tests/check-ci.sh .github/workflows
 
 # Imports every library under src/, private ones too, and requires each
