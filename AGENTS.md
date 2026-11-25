@@ -164,7 +164,7 @@
   pair that is neither the minimum nor a preset, and one hash at the default
   (brief §8.2). Row 22's code rows hash at the few cheap limits each code needs. The
   collect-safe row needs no high limit: it blocks a decoy on a FIFO. Only the no-memory
-  rows hash at `'sensitive`, in children outside the gate (ADR-0011, amended).
+  rows hash at `'sensitive`, in gated children under a memory cap (ADR-0011, amended).
 * A row that says C was not reached proves it from the decoy's call log. libsodium
   accepts many mistakes, for example sizes of 1 to 15 bytes, so its answer proves
   nothing.
