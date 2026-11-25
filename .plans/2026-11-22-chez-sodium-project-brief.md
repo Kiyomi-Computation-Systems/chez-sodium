@@ -600,10 +600,13 @@ it catches.
 ### 8.2 Limits in tests
 
 - **Password rows hash at libsodium's minimum**, read from `_opslimit_min` and
-  `_memlimit_min`. The exceptions are row 5's cheap pair and row 7's one default hash.
+  `_memlimit_min`. The exceptions are row 5's cheap pair, row 7's one default hash, row 22's
+  code rows at the few cheap limits each code needs, and the no-memory rows (ADR-0011,
+  amended).
   Under Valgrind, a minimum hash takes about 0.4 ms, and an interactive one about 0.7 s
   (M3 plan §5.1; the review's 5 ms and 0.8 s were (P)'s).
-- **No row needs a high limit.** The collect-safe row uses a decoy.
+- **Only the no-memory rows use a high limit:** two hashes at `'sensitive`, in gated children
+  under a memory cap. The collect-safe row uses a decoy.
 
 ### 8.3 Versions to run on
 

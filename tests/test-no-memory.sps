@@ -4,14 +4,13 @@
 ;;; &sodium-failed with code -1; crypto_pwhash_str_verify answers -1, so
 ;;; password-verify answers #f, as it does for a wrong password.
 ;;;
-;;; Both need a process whose address space is capped: ulimit -v. Valgrind
-;;; cannot run under a cap, so each child here runs outside the memory gate,
-;;; started with capture-command, not gated-command, and the gate does not
-;;; see it (ADR-0011). Each child prints (valgrind . no), read from
-;;; /proc/self/maps, and this suite asserts it: the point of the rows is that
-;;; Valgrind is not there. The gate's variables are unset for each child, since
-;;; under the gate this suite's own LD_PRELOAD holds Valgrind's preloads.
-;;; This suite's own process hashes nothing, and runs under the gate like any.
+;;; Both need a process whose address space is capped: ulimit -v. Each child
+;;; is started through gated-command, so under the memory gate it runs under
+;;; the gate's own Valgrind, and the gate reads its log; the cap sits outside
+;;; Valgrind, which runs Chez itself. Each child prints its native counts and
+;;; whether it ran under Valgrind, and this suite asserts both: every count
+;;; zero, and yes exactly when the gate asked.
+;;; This suite's own process hashes nothing and never loads libsodium.
 ;;;
 ;;; The cap is 512 MiB, 524288 KiB. Chez and libsodium load under it, a hash
 ;;; at 'interactive (64 MiB) succeeds, and one at 'sensitive (1 GiB) cannot get
@@ -22,8 +21,9 @@
 ;;; wrong answer fails the row.
 (import (rnrs)
         (srfi :64)
-        (only (chezscheme) getenv)
-        (chez-sodium-testing))
+        (only (chezscheme) foreign-entry? getenv)
+        (chez-sodium-testing)
+        (library-loading))
 
 (define runner (test-runner-simple))
 (test-runner-current runner)
@@ -44,30 +44,34 @@
 ;; The cap, in KiB.
 (define cap-kib 524288)
 
-;; run-child : (U Natural #f) String ... -> (U (List Integer String String) (List 'raised String))
-;; The probe in MODE and ARGS, under ulimit -v CAP when CAP is a number, else
-;; uncapped. The gate's variables are unset for it.
+;; run-child : (U Natural #f) String ... -> (U (List Integer (Listof Any) String) (List 'raised String))
+;; The probe in MODE and ARGS, as the gate runs a child, under ulimit -v CAP
+;; when CAP is a number, else uncapped: its exit status, what it printed as
+;; data, and its stderr.
 (define (run-child cap . mode+args)
   (guard (e (#t (list 'raised (describe e))))
-    (capture-command
-     (append (list "env" "-u" "CHEZ_SODIUM_GATE_CHILD" "-u" "LD_PRELOAD")
-             (if cap
-                 (list "sh" "-c" (string-append "ulimit -v " (number->string cap) "; exec \"$@\"") "sh")
-                 '())
-             (list (getenv "CHEZ") "--libdirs" "src:tests:build/scheme-libs"
-                   "--program" "tests/no-memory-probe.sps")
-             mode+args))))
+    (as-data
+     (capture-command
+      (append (if cap
+                  (list "sh" "-c" (string-append "ulimit -v " (number->string cap) "; exec \"$@\"") "sh")
+                  '())
+              (gated-command getenv
+                             (append (list chez "--libdirs" "src:tests:build/scheme-libs"
+                                           "--program" "tests/no-memory-probe.sps")
+                                     mode+args)))))))
 
-;; output-of : Any -> (U String Any)
-;; A child's whole answer as (STATUS STDOUT STDERR), kept whole for a row.
-(define (stdout-of run)
-  (if (and (pair? run) (integer? (car run))) (cadr run) ""))
+;; answer-of : (U (List Integer (Listof Any) String) Any) -> (U (Listof Any) Any)
+;; A child's printed data, or the whole run when it is not one.
+(define (answer-of run)
+  (if (and (pair? run) (integer? (car run)) (pair? (cdr run)) (list? (cadr run)))
+      (cadr run)
+      run))
 
-;; first-datum : String -> Any
-;; The first datum of TEXT, or 'unreadable.
-(define (first-datum text)
-  (guard (e (#t 'unreadable))
-    (read (open-string-input-port text))))
+;; whole : Datum -> Expected
+;; A child's whole answer: status 0, its DATUM, every count zero, whether it
+;; ran under Valgrind, and an empty stderr.
+(define (whole datum)
+  (list 0 (list datum no-native-objects valgrind-line) ""))
 
 (define interactive-run (run-child cap-kib "hash-interactive"))
 (define sensitive-run (run-child cap-kib "hash-sensitive"))
@@ -75,7 +79,7 @@
 
 ;; The hash the uncapped child made, or #f.
 (define sensitive-hash
-  (let ((d (first-datum (stdout-of make-run))))
+  (let ((d (let ((l (answer-of make-run))) (if (pair? l) (car l) 'unreadable))))
     (if (and (pair? d) (eq? (car d) 'made) (pair? (cdr d)) (string? (cadr d)))
         (cadr d)
         #f)))
@@ -94,41 +98,33 @@
 (define free-verify-run
   (if hash-made? (run-child #f "verify" sensitive-hash) 'no-hash))
 
-(define no-valgrind "(valgrind . no)\n")
-
 (test-begin "no-memory")
 
-(test-equal "password-hash at 'interactive, 64 MiB, succeeds under the 512 MiB cap: the cap is not what stops 'sensitive; the child ran outside Valgrind"
-  (list 0
-        (string-append "(hash ok \"$argon2id$v=19$m=65536,t=2,p=1$\")\n" no-valgrind)
-        "")
+(test-equal "password-hash at 'interactive, 64 MiB, succeeds under the 512 MiB cap: the cap is not what stops 'sensitive; no native object is live, and Valgrind runs the child when the gate asks"
+  (whole '(hash ok "$argon2id$v=19$m=65536,t=2,p=1$"))
   interactive-run)
 
-(test-equal "password-hash at 'sensitive, 1 GiB, under the 512 MiB cap raises &sodium-failed, function crypto_pwhash_str, code -1; the child ran outside Valgrind"
-  (list 0
-        (string-append "(hash raised \"crypto_pwhash_str\" -1)\n" no-valgrind)
-        "")
+(test-equal "password-hash at 'sensitive, 1 GiB, under the 512 MiB cap raises &sodium-failed, function crypto_pwhash_str, code -1; no native object is live, and Valgrind runs the child when the gate asks"
+  (whole '(hash raised "crypto_pwhash_str" -1))
   sensitive-run)
 
-(test-equal "a 'sensitive hash is made with no cap, the control for the verify rows, and the child ran outside Valgrind"
-  (list 0 #t no-valgrind "")
-  (if (and (pair? make-run) (integer? (car make-run)))
-      (list (car make-run) hash-made?
-            ;; the second line of the child's output
-            (let* ((out (cadr make-run))
-                   (n (string-length out))
-                   (k (string-length no-valgrind)))
-              (if (>= n k) (substring out (- n k) n) out))
-            (caddr make-run))
+(test-equal "a 'sensitive hash is made with no cap, the control for the verify rows; no native object is live, and Valgrind runs the child when the gate asks"
+  (list 0 #t (list no-native-objects valgrind-line) "")
+  (if (and (pair? make-run) (integer? (car make-run)) (list? (cadr make-run)) (pair? (cadr make-run)))
+      (list (car make-run) hash-made? (cdr (cadr make-run)) (caddr make-run))
       make-run))
 
-(test-equal "password-verify of a 'sensitive hash with its right password answers #f under the 512 MiB cap, where libsodium answers -1 for no memory, and raises nothing; the child ran outside Valgrind"
-  (list 0 (string-append "(verify #f)\n" no-valgrind) "")
+(test-equal "password-verify of a 'sensitive hash with its right password answers #f under the 512 MiB cap, where libsodium answers -1 for no memory, and raises nothing; no native object is live, and Valgrind runs the child when the gate asks"
+  (whole '(verify #f))
   capped-verify-run)
 
-(test-equal "password-verify of the same hash with the same password answers #t with no cap, and raises nothing; the child ran outside Valgrind"
-  (list 0 (string-append "(verify #t)\n" no-valgrind) "")
+(test-equal "password-verify of the same hash with the same password answers #t with no cap, and raises nothing; no native object is live, and Valgrind runs the child when the gate asks"
+  (whole '(verify #t))
   free-verify-run)
+
+(test-equal "this suite's own process never loaded a libsodium"
+  'not-loaded
+  (if (foreign-entry? "sodium_version_string") 'loaded 'not-loaded))
 
 (test-end "no-memory")
 

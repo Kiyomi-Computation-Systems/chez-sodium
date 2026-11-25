@@ -28,7 +28,15 @@
 ;;;   6. it runs collect-rendezvous, records the milliseconds it took, and opens
 ;;;      the FIFO read-write, which releases the call;
 ;;;   7. it waits, bounded, for the thread's answer, kills the watchdog, and
-;;;      checks with kill -0 that its pid is gone.
+;;;      looks in /proc for any live process whose command line names this
+;;;      call's watchdog.sh path, which is unique to the call. It never reads
+;;;      the pid file the kill used, so a wrong pid cannot pass for a dead
+;;;      watchdog.
+;;;
+;;; No row holds the watchdog's early exit, the parent check that ends it once
+;;; this process is gone. A row would have to kill a child from outside after
+;;; its marker, then find no watchdog 12 s later: a cost of 12 s or more per
+;;; run, and more under the gate.
 ;;;
 ;;; Its directory and the watchdog go on every exit path of the run: its end, a
 ;;; refusal and a raise. Only a kill from outside leaves the directory, under
@@ -49,14 +57,14 @@
 ;;;   (verb . VERB)
 ;;;   (released-by . collector|watchdog|nobody)   who opened the FIFO first
 ;;;   (rendezvous-ms . N)                         collect-rendezvous's time
-;;;   (watchdog-gone . #t|#f)                     whether the watchdog's pid is gone
+;;;   (watchdog-gone . #t|#f)                     whether no process names the watchdog
 ;;;   (answer . ANSWER)                           what the call answered, or
 ;;;                                               (raised TEXT), or hung
 ;;;   (counts . ALIST)                            the library's native counts
 ;;;   (valgrind . yes|no)                         whether memcheck runs it
 (import (rnrs)
         (only (chezscheme) collect-rendezvous critical-section current-time display-condition time-second time-nanosecond
-              foreign-alloc foreign-free foreign-procedure foreign-set! fork-thread
+              foreign-alloc foreign-free directory-list foreign-procedure foreign-set! fork-thread
               get-process-id getenv make-mutex make-time mkdir putenv sleep system with-mutex)
         (chez-sodium private counters)
         (chez-sodium private native)
@@ -215,10 +223,40 @@
     (system (string-append "kill $(cat '" watchdog-pid-file "') 2>/dev/null; true"))
     (pause 100)))
 
+;; contains? : Bytevector Bytevector -> Boolean
+(define (contains? hay needle)
+  (let ((n (bytevector-length hay)) (m (bytevector-length needle)))
+    (let loop ((i 0))
+      (cond ((> (+ i m) n) #f)
+            ((let match ((j 0))
+               (or (= j m)
+                   (and (= (bytevector-u8-ref hay (+ i j)) (bytevector-u8-ref needle j))
+                        (match (+ j 1)))))
+             #t)
+            (else (loop (+ i 1)))))))
+
+;; names-watchdog? : String -> Boolean
+;; Whether process PID's command line names this call's watchdog script.
+(define (names-watchdog? pid)
+  (guard (e (#t #f))
+    (let ((cmdline (call-with-port
+                    (open-file-input-port (string-append "/proc/" pid "/cmdline"))
+                    get-bytevector-all)))
+      (and (bytevector? cmdline)
+           (contains? cmdline (string->utf8 watchdog-script))))))
+
 ;; watchdog-gone? : -> Boolean
-;; Whether kill -0 finds no process at the watchdog's pid.
+;; Whether no live process but this one names this call's watchdog script. It
+;; looks in /proc and never reads the pid file the kill used, so a wrong pid
+;; cannot hide a watchdog that lives.
 (define (watchdog-gone?)
-  (not (zero? (system (string-append "kill -0 $(cat '" watchdog-pid-file "') 2>/dev/null")))))
+  (let ((self (number->string (get-process-id))))
+    (not (exists (lambda (name)
+                   (and (positive? (string-length name))
+                        (for-all char-numeric? (string->list name))
+                        (not (string=? name self))
+                        (names-watchdog? name)))
+                 (directory-list "/proc")))))
 
 ;; --- the run -----------------------------------------------------------------------
 

@@ -194,11 +194,13 @@ its questions on 2026-11-24, accepting every recommendation:
     KiB, and a new suite, `test-library-loading-password-limits`, which both rounding mutants
     fail (M3C-F1);
   - **the no-memory codes, by the owner's choice of 2026-11-24:**
-    - a new suite, `test-no-memory`, whose children run the real library outside the gate under
+    - a new suite, `test-no-memory`, whose children run the real library under
       `ulimit -v 524288`;
     - a `'sensitive` hash there raises `&sodium-failed` with code -1;
     - a real `'sensitive` hash's right password verifies `#f` there and `#t` outside it;
-    - this is the gate's third recorded exception (M3C-F2; ADR-0011, amended);
+    - first outside the gate, as an exception the owner chose on the premise that Valgrind
+      cannot run under `ulimit -v`. The re-review measured that premise false (M3C2-F1), and the
+      owner then chose to gate every child (M3C-F2; ADR-0011, amended);
   - **the records brought up to the code:**
     - the watchdog's shape;
     - the allow-lists;
@@ -214,8 +216,25 @@ its questions on 2026-11-24, accepting every recommendation:
   - **the comments** (M3C-F6).
 
   Every mutant is logged ([its mutation log](m3-closing-mutation-log.md)).
+- **Re-reviewed,** as the plan asks where a fix changes a rule. One Opus review of the fixes found
+  no blocker, 1 major and 3 minors ([research/m3-closing-fix-review/](research/m3-closing-fix-review/README.md)).
+  - **The major:** the third exception rested on a premise the gate's own Valgrind refutes.
+    Valgrind runs Chez inside the cap, with 0 errors. The caller had relayed the premise to the
+    owner unmeasured, and reproduced the measurement. The owner then chose to gate every child:
+    every `test-no-memory` child starts through `gated-command`, inside its cap, and asserts its
+    counts and the Valgrind line. There is no third exception.
+  - **The minors:**
+    - the watchdog check reads `/proc`, not the pid file, and the parent check is recorded as held
+      by no row;
+    - brief §8.2, ADR-0011 and the constraints now name row 22's cheap limits and the no-memory
+      rows;
+    - the tripwire's wording;
+    - the comments.
+  - **The owner chose to stop the review loop after this round.** The caller verified each fix by
+    hand, rerunning a mutant of each against the fixed suites.
 - **In the container:** `make test` 41 of 41, `check-test-fails` 13, `test-memory` 41 of 41 (the
   slowest 114 s of 450), `check-memory-gate` 59 cases, `make build`, `check-dev` and `check-seam`.
+- **CI's run** 45526362780 passed all five jobs on the first fixes, `89a891e`.
 
 ### 2026-11-24 — M3 slice 2: the verbs (PR #16)
 

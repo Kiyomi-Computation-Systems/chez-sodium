@@ -63,3 +63,59 @@ Clean rerun: 1.0.22 8/8 (rendezvous 2, 2, 10001 ms); floor 1.0.18 8/8 (2, 2, 999
 - Mutation: the capped children run with no `ulimit`
 - Result: the `'sensitive` hash row and the capped verify row fail; 3 pass
 - Clean rerun: the real files pass, 5 of 5, at 1.0.22 and at the floor
+
+The re-review of the closing fixes ([research/m3-closing-fix-review/](research/m3-closing-fix-review/README.md))
+found the no-memory exception's premise false. Two Sonnet fix agents, on disjoint files, logged
+these, and the caller reran a mutant of each.
+
+## After the re-review: every no-memory child gated
+
+Mutants in whole copies under build/m3c-fix2-nomem/<name>/.
+
+### nocap
+- Guards: the 'sensitive hash row and the capped verify row (they need the 512 MiB cap to get -1).
+- Mutation: run-child's `(if cap` becomes `(if #f`, so no child is capped.
+- Result: plain, those two rows FAIL; 4 pass, exit 1.
+- Clean rerun: unmutated suite, 6 pass plain at 1.0.22 and at the 1.0.18 floor, and under make test-memory.
+
+### nogate
+- Guards: valgrind-line in every row, under the gate.
+- Mutation: gated-command replaced by a lambda that returns its argv.
+- Result: plain it passes (valgrind . no is right there); with CHEZ_SODIUM_GATE_CHILD set, all 5 child rows FAIL, 1 pass.
+- Clean rerun: unmutated, same gate env, 6 pass.
+
+### count
+- Guards: no-native-objects in every child row.
+- Mutation: the probe prints (counts . ((block . 1))).
+- Result: all 5 child rows FAIL, 1 pass. (The probe reaches no foreign-alloc of its own, so a planted count stands for a live block.)
+- Clean rerun: 6 pass.
+
+## After the re-review: the watchdog rows
+
+### wd-pid-outer
+- Guards: watchdog-gone? sees a live watchdog whatever pid the kill used (it scans /proc for this call's watchdog.sh path).
+- Mutation: `echo $! >` -> `echo $$ >` (launching shell's pid) in start-watchdog!.
+- Result: FAIL, 6 pass / 2 unexpected failures (password-hash and password-verify rows; control unaffected).
+- Clean rerun: 8 of 8 at 1.0.22 and at the 1.0.18 floor; gate pass.
+
+### no-stop-watchdog
+- Guards: the run kills the watchdog and the check reads it gone.
+- Mutation: both call sites of (stop-watchdog!) replaced by (if #f #f), definition kept.
+- Result: FAIL, 6 pass / 2 unexpected failures (same two rows).
+- Clean rerun: 8 of 8 (as above).
+
+## The caller, after the re-review's fixes
+
+### wd-pid-outer
+
+- Guards: `test-collect-safe`'s two verb rows
+- Mutation: the watchdog's launcher writes `$$`, its own pid, where it wrote `$!`
+- Result: the two verb rows fail; 6 pass. No watchdog or probe stayed live after 12 s
+- Clean rerun: the real files pass, 8 of 8
+
+### nocap, gated
+
+- Guards: `test-no-memory`'s capped rows
+- Mutation: every child runs with no cap
+- Result: the `'sensitive` hash row and the capped verify row fail; 4 pass
+- Clean rerun: the real files pass, 6 of 6

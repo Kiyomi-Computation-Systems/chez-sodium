@@ -4,13 +4,16 @@
 ;;;
 ;;;   MODE hash-interactive   password-hash at 'interactive
 ;;;   MODE hash-sensitive     password-hash at 'sensitive
+;;;   MODE make-sensitive     password-hash at 'sensitive, the hash itself
 ;;;   MODE verify HASH        password-verify HASH with the password
 ;;;
-;;; Each answer is one datum, then (valgrind . no) or (valgrind . yes), read
-;;; from /proc/self/maps. The suite starts it outside the memory gate, under
-;;; ulimit -v, since Valgrind cannot run there (ADR-0011).
+;;; Each answer is one datum, then (counts . ALIST), the library's native
+;;; counts, then (valgrind . no) or (valgrind . yes), read from
+;;; /proc/self/maps. The suite starts it through the memory gate's command,
+;;; under ulimit -v for the rows that need a cap (ADR-0011).
 (import (rnrs)
-        (chez-sodium))
+        (chez-sodium)
+        (chez-sodium private counters))
 
 (define password "correct horse")
 
@@ -62,6 +65,8 @@
         (list 'made (password-hash password 'sensitive)))
        ((string=? mode "verify") (verified (cadr args)))
        (else (list 'unknown-mode))))
+(newline)
+(write (cons 'counts (native-counts)))
 (newline)
 (write (valgrind-datum))
 (newline)
