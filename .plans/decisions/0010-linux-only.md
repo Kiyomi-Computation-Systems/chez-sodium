@@ -38,8 +38,8 @@ Accepted (the owner, 2026-11-25), proposed in [the M4 plan](../2026-11-25-m4-pla
 item 4, with [ADR-0013], decision 9.
 
 - **0.1.0 claims Linux on x86_64,** with the libsodiums CI runs: Ubuntu 24.04's package, found by
-  discovery; the floor and the current release, each built from source; and Guix's, in the
-  container. Every CI job runs on `ubuntu-24.04`, x86_64.
+  discovery, and the floor and the current release, each built from source. The development
+  container runs Guix's, which no CI job runs. Every CI job runs on `ubuntu-24.04`, x86_64.
 - **Linux on arm64 is named as not run,** in README.org's Status and the changelog's Known
   limitations. Discovery's `aarch64-linux-gnu` directory is written, but no run has reached it.
 - **No arm64 job is added.** One would be a seventh job, a change to `check-ci`'s shape, for a

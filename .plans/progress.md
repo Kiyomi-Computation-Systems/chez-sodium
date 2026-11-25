@@ -172,10 +172,10 @@ release and set B for the pages' facts, raised four questions. The owner answere
 
 ## Owed to M4
 
-Every note below was checked against the code and the real library by the M4 plan's set B. The
-plan's §3 states each as the pages will, and corrects six: the interrupts' times, the entropy
-abort, an unknown account's dummy, the stored hash, the over-cap password, and the fallback's
-reach.
+Every note below was checked against the code and the real library by the M4 plan's set B, and is
+stated here as the plan's §3 states it, which the pages follow. Six were corrected: the
+interrupts' times, the entropy abort, an unknown account's dummy, the stored hash, the over-cap
+password, and the fallback's reach.
 
 - **The documents' notes from M1:**
   - the first reference under an engine (ADR-0007, amended);
@@ -183,33 +183,35 @@ reach.
   - `sodium_init`'s 1;
   - what wiping cannot reach.
 - **The documents' notes from M2:** what the cap is; that the compare leaks only the lengths;
-  that `random-bytes` aborts the process without an entropy source; that `blake2b` can raise
-  `&sodium-failed`.
-- **The documents' notes from M3** (plan §3):
+  that with no entropy source the process aborts at the load, and `random-bytes` only if the
+  source fails later; that `blake2b` can raise `&sodium-failed`.
+- **The documents' notes from M3** (M3 plan §3, as the M4 plan's §3 corrects them):
   - `password-verify` answers `#f` for a wrong password, an unreadable hash and short memory
-    alike, with a caller's fallback: after a `#f`, hash a throwaway string at the same limits.
-    It sees only a failure libsodium is told of, under `ulimit` or with no overcommit, since a
-    container's memory limit kills the process instead, and it fits only hashes made at the
-    caller's current limits;
+    alike, with a caller's fallback: after a `#f`, hash a throwaway string at the current limits.
+    It sees only a failure libsodium is told of, as under `ulimit -v`; under short memory a wrong
+    password reads as short memory too; and it fits only hashes made at the caller's current
+    limits;
   - a hash's own limits set what verifying it costs, so hashes come from trusted storage;
-  - a container's memory limit can get the process killed;
+  - a container's memory limit kills the process, exit 137, with nothing raised (measured);
   - the login pattern: `password-needs-rehash?` only after `password-verify` answers `#t`;
   - a password changed by another thread during the call is refused;
-  - a password over the cap is refused by `password-verify`, not answered `#f`, so a login form
-    bounds or catches it first;
-  - a hash string is stored exactly: a stray space or newline verifies `#f` for ever;
-  - the calling thread's interrupts wait while a hash runs: about 55 ms at `'interactive`,
-    seconds at `'sensitive` (M3S2-F4).
-  - an unknown account is checked against a real hash made at the current limits, never a
-    string the pre-check refuses, which answers at once and tells accounts apart by time;
+  - a password over the cap, or one that is no string, is refused by `password-verify`, not
+    answered `#f`, so a login form checks for a string of at most 16384 characters first, or
+    catches the refusal;
+  - a hash string is stored exactly: any change verifies `#f` for ever, and
+    `password-needs-rehash?` may still answer `#f`;
+  - the calling thread's interrupts wait while a hash runs: about 50 ms at `'interactive`, about
+    2 s at `'sensitive`, here (M3S2-F4);
+  - an unknown account is checked against a real hash made at the current limits. Any string that
+    is not a real hash answers in microseconds and tells accounts apart by time;
   - custom limits go to both `password-hash` and `password-needs-rehash?`, or every login
     rehashes;
   - the binding never normalises a password: NFC and NFD forms do not verify against each other;
   - the login pattern's rehash can raise `&sodium-failed` after a `#t` verify, and a failed
     rehash need not fail the login (M3C-F4).
-- **The docs rule of `check-floors`** waits for `docs/`.
-- **The install-line checks of `test-manifest`** wait for the first release, which writes the
-  install lines.
+- **The docs rule of `check-floors`,** built in M4's slice 1 (the M4 plan, §4.5).
+- **The clone-line check of `test-manifest`,** built in M4's slice 1 at 0.0.0, with no branch,
+  and moved to the tag by the release (the M4 plan, §4.4).
 
 ## Close-outs
 

@@ -73,8 +73,9 @@
     `password-needs-rehash?` answers `#t`. The documents say what
   wiping cannot reach: the caller's copies, the bytevectors a verb returns, and copies
   the collector leaves behind.
-* A hash string is checked before C: printable ASCII, with no U+0000, within the input
-  cap. Its block ends in a 0, since C reads it up to its first NUL (brief §4.1). The
+* A hash string is checked before C: printable ASCII from U+0021 to U+007E, so no space
+  and no U+0000, within the input cap. Its block ends in a 0, since C reads it up to its
+  first NUL (brief §4.1). The
   pre-check and needs-rehash's shape check live in the pure
   `(chez-sodium private password-text)`, and run before any section.
 * A password is hashed as its UTF-8 bytes, exactly as given. The binding never

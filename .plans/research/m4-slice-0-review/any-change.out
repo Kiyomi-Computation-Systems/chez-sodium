@@ -1,0 +1,6 @@
+== libsodium at <profile>/lib/libsodium.so.26
+(length 93 substitutions 8649 verified-true 0 ())
+== exit 0
+== libsodium at <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+(length 93 substitutions 8649 verified-true 0 ())
+== exit 0

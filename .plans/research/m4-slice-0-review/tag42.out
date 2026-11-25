@@ -1,0 +1,26 @@
+== libsodium at <profile>/lib/libsodium.so.26
+(intact #f)
+(tag-42-ending #\7 low-bits 11 needs-rehash #t)
+(tag-42-ending #\g low-bits 0 needs-rehash #f)
+(tag-42-ending #\w low-bits 0 needs-rehash #f)
+(tag-42-ending #\A low-bits 0 needs-rehash #f)
+(tag-42-ending #\Q low-bits 0 needs-rehash #f)
+(tag-42-ending #\h low-bits 1 needs-rehash #t)
+(salt-characters 22 needs-rehash #f)
+(salt-characters 21 needs-rehash #t)
+(salt-characters 20 needs-rehash #f)
+(salt-characters 16 needs-rehash #f)
+== exit 0
+== libsodium at <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+(intact #f)
+(tag-42-ending #\7 low-bits 11 needs-rehash #t)
+(tag-42-ending #\g low-bits 0 needs-rehash #f)
+(tag-42-ending #\w low-bits 0 needs-rehash #f)
+(tag-42-ending #\A low-bits 0 needs-rehash #f)
+(tag-42-ending #\Q low-bits 0 needs-rehash #f)
+(tag-42-ending #\h low-bits 1 needs-rehash #t)
+(salt-characters 22 needs-rehash #f)
+(salt-characters 21 needs-rehash #t)
+(salt-characters 20 needs-rehash #f)
+(salt-characters 16 needs-rehash #f)
+== exit 0

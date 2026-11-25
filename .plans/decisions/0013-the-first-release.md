@@ -70,14 +70,15 @@
 6. **The comments carry no history,** as AGENTS.md's rule has required since PR #1. One pass
    before the tag removes the rest:
    - "decision N" and "amended" after an ADR go. A bare `ADR-NNNN` stays;
-   - so does the brief cited by section or row;
+   - the brief cited by section or row goes too, since `.plans/` is in no archive. A row number
+     inside a test's name is a string, and stays;
    - each edited Scheme file reads as the same datums, each changed shell line is a whole-line
      comment, and each C file compiles to the same object.
 7. **A release archive leaves out `.plans/` and `AGENTS.md`,** by `.gitattributes`, as it has since
    M0. Each tag's archive is listed after its push.
 8. **No Akku publish at 0.1.0** (brief §11.8). `Akku.manifest`'s 0.1.0 is for `test-manifest`.
-9. **0.1.0 claims what ran:** Linux on x86_64, with the libsodiums CI runs. Linux on arm64 is named
-   as not run, in README.org and the changelog's Known limitations ([ADR-0010], amended).
+9. **0.1.0 claims what ran:** Linux on x86_64, with the libsodiums CI runs and, in the development
+   container, Guix's. Linux on arm64 is named as not run, in README.org and the changelog's Known limitations ([ADR-0010], amended).
 10. **The docs state what M1 to M3 owe them,** as the M4 plan's §3 corrects them. A time is the
     development workstation's, written "about … here".
 11. **CHANGELOG.md's `[0.1.0]`** is in Keep a Changelog's form:
@@ -132,8 +133,8 @@
 - **The pages cannot drift from the code silently.** A change to an export's signature fails
   `test-reference`; a change to discovery or the refusal reasons fails `test-docs`; a floor's move
   fails `check-floors` on any page that restates it.
-- **`test-docs` costs about a minute under the gate,** most of it gated whole programs (pre-work A,
-  §4.2).
+- **`test-docs` is estimated at about a minute under the gate,** most of it gated whole programs
+  (pre-work A, §4.2); slice 1's join measures it.
 - **Each later release** dates its entry, bumps the manifest and the clone lines together, signs
   its tag, and makes its Release by the same recipe.
 - **Publishing on Akku stays a later decision,** after Techo has battle-tested the library

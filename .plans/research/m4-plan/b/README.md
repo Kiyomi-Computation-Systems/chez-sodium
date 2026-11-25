@@ -165,8 +165,10 @@ checks its arguments left to right, type before range, and refuses the first mis
     | `(make-password-limits 2 16)` | `m=16,t=2` |
     | `(make-password-limits 2 19456)` | `m=19456,t=2` |
 
-  - Length: 93 characters at `(make-password-limits 1 8)`. At the presets it is 97: 31, then 22
-    for the salt, `$`, and 43 for the tag. That 97 is computed, not printed.
+  - Length: 93 characters at `(make-password-limits 1 8)`. At `'interactive` it is 97: 31, then
+    22 for the salt, `$`, and 43 for the tag. **Corrected by the slice 0 review (M4S0-F9):**
+    `'moderate` is 98 and `'sensitive` 99, since the parameter field grows
+    (`research/m4-slice-0-review/preset-lengths.out`).
 - **Refusals,** from `password-hash` (`password-verbs.sls:124-133`, `106-117`):
 
   | Mistake | Irritants | Message |

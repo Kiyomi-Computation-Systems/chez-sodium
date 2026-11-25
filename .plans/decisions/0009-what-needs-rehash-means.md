@@ -1,4 +1,4 @@
-# ADR-0009: `password-needs-rehash?` answers `#t` for a hash not made with today's algorithm and limits
+# ADR-0009: `password-needs-rehash?` answers `#t` for a hash not made with today's algorithm, parallelism and limits
 
 - **Status:** Accepted (the owner, 2026-11-22), brief §11.1. Decision 4's KiB unit and the
   bound `crypto_pwhash_strprefix` are brief §11.5; the default limits are brief §11.7.
@@ -176,8 +176,14 @@ Accepted (the owner, 2026-11-25: "go with A"), proposed in [the M4 plan](../2026
     login. Techo makes every hash it stores with `password-hash`.
 - **The login pattern is unchanged, and unaffected.** It asks only after `password-verify`
   answers `#t`, and a damaged hash verifies `#f`.
-- **The documents say it:** needs-rehash tells whether a hash was made with today's algorithm and
-  limits; it is no check that the hash is intact.
+- **The documents say it:** needs-rehash tells whether a hash was made with today's algorithm,
+  parallelism and limits; it is no check that the hash is intact.
+- **The M3 amendment's "a tag of 42" is corrected.** libsodium answers -1 for a salt of 21
+  characters, since a lone trailing character never decodes. A tag of 42 characters answers -1
+  only when its last character's spare bits are not zero: ending in `g`, `w`, `A` or `Q` it
+  answers 0, and needs-rehash `#f`, at both releases. libsodium requires a salt of at least 8
+  bytes and a tag of at least 16, and no particular length ([the M4 slice 0
+  review](../research/m4-slice-0-review/README.md), M4S0-F7).
 - **Decision 4's "about 55 ms a hash here"** was M3's measurement. M4's pre-work measured medians
   of 49.0 to 50.5 ms on the same machine, and the documents say "about 50 ms here".
 

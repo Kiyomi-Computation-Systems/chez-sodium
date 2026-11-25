@@ -206,11 +206,12 @@ record it comes from, and where a rule and its record disagree, the record wins.
 
 ## Passwords
 
-- **`password-needs-rehash?` answers `#t` for a hash not made with today's algorithm and
-  limits:** the limits differ; libsodium cannot read it; it fails the pre-check; its prefix is
-  not the loaded library's `crypto_pwhash_strprefix()`; or its parameters do not read `p=1`. It
-  answers `#f` only otherwise, and never raises because of the hash. It reads no salt or tag
-  size, so it is no check that a hash is whole, and the documents say so ([ADR-0009], amended).
+- **`password-needs-rehash?` answers `#t` for a hash not made with today's algorithm,
+  parallelism and limits:** the limits differ; libsodium cannot read it; it fails the
+  pre-check; its prefix is not the loaded library's `crypto_pwhash_strprefix()`; or its
+  parameters do not read `p=1`. It answers `#f` only otherwise, and never raises because of the
+  hash. It reads no salt or tag size, so it is no check that a hash is whole, and the documents
+  say so ([ADR-0009], amended).
 - **Custom limits are made by `make-password-limits`, with memory in KiB,** each range checked
   when it is called, so a `Password-limits` is always in range. The default is `'interactive`
   ([ADR-0009], amended).
