@@ -230,7 +230,8 @@
 (test-equal "the libraries under src/ that load libsodium, found from their imports: native, and each that imports a loader"
   (sorted '((chez-sodium)
             (chez-sodium private byte-verbs)
-            (chez-sodium private native)))
+            (chez-sodium private native)
+            (chez-sodium private password-verbs)))
   (if src-read? loaders src-imports))
 
 ;; What the testing library imports, read from its file, not its allowlist.
@@ -326,7 +327,8 @@
 ;; verb-names : (Listof Symbol)
 ;; The exports of (chez-sodium) that load libsodium. Every other export is a
 ;; condition export.
-(define verb-names '(sodium-version random-bytes blake2b constant-time-bytevector=?))
+(define verb-names '(sodium-version random-bytes blake2b constant-time-bytevector=?
+    password-hash password-verify password-needs-rehash? make-password-limits))
 
 ;; condition-names : (Listof Symbol)
 ;; The exports of (chez-sodium) less the verbs, as Chez lists them, sorted.

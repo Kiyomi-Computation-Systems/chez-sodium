@@ -65,6 +65,8 @@
  *   pwhash-str-unreadable
  *                      crypto_pwhash_str answers 0 and leaves its output all
  *                      A5, with no 0 in it
+ *   pwhash-str-empty   crypto_pwhash_str answers 0 and leaves its output all
+ *                      A5 but a 0 at index 0: an empty string
  *   verify-other       crypto_pwhash_str_verify answers 1, a second code
  *   strprefix-null     crypto_pwhash_strprefix answers NULL
  *   pwhash-blocks      crypto_pwhash_str and crypto_pwhash_str_verify each
@@ -199,6 +201,7 @@ enum decoy_switch {
   PWHASH_STR_FAILS,
   PWHASH_STR_OTHER,
   PWHASH_STR_UNREADABLE,
+  PWHASH_STR_EMPTY,
   VERIFY_OTHER,
   STRPREFIX_NULL,
   PWHASH_BLOCKS
@@ -225,6 +228,7 @@ static const struct {
   {"pwhash-str-fails", PWHASH_STR_FAILS},
   {"pwhash-str-other", PWHASH_STR_OTHER},
   {"pwhash-str-unreadable", PWHASH_STR_UNREADABLE},
+  {"pwhash-str-empty", PWHASH_STR_EMPTY},
   {"verify-other", VERIFY_OTHER},
   {"strprefix-null", STRPREFIX_NULL},
   {"pwhash-blocks", PWHASH_BLOCKS},
@@ -553,7 +557,8 @@ static int rehash_answer(uintptr_t s, unsigned long long opslimit, size_t memlim
 #ifndef DECOY_LACKS_crypto_pwhash_str
 /* Logs its call, writes A5 over the decoy's own strbytes of OUT, then the
    fixed hash string and a 0, and answers 0, -1 or 1 under the two switches.
-   Under pwhash-str-unreadable it leaves OUT all A5 and answers 0. Under
+   Under pwhash-str-unreadable it leaves OUT all A5 and answers 0, and under
+   pwhash-str-empty all A5 but a 0 at index 0. Under
    pwhash-blocks it first waits on the FIFO. */
 int crypto_pwhash_str(char out[crypto_pwhash_STRBYTES],
                       const char *const passwd, unsigned long long passwdlen,
@@ -575,7 +580,9 @@ int crypto_pwhash_str(char out[crypto_pwhash_STRBYTES],
   if (o) {
     for (n = 0; n < size; n++)
       bytes[n] = 0xA5;
-    if (mode != PWHASH_STR_UNREADABLE) {
+    if (mode == PWHASH_STR_EMPTY) {
+      bytes[0] = 0;
+    } else if (mode != PWHASH_STR_UNREADABLE) {
       for (n = 0; n < length; n++)
         bytes[n] = (unsigned char) hash[n];
       bytes[length] = 0;

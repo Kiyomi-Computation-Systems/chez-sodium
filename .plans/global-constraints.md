@@ -115,7 +115,7 @@ record it comes from, and where a rule and its record disagree, the record wins.
 - **Every library condition is a `&chez-sodium-error`:** `&sodium-library-unavailable`, or
   `&sodium-failed`, raised when `crypto_pwhash_str` or `crypto_generichash` answers anything but
   0 for limits, sizes and a key that passed their checks, and when `crypto_pwhash_str` answers 0
-  but leaves no readable string, with code 0.
+  but leaves no readable string, or one that fails the pre-check, with code 0.
   `&sodium-failed`'s fields are `function` and `code` ([ADR-0006], amended).
 - **Every raise carries `&who`:** `chez-sodium` for the load's refusals, the public verb for a
   refusal raised through the public surface, the given WHO for a helper's, and its own name for

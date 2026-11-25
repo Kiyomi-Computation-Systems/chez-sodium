@@ -34,7 +34,7 @@
 ;;; show both, and this suite asserts the whole of its output.
 ;;;
 ;;; A second child, started the same way, runs the verbs of (chez-sodium private
-;;; byte-verbs) against the decoy libsodium (tests/decoy-libsodium.c), which
+;;; byte-verbs) and (chez-sodium private password-verbs) against the decoy libsodium (tests/decoy-libsodium.c), which
 ;;; names to the interposer each block it is handed. One row a call: the
 ;;; child answers the whole list of (length verdict) pairs, one per named
 ;;; block, in the order named, and every verdict is 1. Standing controls call
@@ -199,7 +199,8 @@
    "        (chez-sodium private counters)\n"
    "        (chez-sodium private memory)\n"
    "        (chez-sodium private native)\n"
-   "        (chez-sodium private byte-verbs))\n"
+   "        (chez-sodium private byte-verbs)\n"
+   "        (chez-sodium private password-verbs))\n"
    "(define interposer (cadr (command-line)))\n"
    "(load-shared-object interposer)\n"
    "(define watch-reset (foreign-procedure \"watch_reset\" () void))\n"
@@ -229,6 +230,17 @@
    "(define input-3 (u8-list->bytevector (list 1 2 3)))\n"
    "(define five-a (u8-list->bytevector (list 1 2 3 4 5)))\n"
    "(define five-b (u8-list->bytevector (list 1 2 3 4 5)))\n"
+   ";; A password of nine UTF-8 bytes: p, a-umlaut (two bytes), s, s, w, o, r, d.\n"
+   "(define password (string #\\p (integer->char 228) #\\s #\\s #\\w #\\o #\\r #\\d))\n"
+   "(define password-limits (make-password-limits 1 8))\n"
+   ";; The decoy's own hash string, 93 characters.\n"
+   "(define control-hash\n"
+   "  (string-append \"$argon2id$v=19$m=8,t=1,p=1$\" \"c2FsdHNhbHRzYWx0c2FsdA\" \"$\"\n"
+   "                 \"dGFndGFndGFndGFndGFndGFndGFndGFndGFndGFndGE\"))\n"
+   ";; filled-string : Natural -> Natural*\n"
+   ";; A block of N bytes holding #x41 and a NUL at the end: a C string of N-1 characters.\n"
+   "(define (filled-string n)\n"
+   "  (let ((b (filled n))) (foreign-set! 'unsigned-8 b (- n 1) 0) b))\n"
    "(define results\n"
    "  (let* ((a (row 'random-bytes-40 (lambda () (random-bytes 40))))\n"
    "         (b (row 'blake2b-keyed (lambda () (blake2b input-3 32 key-16))))\n"
@@ -245,8 +257,23 @@
    "         (g (row 'control-memcmp\n"
    "                 (lambda () (let ((x (filled 5)) (y (filled 5)))\n"
    "                              (sodium-memcmp x y 5)\n"
-   "                              (freed-unwiped x y))))))\n"
-   "    (list a b c d e f g)))\n"
+   "                              (freed-unwiped x y)))))\n"
+   "         (h (row 'password-hash (lambda () (password-hash password password-limits))))\n"
+   "         (i (row 'password-verify (lambda () (password-verify control-hash password))))\n"
+   "         (j (row 'password-needs-rehash (lambda () (password-needs-rehash? control-hash))))\n"
+   "         (k (row 'control-pwhash-str\n"
+   "                 (lambda () (let ((out (filled 128)) (pw (filled 9)))\n"
+   "                              (crypto-pwhash-str out pw 9 1 8192)\n"
+   "                              (freed-unwiped out pw)))))\n"
+   "         (l (row 'control-pwhash-str-verify\n"
+   "                 (lambda () (let ((s (filled-string 94)) (pw (filled 9)))\n"
+   "                              (crypto-pwhash-str-verify s pw 9)\n"
+   "                              (freed-unwiped s pw)))))\n"
+   "         (m (row 'control-pwhash-str-needs-rehash\n"
+   "                 (lambda () (let ((s (filled-string 94)))\n"
+   "                              (crypto-pwhash-str-needs-rehash s 1 8192)\n"
+   "                              (freed-unwiped s))))))\n"
+   "    (list a b c d e f g h i j k l m)))\n"
    "(for-each (lambda (r) (write r) (newline)) results)\n"
    "(write (cons 'decoy (if (foreign-entry? \"decoy_calls\") 'yes 'no)))\n"
    "(newline)\n"
@@ -268,6 +295,12 @@
    "(control-randombytes-buf ran ((40 2)))\n"
    "(control-generichash ran ((32 2) (3 2) (16 2)))\n"
    "(control-memcmp ran ((5 2) (5 2)))\n"
+   "(password-hash ran ((128 1) (9 1)))\n"
+   "(password-verify ran ((94 1) (9 1)))\n"
+   "(password-needs-rehash ran ((94 1)))\n"
+   "(control-pwhash-str ran ((128 2) (9 2)))\n"
+   "(control-pwhash-str-verify ran ((94 2) (9 2)))\n"
+   "(control-pwhash-str-needs-rehash ran ((94 2)))\n"
    "(decoy . yes)\n"
    "(ld-preload . same)\n(valgrind . no)\n(counts ((block . 0)))\n"))
 
@@ -380,7 +413,7 @@
             (caddr child-run))
       child-run))
 
-(test-equal "row 24 for the verbs: against the decoy, which names each block it is handed, each verb's whole list of (length verdict) is one pair per block, all 1: random-bytes 40; keyed blake2b, its output, input and key; unkeyed, its key named with length 0; the compare's two operands; and each entry called through native's raw binding on blocks freed with no wipe reads 2 for every block it names; the child ran against the decoy, outside Valgrind, with the interposer alone preloaded, and counted no block"
+(test-equal "row 24 for the verbs: against the decoy, which names each block it is handed, each verb's whole list of (length verdict) is one pair per block, all 1: random-bytes 40; keyed blake2b, its output, input and key; unkeyed, its key named with length 0; the compare's two operands; password-hash, its out block of 128 and its 9-byte password; password-verify, the 94-byte hash string and the password; password-needs-rehash?, the string; and each entry called through native's raw binding on blocks freed with no wipe reads 2 for every block it names; the child ran against the decoy, outside Valgrind, with the interposer alone preloaded, and counted no block"
   (list 0 decoy-expected-output "")
   decoy-run)
 
