@@ -50,8 +50,12 @@ cd ..
 ## Get it
 
 ```sh
-git clone https://github.com/Kiyomi-Computation-Systems/chez-sodium.git
+git clone --branch v0.1.0 https://github.com/Kiyomi-Computation-Systems/chez-sodium.git
 ```
+
+Git may warn that the tag "is not a commit!", and say you are in a
+"detached HEAD" state. Both are expected for a release's tag: the clone
+holds the release.
 
 There is nothing to build. `src/` holds the library you import,
 `(chez-sodium)`.

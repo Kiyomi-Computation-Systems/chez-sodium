@@ -1,0 +1,14 @@
+== v010
+live-check: http://127.0.0.1:8765/v010/ is v0.1.0's site
+exit 0
+== main
+live-check: links: not a file at v0.1.0: blob/main/README.org
+live-check: links: no link names a repository file at blob/v0.1.0/
+exit 1
+== plant-pages
+live-check: pages: tokens.html answered 404, not 200
+exit 1
+== plant-clone
+live-check: clone: this git clone is not --branch v0.1.0:
+  git clone https://github.com/Kiyomi-Computation-Systems/chez-sodium.git
+exit 1

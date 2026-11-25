@@ -66,7 +66,11 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   stacked PRs for M4 on 2026-11-25, as for M3.
   - **Merged:** slice 0, the plan and the records (#18, `6edcb7f`), and slice 1, the docs and the
     site (#19, `6687b63`).
-  - **Next:** M4's closing review's fixes, then the release (the plan's §4.9 to §4.11).
+  - **Merged:** M4's closing review and its fixes (#20, `aee5f90`).
+  - **The release:** the repository's settings are set and read back; the release branch,
+    `m4-release`, holds CHANGELOG.md's `[0.1.0]`, the manifest at 0.1.0 and the clone lines at
+    the tag ([research/m4-release/](research/m4-release/README.md)). Next: its merge, then the
+    owner's signed tag.
 
 ## Answered for M1
 
@@ -217,6 +221,32 @@ password, and the fallback's reach.
   and moved to the tag by the release (the M4 plan, §4.4).
 
 ## Close-outs
+
+### 2026-11-25 — M4's closing review and its fixes (PR #20)
+
+- **Reviewed:** one Opus review, read-only, of the whole milestone, `d53e83c` to `b34b7ee`. It
+  found no blocker, 3 majors and 11 minors
+  ([research/m4-closing-review/](research/m4-closing-review/README.md)). It stopped at the two
+  blocked commands it met, and reran neither. The majors:
+  - **the docs review's correction of `changed-during-call` had reached only the pages:** the
+    constraints, the brief, ADR-0006, ADR-0009, the ledger and three comments still said every
+    change is refused;
+  - **the reference's needs-rehash entry** kept the wording ADR-0009's amendment withdrew;
+  - **the unknown-account example's dummy** was made from a password the page printed, and its
+    refusal line was held by nothing.
+- **Fixed** by four fix agents on disjoint files (Opus for the pages, Sonnet for the rest) and by
+  the caller for the records. Every fix was watched failing
+  ([its mutation log](m4-closing-mutation-log.md)).
+- **Also fixed:** `test-native-codes`' 0xC3 row, which failed PR #19's CI once. libsodium 1.0.18
+  reads 0xC3 as `/`, so a random salt that began with `/` still verified, about once in 64. The
+  row chooses its hash now, and a new row holds the alias (`traps.md`).
+- **In the container:** `make test` 44 of 44, `check-test-fails` 18 cases, `check-site` all green
+  with `v0.1.0-rc.1` and `v0.2` refused.
+- **CI:** run 45632384946 passed all six jobs. Squash-merged as `aee5f90`, its tree equal to the
+  tested head's.
+- **Then, at the owner's word:** the caller set branch protection, Pages, the `github-pages`
+  environment and the "release tags" ruleset, each read back
+  ([research/m4-release/](research/m4-release/README.md)).
 
 ### 2026-11-25 — M4 slice 1: the docs and the site (PR #19)
 
