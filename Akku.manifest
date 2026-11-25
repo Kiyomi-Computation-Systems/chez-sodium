@@ -19,8 +19,9 @@
 ;; compiled (ADR-0001). See chez-cmark-gfm ADR-0017.
 ;;
 ;; The version is CHANGELOG.md's latest release, or 0.0.0 while there is
-;; none; test-manifest holds the two.
-(akku-package ("chez-sodium" "0.0.0")
+;; none, and the clone lines of README.org and docs/quickstart.md name its
+;; tag; test-manifest holds the three.
+(akku-package ("chez-sodium" "0.1.0")
   (synopsis "Password hashing for Chez Scheme, through libsodium")
   (authors "Kiyomi Computation Systems LLC")
   (homepage "https://github.com/Kiyomi-Computation-Systems/chez-sodium")
