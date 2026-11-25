@@ -1,42 +1,102 @@
 * chez-sodium
 
-Password hashing, random bytes and fast hashing for Chez Scheme, through
-[[https://doc.libsodium.org/][libsodium]]'s C library.
+[[https://github.com/Kiyomi-Computation-Systems/chez-sodium/actions/workflows/ci.yml][https://github.com/Kiyomi-Computation-Systems/chez-sodium/actions/workflows/ci.yml/badge.svg]]
+
+Password hashing for Chez Scheme, through [[https://doc.libsodium.org/][libsodium]]'s C library.
+
+chez-sodium binds a small, deliberate part of =libsodium= through Chez's
+foreign interface, and loads it when your program runs: there is nothing to
+compile. Password hashing is its main job. It does four things:
+
+- hash a password with argon2id, check it, and tell when a hash needs
+  redoing because its limits changed;
+- make random bytes from the system, for keys and tokens;
+- hash bytes fast with BLAKE2b, for storing an API key without storing the
+  key;
+- compare two secrets in constant time.
+
+It is not a general libsodium binding, and not a crypto toolkit. It has:
+
+- no encryption, secret-key or public-key;
+- no signatures, key exchange, AEAD or streams;
+- no key derivation from a password (=crypto_pwhash= as a KDF), and no
+  scrypt;
+- no guarded memory (=sodium_malloc=, =mlock=);
+- no hex or base64 helpers: plain Scheme does those.
+
+SHA-256 and HMAC-SHA256 are planned for a later release. For anything
+else, use libsodium through another binding, or ask for it in an
+[[https://github.com/Kiyomi-Computation-Systems/chez-sodium/issues][issue]].
 
 #+begin_quote
 ✨ *AI Disclosure:* LLMs are used extensively in the planning and development of this project.
 #+end_quote
 
-chez-sodium will bind a small part of =libsodium= through Chez's foreign
-interface, and load it when your program runs: there will be nothing to
-compile. It covers four jobs:
-
-- hash a password with argon2id, check it, and tell when a hash needs
-  redoing because its limits were raised;
-- make random bytes from the system, for keys and tokens;
-- hash bytes fast with BLAKE2b, for storing a long random key without storing
-  the key;
-- compare two secrets in constant time.
-
-SHA-256 and HMAC-SHA256 come later. Encryption and signatures are not
-planned.
-
 ** Status
 
-*One verb is built so far.* chez-sodium finds libsodium, checks that it is
-new enough, and loads it, and =sodium-version= names the version it loaded.
-Random bytes, BLAKE2b and the constant-time compare come next, then the
-password verbs.
-[[file:.plans/2026-11-22-chez-sodium-project-brief.md][The brief]] sets out what will be bound, and why. Its names may change before
-the first release, and the API may change in any release before 1.0.
+Every verb is built. chez-sodium's suites run on Linux on x86_64:
+
+- in CI, on Chez built from its source at the oldest version Requirements
+  names: with Ubuntu 24.04's libsodium, which chez-sodium finds by itself,
+  and with libsodium built from its own source, at the oldest release
+  Requirements names and at the current release;
+- in the development container, on Guix's Chez and Guix's libsodium.
+
+Linux on arm64 has not run them. Linux is the only system supported.
 
 ** Requirements
 
-CI tests each on Linux at its oldest version, and libsodium at its latest
-release too:
-
 - Chez Scheme 10.4.0 or later, built with threads
 - libsodium 1.0.18 or later
+
+That is all a program needs: no C compiler, no headers and no build step.
+The tests need more: a C compiler, with libsodium's header =sodium.h=; GNU
+=timeout=; and Valgrind, for =make test-memory=.
+
+** Installing
+
+Clone it, and put its =src= directory on Chez's library path. There is
+nothing to build: libsodium is loaded when your program runs.
+
+#+begin_src sh
+git clone https://github.com/Kiyomi-Computation-Systems/chez-sodium.git
+scheme --libdirs chez-sodium/src --program app.sps
+#+end_src
+
+chez-sodium finds the system's libsodium; =CHEZ_SODIUM_LIBRARY= names
+another, by its absolute path. The [[file:docs/quickstart.md][quick start]] says more, and how to build
+Chez on Ubuntu 24.04.
+
+** A taste
+
+A program's body, which follows its =(import (rnrs) (chez-sodium))=. It
+hashes a password, then checks the right one and a wrong one; its last line
+shows what it gives:
+
+#+begin_src scheme
+(define hash (password-hash "correct horse"))
+(list (password-verify hash "correct horse")
+      (password-verify hash "battery staple"))
+;; => (#t #f)
+#+end_src
+
+The [[file:docs/quickstart.md][quick start]] shows the whole program, and how to run it.
+
+** Documentation
+
+- [[file:docs/quickstart.md][Quick start]]: from a clone to a first program.
+- [[file:docs/passwords.md][Passwords]]: hash and check passwords, and log users in safely.
+- [[file:docs/tokens.md][Tokens]]: make API keys, store them, and compare secrets.
+- [[file:docs/finding-libsodium.md][Finding libsodium]]: which library is loaded, and how to name another.
+- [[file:docs/reference.md][Reference]]: every name the library exports.
+
+** Contributing
+
+[[file:CONTRIBUTING.md][CONTRIBUTING.md]] says how to set up, which checks a pull request must pass, and the house rules.
+
+** Security
+
+Report a vulnerability privately; [[file:SECURITY.md][SECURITY.md]] says how.
 
 ** License
 

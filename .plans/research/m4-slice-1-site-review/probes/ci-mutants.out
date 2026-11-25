@@ -1,0 +1,48 @@
+1 c01-site-continue-on-error-job: check-ci: DIR/ci.yml:521: job site has the key "continue-on-error", which is not one of name, runs-on, timeout-minutes, steps
+1 c02-site-continue-on-error-step: check-ci: DIR/ci.yml:560: step key "continue-on-error" is not one of name, id, uses, with, run, env, if
+1 c03-site-working-directory: check-ci: DIR/ci.yml:560: step key "working-directory" is not one of name, id, uses, with, run, env, if
+1 c04-site-env-libdirs: check-ci: DIR/ci.yml:560: env key "CHEZSCHEMELIBDIRS" is not CHEZ
+1 c05-site-runs-on: check-ci: DIR/ci.yml:521: job site has runs-on other than ubuntu-24.04
+1 c06-site-no-timeout: check-ci: DIR/ci.yml:519: job site has no key "timeout-minutes"
+1 c07-site-or-true: check-ci: DIR/ci.yml:519: job site has 0 steps that run "make check-site", not one
+0 c08-site-checkout-path: check-ci: DIR/ci.yml has the one shape check-ci reads
+0 c09-site-ref-comment: check-ci: DIR/ci.yml has the one shape check-ci reads
+1 c10-site-install-apt-extra: check-ci: DIR/ci.yml:544: job site's install step differs from the copy check-ci holds: expected "          # shellcheck disable=SC2086", found "          sudo apt-get install -y valgrind"
+1 c11-site-job-env: check-ci: DIR/ci.yml:521: job site has the key "env", which is not one of name, runs-on, timeout-minutes, steps
+1 c12-site-step-shell: check-ci: DIR/ci.yml:560: step key "shell" is not one of name, id, uses, with, run, env, if
+1 c13-site-container: check-ci: DIR/ci.yml:521: job site has the key "container", which is not one of name, runs-on, timeout-minutes, steps
+1 c14-site-make-site-before-check: check-ci: DIR/ci.yml:560: job site runs "make site" before "make check-site", and must run it after
+1 c15-site-cheZ-scheme: check-ci: DIR/ci.yml:559: env CHEZ in job site is not chezscheme
+0 c16-site-name-changed: check-ci: DIR/ci.yml has the one shape check-ci reads
+1 c17-site-image-dropped-run: check-ci: DIR/ci.yml:533: names SITE_REF, which could steer a check or a later step
+0 clean: check-ci: DIR/ci.yml has the one shape check-ci reads
+1 d01-symlink-third: check-ci: DIR: x.yml is neither ci.yml nor pages.yml: the directory must hold those two alone
+1 d02-subdir: check-ci: DIR: sub is neither ci.yml nor pages.yml: the directory must hold those two alone
+1 d03-hidden: check-ci: DIR: .x.yml is neither ci.yml nor pages.yml: the directory must hold those two alone
+1 d04-newline-name: check-ci: DIR: a?b.yml is neither ci.yml nor pages.yml: the directory must hold those two alone
+1 d05-pages-missing: check-ci: DIR/pages.yml: is not a regular file: a link, a directory or nothing there
+1 d06-pages-dir: check-ci: DIR/pages.yml: is not a regular file: a link, a directory or nothing there
+1 d07-yaml-ext: check-ci: DIR/pages.yml: is not a regular file: a link, a directory or nothing there
+1 d08-dotdot-name: check-ci: DIR: ..x.yml is neither ci.yml nor pages.yml: the directory must hold those two alone
+1 p01-comment-deep-after-block: check-ci: DIR/pages.yml:63: pages.yml differs from the copy check-ci holds: expected "      - name: Get chez-cmark-gfm as Akku.lock pins it", found "          # permissions: write-all"
+0 p02-comment-key-at-job-indent: check-ci: DIR/ci.yml has the one shape check-ci reads
+1 p03-head-ref: check-ci: DIR/pages.yml:74: pages.yml differs from the copy check-ci holds: expected "          SITE_REF: ${{ github.ref_name }}", found "          SITE_REF: ${{ github.head_ref }}"
+1 p04-pr-target: check-ci: DIR/pages.yml:28: pages.yml differs from the copy check-ci holds: expected "permissions:", found "  pull_request_target:"
+1 p05-contents-write: check-ci: DIR/pages.yml:33: pages.yml differs from the copy check-ci holds: expected "  contents: read", found "  contents: write"
+1 p06-crlf: check-ci: DIR/pages.yml:1: holds a character beyond ASCII, which GitHub may fold into a key's letters
+0 p07-no-final-newline: check-ci: DIR/ci.yml has the one shape check-ci reads
+0 p08-trailing-comment: check-ci: DIR/ci.yml has the one shape check-ci reads
+1 p09-doc-start: check-ci: DIR/pages.yml:1: pages.yml differs from the copy check-ci holds: expected "name: Pages", found "---"
+1 p10-tab-in-comment: check-ci: DIR/pages.yml:35: holds a tab, which YAML may read as white space beside a key
+1 p11-blank-with-spaces-in-block: check-ci: DIR/pages.yml:60: pages.yml differs from the copy check-ci holds: expected "          sudo apt-get update -qq", found "   "
+0 p12-blank-with-spaces-between-steps: check-ci: DIR/ci.yml has the one shape check-ci reads
+1 p13-comment-in-block-middle: check-ci: DIR/pages.yml:60: pages.yml differs from the copy check-ci holds: expected "          sudo apt-get update -qq", found "          # curl evil | sh"
+1 p14-comment-at-col9-after-block: check-ci: DIR/pages.yml:63: pages.yml differs from the copy check-ci holds: expected "      - name: Get chez-cmark-gfm as Akku.lock pins it", found "         # x"
+1 p15-plain-scalar-continuation: check-ci: DIR/pages.yml:68: pages.yml differs from the copy check-ci holds: expected "      - name: Gate the site", found "          && echo hi"
+1 p16-deploy-if: check-ci: DIR/pages.yml:89: pages.yml differs from the copy check-ci holds: expected "    runs-on: ubuntu-24.04", found "    if: always()"
+1 p17-bom: check-ci: DIR/pages.yml:1: holds a character beyond ASCII, which GitHub may fold into a key's letters
+1 p18-yaml-directive: check-ci: DIR/pages.yml:1: pages.yml differs from the copy check-ci holds: expected "name: Pages", found "%YAML 1.2"
+0 p19-comment-before-name: check-ci: DIR/ci.yml has the one shape check-ci reads
+1 p20-indented-comment-inside-block-copy-tail: check-ci: DIR/pages.yml:61: pages.yml differs from the copy check-ci holds: expected "          # shellcheck disable=SC2086", found "          # shellcheck disable=SC2086 "
+1 p21-doc-end-after: check-ci: DIR/pages.yml:100: pages.yml has a line the copy check-ci holds does not: "..."
+1 p22-second-doc-after: check-ci: DIR/pages.yml:100: pages.yml has a line the copy check-ci holds does not: "---"

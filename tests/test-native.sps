@@ -27,7 +27,7 @@
 ;;;                  are the sizes' rows, below
 ;;;   the sizes      crypto_generichash's five sizes, read once at the load,
 ;;;                  equal what the C oracle reads through the library and
-;;;                  through the header's macros, and brief 3.4's 32, 16, 64,
+;;;                  through the header's macros, and are 32, 16, 64,
 ;;;                  16 and 64
 ;;;   bytes          call-with-bytes: a bytevector's bytes, U+0000 and bytes
 ;;;                  past ASCII kept, in a counted block of at least one byte,

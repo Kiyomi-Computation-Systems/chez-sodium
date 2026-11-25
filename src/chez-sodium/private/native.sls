@@ -40,10 +40,10 @@
 ;;;
 ;;; Steps 1 to 7 are the let* of one definition, load-answers, run inside one
 ;;; call-in-section: dlopen, every bind, sodium_init and the size calls happen
-;;; in one critical section, which answers data (ADR-0007, decision 9). Our
-;;; own pure code refuses inside it, and the guard of call-in-section raises the refusal
-;;; again once the section has ended, where load-step, outside it, makes the
-;;; raise serious, records it and raises it. So no caller's handler runs
+;;; in one critical section, which answers data (ADR-0007). Our own pure code
+;;; refuses inside it, and the guard of call-in-section raises the refusal again
+;;; once the section has ended, where load-step, outside it, makes the raise
+;;; serious, records it and raises it. So no caller's handler runs
 ;;; inside the section. An engine spends no ticks inside a section, so the
 ;;; load is never abandoned half-done by an expiry; one abandoned before the
 ;;; section starts leaves the library wedged, which no code closes, and every
@@ -167,7 +167,7 @@
   ;; answers data, and a verb raises what that data says after the call: for a
   ;; verb the guard is a net for a bug, not a channel. The tags are a fresh
   ;; list per call, so an answer shaped like (raised X) is an answer, never a
-  ;; raise (ADR-0007, decision 7).
+  ;; raise (ADR-0007).
   (define (call-in-section thunk)
     (let ((outcome (critical-section
                     (guard (c (#t (list 'raised c)))
@@ -373,7 +373,7 @@
   ;; gets a block of one byte, written 0, so the address is never NULL.
   ;; BYTES is read in place, N read once, and never copied: a bytevector's
   ;; length cannot change, so the read is memory-safe, and no Scheme copy of a
-  ;; secret is made (ADR-0008, decision 4). A WHO that is no symbol is an
+  ;; secret is made (ADR-0008). A WHO that is no symbol is an
   ;; assertion violation from call-with-bytes; a BYTES that is no bytevector
   ;; is refused through refuse-secret from WHO, irritants (not-a-bytevector
   ;; bytes (kind K)), and a PROC that is no procedure, from WHO, by
@@ -780,8 +780,9 @@
 
   ;; randombytes-buf : Positive-Integer Natural -> Void
   ;; void randombytes_buf(void * const buf, const size_t size): writes SIZE
-  ;; random bytes at BUF. It aborts the process when no entropy source is
-  ;; available.
+  ;; random bytes at BUF. With no entropy source at all the process aborts at
+  ;; the load, when sodium_init stirs the generator; this call aborts only if
+  ;; the source fails later.
   (define randombytes-buf (answer 'randombytes-buf))
 
   ;; crypto-generichash : Positive-Integer Natural Positive-Integer Natural
@@ -909,8 +910,7 @@
   ;; at the load, 0 or 1. A fresh list and fresh strings at every call, so
   ;; nothing a caller does to an answer reaches the next. Reaching this
   ;; binding runs the load above, once; a refusal raises from there instead,
-  ;; at this reference and every later one. It holds no section (ADR-0007,
-  ;; decision 8).
+  ;; at this reference and every later one. It holds no section (ADR-0007).
   (define (loaded-libsodium)
     (list (cons 'path (string-copy libsodium-path))
           (cons 'source libsodium-source)
@@ -922,6 +922,6 @@
   ;; sodium-version : -> String
   ;; libsodium's version string, as the load read it: a fresh string at every
   ;; call. It makes no block and calls no C, so it holds no section
-  ;; (ADR-0007, decision 8).
+  ;; (ADR-0007).
   (define (sodium-version)
     (string-copy libsodium-version)))

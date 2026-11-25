@@ -1,10 +1,12 @@
 #!/bin/sh
-# check-ci: hold .github/workflows/ci.yml to the one shape this check reads.
+# check-ci: hold .github/workflows/ci.yml to the one shape this check reads,
+# and pages.yml to the copy it holds.
 #
 #   sh tests/check-ci.sh DIR
 #
-# DIR must hold ci.yml alone, a regular file and no link: a second workflow
-# would run jobs this check does not read. Its entries are read by a glob, so
+# DIR must hold ci.yml and pages.yml alone, each a regular file and no link: a
+# third workflow would run jobs this check does not read. Its entries are read
+# by a glob, so
 # a name that holds a newline is one name, shown with a ? for each byte that is
 # not printable ASCII. On a pass it prints one line on stdout and exits 0. On a
 # failure it prints each problem on stderr, as "check-ci: FILE:LINE: problem",
@@ -25,8 +27,8 @@
 #     and a ${{ }} expression), a quoted scalar left open, and a backslash after
 #     a double quote;
 #   - the shape: the top-level keys, the three blocks `on`, `permissions` and
-#     `concurrency` line for line, the five jobs (main, memory, nothreads,
-#     floor and current) and each key in them, each step's keys, with: and
+#     `concurrency` line for line, the six jobs (main, memory, nothreads,
+#     floor, current and site) and each key in them, each step's keys, with: and
 #     env: keys, the ifs and where they may be, the Chez cache's path and keys,
 #     one restore and one save of it in each job, and the checks each job must
 #     run, each as one step's whole run line, in order:
@@ -61,13 +63,22 @@
 #     value (floor's library is libsodium.so.23, current's .so.26), stand on
 #     the steps that run the check, make build and make test, each of which
 #     must carry both and CHEZ, and on no other step;
+#   - in job site, the docs site, on Ubuntu's Chez (ADR-0013): seven steps; the
+#     checkout with submodules first; the image step second; the install step
+#     third, held line for line, from its first line to the next step's, to the
+#     copy below that pages.yml's install step is held to, by the rule
+#     pages.yml is held by, so the two cannot drift; then make
+#     check-site-deps, make site-deps, make check-site and make site, each one
+#     step's whole run line, in that order, each with env CHEZ chezscheme; no
+#     step that uses an action but actions/checkout@, so no cache; and no if:
+#     on any step, since there is no cache for one to guard;
 #   - in every job, the step "Identify the runner image", which names the
 #     runner's OS release and architecture in the caches' keys: exactly one,
 #     with id: image and a run block of exactly its two lines (. /etc/os-release,
 #     then the echo of id=${ID}-${VERSION_ID}-${RUNNER_ARCH} to GITHUB_OUTPUT),
 #     before the job's first cache restore; each Chez restore's key, held whole
 #     (its prefix, the hashFiles list, then -${{ steps.image.outputs.id }}); and each job's timeout-minutes, 120
-#     for memory and 60 for every other job;
+#     for memory, 10 for site and 60 for every other job;
 #   - a uses: step may only be actions/checkout@, actions/cache/restore@ or
 #     actions/cache/save@; each cache's restore comes before its build, and its
 #     save after the build and before the cache's check (a cache is told by
@@ -83,8 +94,10 @@
 #     MEMORY_*, ...), the compiler's and the loader's among them (CC,
 #     C_INCLUDE_PATH, CPATH, LIBRARY_PATH, LD_LIBRARY_PATH, LD_PRELOAD), which
 #     could steer the library the suites load or the report, the library's own
-#     (CHEZ_SODIUM_LIBRARY), and CHECK_CI_ROOT, which would point this check's
-#     execute-bit rule at another tree. One exception: CHEZ_SODIUM_LIBRARY and
+#     (CHEZ_SODIUM_LIBRARY), the site's (SITE_REF, CHEZ_CMARK_GFM_LIBS), which
+#     could steer the links it writes or the cmark-gfm it loads, and
+#     CHECK_CI_ROOT, which would point this check's execute-bit rule at another
+#     tree. One exception: CHEZ_SODIUM_LIBRARY and
 #     C_INCLUDE_PATH may stand as an env key of floor and current, above, and
 #     in no other job: main, which tests discovery, memory and nothreads
 #     refuse them, the discovery check's step among them; and
@@ -99,8 +112,22 @@
 # the shell runs, so it is held to the rules of the block's other lines (the
 # names, the gates and scripts/ among them), and no comment's rule frees it.
 #
+# pages.yml deploys the site, and needs what that shape refuses: needs:, a
+# job's own permissions: and environment:, and two actions beside the
+# checkout. It has no part that varies, so it is held to a copy, below: every
+# line of it must equal the copy's next line, in order, and the file must end
+# where the copy does, but a comment or a blank line (spaces, then # or
+# nothing) outside a block scalar's content, which is no part of what GitHub
+# runs. A line is a block scalar's content when the copy's next line is, so a
+# line the copy's block is cut by is held, or when it is blank or indented
+# deeper than the key of a block the file holds open; a blank line there is
+# held when content follows it, and dropped, as YAML drops it, when none does.
+# A problem names the first held line that differs, and only it. The text
+# rules hold on every line of pages.yml, a comment's among them.
+#
 # Every rule is held by a row of tests/test-check-ci.sps, which plants it in a
-# copy of the real workflow. A change to ci.yml changes this file with it.
+# copy of the real workflows. A change to ci.yml or pages.yml changes this file
+# with it.
 
 usage() {
   printf 'check-ci: usage: sh tests/check-ci.sh DIR\n' >&2
@@ -126,6 +153,98 @@ note() {
 }
 
 file=$dir/ci.yml
+pages=$dir/pages.yml
+
+# The site's install step: ci.yml's site job and pages.yml's build job each
+# hold it, line for line, so the two cannot drift.
+cat >"$tmp/install" <<'INSTALL'
+      - name: Install the packages in packaging/debian-site-prereqs.txt
+        run: |
+          pkgs=$(grep -v -e '^#' -e '^$' packaging/debian-site-prereqs.txt | tr '\n' ' ')
+          if [ -z "$pkgs" ]; then
+            echo "::error::packaging/debian-site-prereqs.txt yielded no packages: a broken step, not an empty list"
+            exit 1
+          fi
+          sudo apt-get update -qq
+          # shellcheck disable=SC2086
+          sudo apt-get install -y --no-install-recommends $pkgs
+INSTALL
+
+# The copy reader, read by both checks' awk: a text's lines, held to a copy.
+cat >"$tmp/copy.awk" <<'AWKPROGRAM'
+# indent(s): how many spaces s starts with.
+function indent(s,   n) {
+  n = 0
+  while (substr(s, n + 1, 1) == " ") n++
+  return n
+}
+
+# keycol(s): the column of s's key: its indent, then each "- " before the key
+# and the spaces after it.
+function keycol(s,   c, r) {
+  c = indent(s); r = substr(s, c + 1)
+  while (r == "-" || substr(r, 1, 2) == "- ") {
+    r = substr(r, 2); c++
+    while (substr(r, 1, 1) == " ") { r = substr(r, 2); c++ }
+  }
+  return c
+}
+
+# opens(s): whether s is a key whose value is | or >, a block scalar.
+function opens(s) {
+  return (s !~ /^ *#/ && s ~ /: [|>][-+0-9]*( +#.*)?$/)
+}
+
+# cpline(s, n): s, line n, is held, and must be the copy's next line. Answers
+# 0, having named it, when it is not.
+function cpline(s, n) {
+  cp_held++
+  if (cp_held > cp_nc) {
+    prob(n, cp_what " has a line the copy check-ci holds does not: \"" s "\"")
+    return 0
+  }
+  if (s != cpc[cp_held]) {
+    prob(n, cp_what " differs from the copy check-ci holds: expected \"" cpc[cp_held] "\", found \"" s "\"")
+    return 0
+  }
+  return 1
+}
+
+# cpcheck(nf, nc, what, endn): the text's lines cpf[1..nf], numbered
+# cpfl[1..nf], held to the copy cpc[1..nc], as the header says: a comment or
+# a blank line outside a block scalar's content is skipped, and every other
+# line must be the copy's next. Names the first line that differs, alone, or
+# line endn (0: the file) when the text ends first. Answers 1 when it named
+# one. what names the text in the problem.
+function cpcheck(nf, nc, what, endn,   i, j, s, inc, ccol, inb, col, np, blank) {
+  # Which of the copy's lines are a block scalar's content.
+  inc = 0
+  for (j = 1; j <= nc; j++) {
+    cpb[j] = (inc && indent(cpc[j]) > ccol)
+    if (!cpb[j]) { inc = opens(cpc[j]); if (inc) ccol = keycol(cpc[j]) }
+  }
+  cp_held = 0; cp_nc = nc; cp_what = what; inb = 0; np = 0
+  for (i = 1; i <= nf; i++) {
+    s = cpf[i]; blank = (s ~ /^ *$/)
+    # A line indented no deeper than the open block's key ends it, and the
+    # blank lines before it are dropped.
+    if (inb && !blank && indent(s) <= col) { inb = 0; np = 0 }
+    if (!(cp_held < nc && cpb[cp_held + 1]) && (blank || (!inb && s ~ /^ *#/))) {
+      if (blank && inb) cppend[++np] = i
+      continue
+    }
+    for (j = 1; j <= np; j++) if (!cpline(cpf[cppend[j]], cpfl[cppend[j]])) return 1
+    np = 0
+    if (!cpline(s, cpfl[i])) return 1
+    if (!cpb[cp_held] && opens(s)) { inb = 1; col = keycol(s) }
+  }
+  if (cp_held < nc) {
+    prob(endn, what " ends early: expected \"" cpc[cp_held + 1] "\"")
+    return 1
+  }
+  return 0
+}
+AWKPROGRAM
 
 if [ ! -d "$dir" ]; then
   note "$dir: is not a directory"
@@ -136,15 +255,21 @@ else
   else
     read_ok=1
   fi
+  pages_ok=0
+  if [ -L "$pages" ] || [ ! -f "$pages" ]; then
+    note "$pages: is not a regular file: a link, a directory or nothing there"
+  else
+    pages_ok=1
+  fi
   # Read by a glob, never by lines of ls: a name may hold a newline.
   for entry in "$dir"/* "$dir"/.[!.]* "$dir"/..?*; do
     [ -e "$entry" ] || [ -L "$entry" ] || continue
     name=${entry##*/}
     case $name in
-      ci.yml) ;;
+      ci.yml | pages.yml) ;;
       *)
         shown=$(printf '%s' "$name" | LC_ALL=C tr -c '[:print:]' '[?*]')
-        note "$dir: $shown is not ci.yml: the directory must hold ci.yml alone" ;;
+        note "$dir: $shown is neither ci.yml nor pages.yml: the directory must hold those two alone" ;;
     esac
   done
 
@@ -253,6 +378,11 @@ function issod(p) { return (p == sodp["floor"] || p == sodp["current"]) }
 # the build's library and header directory).
 function nreq(j,   n) {
   split("", rqk)
+  if (j == "site") {
+    rq[1] = "make check-site-deps"; rqk[1] = "env"; rq[2] = "make site-deps"; rqk[2] = "env"
+    rq[3] = "make check-site"; rqk[3] = "env"; rq[4] = "make site"; rqk[4] = "env"
+    return 4
+  }
   if (isl(j)) {
     rq[1] = BLDT; rqk[1] = "bld"; rq[2] = CHKT
     rq[3] = CCLINE; rqk[3] = "cc"
@@ -404,6 +534,10 @@ function argof(s, script,   w, t) {
 function endstep() {
   if (!instep) return
   instep = 0
+  if (job == "site") {
+    if (S_if[sn] != "") prob(S_ifln[sn], "job site takes no if: it has no cache")
+    return
+  }
   if (isl(job)) {
     lanestep()
     if (S_uses[sn] ~ /^actions\/cache\/(restore|save)@/) cachestep()
@@ -477,6 +611,12 @@ function runs(s, what, prog) {
 # save after the build and before its check, and one of each.
 function cacheorder(first, last,   s, t, restore, nr, ns, sr, ss) {
   nr = 0; ns = 0; sr = 0; ss = 0
+  if (job == "site") {
+    for (s = first; s <= last; s++)
+      if (S_uses[s] != "" && !(S_uses[s] ~ /^actions\/checkout@/))
+        prob(S_ln[s], "job site has a step that uses \"" S_uses[s] "\", which is not actions/checkout@: it has no cache")
+    return
+  }
   for (s = first; s <= last; s++) {
     if (S_uses[s] != "" && !(S_uses[s] ~ /^actions\/(checkout|cache\/restore|cache\/save)@/))
       prob(S_ln[s], "job " job " has a step that uses \"" S_uses[s] "\", which is not actions/checkout@, actions/cache/restore@ or actions/cache/save@")
@@ -550,16 +690,34 @@ function imagestep(first, last,   s, c, at, fr, n, i, m, rl) {
   }
 }
 
+# sitesteps(first, last): job site holds seven steps: the checkout, the image
+# step, the install step, held to the copy from its first line to the line
+# before the next step's (or the line that ends the job), and the four checks.
+function sitesteps(first, last,   n, a, z, i, k) {
+  n = last - first + 1
+  if (n != 7) prob(jln, "job site has " n " steps, not seven: its checkout, its image step, its install step and its four checks")
+  if (n >= 2 && S_name[first + 1] != "name: " IMGN)
+    prob(S_ln[first + 1], "job site's second step is not \"" IMGN "\"")
+  if (n < 3) return
+  a = S_ln[first + 2]; z = (n >= 4) ? S_ln[first + 3] : endln
+  k = 0
+  for (i = 1; i <= nsraw; i++)
+    if (srawln[i] >= a && srawln[i] < z) { k++; cpf[k] = sraw[i]; cpfl[k] = srawln[i] }
+  for (i = 1; i <= ninst; i++) cpc[i] = inst[i]
+  cpcheck(k, ninst, "job site's install step", cpfl[k])
+}
+
 function endjob(   i, s, c, at, pos, lastp, m, x, lastx, first, last, isb, k, okstep) {
   if (job == "") return
   endstep()
   for (i = 1; i <= 4; i++)
     if (!jbad && !(jk2[i] in jkseen)) prob(jln, "job " job " has no key \"" jk2[i] "\"")
   first = jfirst; last = sn; lastp = 0; lastx = "the start"
-  if (job == "main" || job == "memory" || isl(job)) {
+  if (job == "main" || job == "memory" || isl(job) || job == "site") {
     if (first > last || !(S_uses[first] ~ /^actions\/checkout@/ && S_sub[first] == "recursive" && S_run[first] == "" && S_if[first] == ""))
       prob((first <= last) ? S_ln[first] : jln, "job " job "'s first step is not uses: actions/checkout@ with submodules: recursive")
   }
+  if (job == "site") sitesteps(first, last)
   if (job == "main") {
     if (first + 1 > last || S_run[first + 1] != "run: " PINRUN)
       prob((first + 1 <= last) ? S_ln[first + 1] : jln, "job main's second step is not run: " PINRUN)
@@ -620,7 +778,7 @@ function endsec(   i) {
   endjob()
   if (curblk != "") { closeblock(curblk); curblk = "" }
   if (sec == "jobs")
-    for (i = 1; i <= 5; i++)
+    for (i = 1; i <= 6; i++)
       if (!(jn[i] in jobseen)) prob(jobsln, "job \"" jn[i] "\" is missing")
   sec = ""
 }
@@ -628,15 +786,19 @@ function endsec(   i) {
 BEGIN {
   F = ENVIRON["CI_FILE"]
   for (i = 32; i < 127; i++) ascii = ascii sprintf("%c", i)
+  # The site's install step, which its job's third step must be.
+  INSTF = ENVIRON["INSTALL_FILE"]
+  while ((getline l < INSTF) > 0) inst[++ninst] = l
+  close(INSTF)
   TABMSG = "holds a tab, which YAML may read as white space beside a key"
   ODDMSG = "holds a character beyond ASCII, which GitHub may fold into a key's letters"
   TOPS = "name, on, permissions, concurrency, jobs"
   split("name on permissions concurrency jobs", tk, " ")
   for (i = 1; i <= 5; i++) topidx[tk[i]] = i
   isblock["on"] = 1; isblock["permissions"] = 1; isblock["concurrency"] = 1
-  JOBS = "main, memory, nothreads, floor, current"
-  split("main memory nothreads floor current", jn, " ")
-  for (i = 1; i <= 5; i++) wantjob[jn[i]] = 1
+  JOBS = "main, memory, nothreads, floor, current, site"
+  split("main memory nothreads floor current site", jn, " ")
+  for (i = 1; i <= 6; i++) wantjob[jn[i]] = 1
   JOBKEYS = "name, runs-on, timeout-minutes, steps"
   split("name runs-on timeout-minutes steps", jk2, " ")
   for (i = 1; i <= 4; i++) jobkey[jk2[i]] = 1
@@ -647,7 +809,7 @@ BEGIN {
   split("submodules path key", wk, " ")
   for (i = 1; i <= 3; i++) withkeys[wk[i]] = 1
   gname[1] = "check-memory-gate"; gname[2] = "test-memory"; gname[3] = "check-nothreads"
-  nbw = split("MAKEFLAGS MFLAGS GNUMAKEFLAGS VALGRIND MEMORY_SUITES MEMORY_TIMEOUT TEST_TIMEOUT LIBDIRS TIMEOUT SUITES CHEZ_SODIUM_LIBRARY CHEZ_SODIUM_GATE_CHILD CC C_INCLUDE_PATH CPATH LIBRARY_PATH LD_LIBRARY_PATH LD_PRELOAD CHECK_CI_ROOT", bw, " ")
+  nbw = split("MAKEFLAGS MFLAGS GNUMAKEFLAGS VALGRIND MEMORY_SUITES MEMORY_TIMEOUT TEST_TIMEOUT LIBDIRS TIMEOUT SUITES CHEZ_SODIUM_LIBRARY CHEZ_SODIUM_GATE_CHILD CC C_INCLUDE_PATH CPATH LIBRARY_PATH LD_LIBRARY_PATH LD_PRELOAD CHECK_CI_ROOT SITE_REF CHEZ_CMARK_GFM_LIBS", bw, " ")
   for (i = 1; i <= nbw; i++) banned[bw[i]] = 1
   HASHLIST = "'packaging/floors.sexp', 'scripts/ci/floor.sh', 'scripts/ci/build-chez.sh', 'scripts/ci/check-chez.sh'"
   IFLINE = "if: steps.chez.outputs.cache-hit != 'true'"
@@ -686,7 +848,7 @@ BEGIN {
   nimg = 2
   imgl[1] = "          . /etc/os-release"
   imgl[2] = "          echo \"id=${ID}-${VERSION_ID}-${RUNNER_ARCH}\" >> \"$GITHUB_OUTPUT\""
-  twant["main"] = "60"; twant["memory"] = "120"; twant["nothreads"] = "60"; twant["floor"] = "60"; twant["current"] = "60"
+  twant["main"] = "60"; twant["memory"] = "120"; twant["nothreads"] = "60"; twant["floor"] = "60"; twant["current"] = "60"; twant["site"] = "10"
   nvl = 5
   vl[1] = "          \"$RUNNER_TEMP/chez-threads/bin/scheme\" --version"
   vl[2] = "          cc --version | head -n 1"
@@ -697,6 +859,7 @@ BEGIN {
   chezpath["memory"] = chezpath["main"]
   chezpath["floor"] = chezpath["main"]; chezpath["current"] = chezpath["main"]
   chezpath["nothreads"] = "${{ runner.temp }}/chez-nothreads/bin/scheme"
+  chezpath["site"] = "chezscheme"
   cachepath["main"] = "${{ runner.temp }}/chez-threads"
   cachepath["memory"] = cachepath["main"]
   cachepath["floor"] = cachepath["main"]; cachepath["current"] = cachepath["main"]
@@ -722,7 +885,10 @@ fileno == 1 {
 
 # The second file: the workflow.
 {
-  ln = FNR; lastline = FNR; raw = $0
+  ln = FNR; lastline = FNR; raw = $0; endln = ln
+  # Every line of job site, a blank or a comment one among them: its install
+  # step is held whole, at the job's end.
+  if (job == "site") { nsraw++; sraw[nsraw] = raw; srawln[nsraw] = ln }
   if (raw ~ /^ *$/) next
   ind = 0
   while (substr(raw, ind + 1, 1) == " ") ind++
@@ -856,13 +1022,14 @@ fileno == 1 {
 }
 
 END {
+  endln = lastline + 1
   endsec()
   for (i = 1; i <= 5; i++)
     if (!(tk[i] in topseen)) prob(lastline, "top-level key \"" tk[i] "\" is missing")
 }
 AWKPROGRAM
 
-    CI_FILE=$file LC_ALL=C awk -f "$tmp/check.awk" \
+    CI_FILE=$file INSTALL_FILE=$tmp/install LC_ALL=C awk -f "$tmp/copy.awk" -f "$tmp/check.awk" \
       "$tmp/expected" "$file" >>"$problems" 2>"$tmp/awkerr"
     status=$?
     if [ "$status" -ne 0 ]; then
@@ -903,6 +1070,114 @@ AWKPROGRAM
       lineno=${entry%%:*}
       note "$file:$lineno: names scripts/ other than as a step's whole run line of scripts/ci/ or a cache key's hashed files"
     done <"$tmp/stray"
+  fi
+
+  # pages.yml: every line, line for line and in order, is the copy here, but a
+  # comment or a blank one outside a block scalar's content, and every line of
+  # it keeps the text rules. The copy's install step is the site job's.
+  if [ "$pages_ok" -eq 1 ]; then
+    {
+      cat <<'PAGES_HEAD'
+name: Pages
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+PAGES_HEAD
+      cat "$tmp/install"
+      cat <<'PAGES_TAIL'
+      - name: Get chez-cmark-gfm as Akku.lock pins it
+        env:
+          CHEZ: chezscheme
+        run: make site-deps
+      - name: Gate the site
+        env:
+          CHEZ: chezscheme
+          SITE_REF: ${{ github.ref_name }}
+        run: make check-site
+      - name: Build the site
+        env:
+          CHEZ: chezscheme
+          SITE_REF: ${{ github.ref_name }}
+        run: make site
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: build/site
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+PAGES_TAIL
+    } >"$tmp/pages"
+
+    cat >"$tmp/pages.awk" <<'AWKPROGRAM'
+# prob(n, m): a problem on line n, or on the file when n is 0.
+function prob(n, m) {
+  if (n > 0) printf "check-ci: %s:%d: %s\n", F, n, m
+  else printf "check-ci: %s: %s\n", F, m
+}
+
+# odd(s): whether s holds a byte that is not printable ASCII (a tab apart).
+function odd(s,   i, n, c) {
+  n = length(s)
+  for (i = 1; i <= n; i++) {
+    c = substr(s, i, 1)
+    if (c != "\t" && index(ascii, c) == 0) return 1
+  }
+  return 0
+}
+
+BEGIN {
+  F = ENVIRON["PAGES_FILE"]
+  for (i = 32; i < 127; i++) ascii = ascii sprintf("%c", i)
+  last = 0; nc = 0; nf = 0
+}
+
+FNR == 1 { fileno++ }
+
+# The first file: the copy.
+fileno == 1 { cpc[++nc] = $0; next }
+
+# The second file: pages.yml, every line held to the text rules, and kept.
+{
+  last = FNR
+  if (index($0, "\t") > 0) prob(FNR, "holds a tab, which YAML may read as white space beside a key")
+  if (odd($0)) prob(FNR, "holds a character beyond ASCII, which GitHub may fold into a key's letters")
+  cpf[++nf] = $0; cpfl[nf] = FNR
+}
+
+END { cpcheck(nf, nc, "pages.yml", last) }
+AWKPROGRAM
+
+    PAGES_FILE=$pages LC_ALL=C awk -f "$tmp/copy.awk" -f "$tmp/pages.awk" "$tmp/pages" "$pages" \
+      >>"$problems" 2>"$tmp/awkerr"
+    status=$?
+    if [ "$status" -ne 0 ]; then
+      note "$pages: the check (awk) exited $status: $(cat "$tmp/awkerr")"
+    fi
   fi
 fi
 

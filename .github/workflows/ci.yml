@@ -6,7 +6,8 @@ name: CI
 #   - A macOS runner. AGENTS.md: linux only (ADR-0010).
 #   - The Guix container. Nothing in CI runs it: the toolchain here is Chez
 #     built from its release tarball, and the runner's libsodium and packages
-#     (packaging/debian-prereqs.txt).
+#     (packaging/debian-prereqs.txt). The site job alone installs from
+#     packaging/debian-site-prereqs.txt.
 #
 # The jobs, all independent, and every one of them on every event below: each
 # pull request, each push to main or a v* tag, and each run asked for from the
@@ -24,6 +25,9 @@ name: CI
 #               suites against it (ADR-0003).
 #   current     the same against the current release, which the build script
 #               pins.
+#   site        the docs site (ADR-0013): the fetcher's offline test, then
+#               make site-deps, make check-site and make site, on Ubuntu's
+#               Chez and cmark-gfm, as pages.yml builds it to deploy.
 #
 # This workflow states no floor. scripts/ci/build-chez.sh takes no version and
 # reads its own from packaging/floors.sexp, and so does any step that needs a
@@ -38,7 +42,7 @@ name: CI
 # way.
 #
 # `make check-ci` (tests/check-ci.sh), which make test runs, holds this file
-# to the one shape it reads: these triggers, these five jobs and their keys,
+# to the one shape it reads: these triggers, these six jobs and their keys,
 # each check as a step's whole run line, no if: but on the caches' own steps,
 # no continue-on-error:, no variable that would steer a check (but the two
 # names floor and current hold, as exact env keys of the steps that run a
@@ -496,3 +500,66 @@ jobs:
           CHEZ_SODIUM_LIBRARY: ${{ runner.temp }}/sodium-current/lib/libsodium.so.26
           C_INCLUDE_PATH: ${{ runner.temp }}/sodium-current/include
         run: make test
+
+  # The docs site, built as pages.yml builds it to deploy on a v* tag: Ubuntu's
+  # Chez, below the library's floor, which is fine here, since nothing the site
+  # runs imports a library under src/, where (chez-sodium private
+  # require-threaded) refuses such a Chez; and Ubuntu's cmark-gfm, which
+  # chez-cmark-gfm loads. chez-cmark-gfm comes from the archive Akku.lock pins
+  # (make site-deps), and check-site-deps first holds the script that fetches
+  # it to its offline test. The submodules are check-site's: make deps links
+  # SRFI-64 for the generator's suites. It has no cache, so no if:, and no
+  # SITE_REF: it builds the site for main, whose links to repository files name
+  # main. check-ci holds the job at these seven steps: the checkout; the image
+  # step, as every job has; the install step, line for line, to the text it
+  # holds pages.yml's to, so the two cannot drift; and the four checks, each a
+  # step's whole run line, in this order, each with CHEZ chezscheme. Only
+  # check-ci sees a CHEZ lost: Ubuntu's package makes /usr/bin/scheme an
+  # alternative for chezscheme, and make's own default CHEZ finds it.
+  site:
+    name: site (the docs site, on Ubuntu's Chez)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+
+      - name: Identify the runner image
+        id: image
+        run: |
+          . /etc/os-release
+          echo "id=${ID}-${VERSION_ID}-${RUNNER_ARCH}" >> "$GITHUB_OUTPUT"
+
+      # The site's own package list. A failed grep must not become an empty
+      # install.
+      - name: Install the packages in packaging/debian-site-prereqs.txt
+        run: |
+          pkgs=$(grep -v -e '^#' -e '^$' packaging/debian-site-prereqs.txt | tr '\n' ' ')
+          if [ -z "$pkgs" ]; then
+            echo "::error::packaging/debian-site-prereqs.txt yielded no packages: a broken step, not an empty list"
+            exit 1
+          fi
+          sudo apt-get update -qq
+          # shellcheck disable=SC2086
+          sudo apt-get install -y --no-install-recommends $pkgs
+
+      - name: Test the archive fetcher offline
+        env:
+          CHEZ: chezscheme
+        run: make check-site-deps
+
+      - name: Get chez-cmark-gfm as Akku.lock pins it
+        env:
+          CHEZ: chezscheme
+        run: make site-deps
+
+      - name: Gate the site
+        env:
+          CHEZ: chezscheme
+        run: make check-site
+
+      - name: Build the site
+        env:
+          CHEZ: chezscheme
+        run: make site

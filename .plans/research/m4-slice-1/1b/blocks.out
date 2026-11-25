@@ -1,0 +1,64 @@
+== blocks at the profile
+ok: docs/quickstart.md:26 sh block
+ok: docs/quickstart.md:46 sh block
+ok: docs/quickstart.md:57 sh block
+ok: docs/quickstart.md:65 whole program, text block at line 78
+ok: docs/quickstart.md:65 reads
+ok: docs/quickstart.md:78 text block
+ok: docs/quickstart.md:92 run block gives (#t #f)
+ok: docs/quickstart.md:104 whole program, no text block
+ok: docs/quickstart.md:104 reads
+ok: docs/quickstart.md:138 sh block
+ok: docs/quickstart.md:150 sh block
+ok: docs/passwords.md:12 run block gives (#t #t #f)
+ok: docs/passwords.md:36 reads
+ok: docs/passwords.md:48 run block gives (#t #f #t)
+ok: docs/passwords.md:69 reads
+ok: docs/passwords.md:122 whole program, text block at line 167
+ok: docs/passwords.md:122 reads
+ok: docs/passwords.md:167 text block
+ok: docs/passwords.md:196 reads
+ok: docs/passwords.md:251 run block gives (#t #f)
+ok: docs/tokens.md:10 run block gives 32
+ok: docs/tokens.md:29 whole program, text block at line 71
+ok: docs/tokens.md:29 reads
+ok: docs/tokens.md:71 text block
+ok: docs/tokens.md:94 run block gives (#t #f)
+ok: docs/tokens.md:119 run block gives (32 64)
+ok: docs/finding-libsodium.md:11 sh block
+ok: README.org's Scheme block is a run block's twin: (define hash (password-hash "correct horse"))
+library: "1.0.22"
+failures: 0
+exit 0
+== blocks at the floor
+ok: docs/quickstart.md:26 sh block
+ok: docs/quickstart.md:46 sh block
+ok: docs/quickstart.md:57 sh block
+ok: docs/quickstart.md:65 whole program, text block at line 78
+ok: docs/quickstart.md:65 reads
+ok: docs/quickstart.md:78 text block
+ok: docs/quickstart.md:92 run block gives (#t #f)
+ok: docs/quickstart.md:104 whole program, no text block
+ok: docs/quickstart.md:104 reads
+ok: docs/quickstart.md:138 sh block
+ok: docs/quickstart.md:150 sh block
+ok: docs/passwords.md:12 run block gives (#t #t #f)
+ok: docs/passwords.md:36 reads
+ok: docs/passwords.md:48 run block gives (#t #f #t)
+ok: docs/passwords.md:69 reads
+ok: docs/passwords.md:122 whole program, text block at line 167
+ok: docs/passwords.md:122 reads
+ok: docs/passwords.md:167 text block
+ok: docs/passwords.md:196 reads
+ok: docs/passwords.md:251 run block gives (#t #f)
+ok: docs/tokens.md:10 run block gives 32
+ok: docs/tokens.md:29 whole program, text block at line 71
+ok: docs/tokens.md:29 reads
+ok: docs/tokens.md:71 text block
+ok: docs/tokens.md:94 run block gives (#t #f)
+ok: docs/tokens.md:119 run block gives (32 64)
+ok: docs/finding-libsodium.md:11 sh block
+ok: README.org's Scheme block is a run block's twin: (define hash (password-hash "correct horse"))
+library: "1.0.18"
+failures: 0
+exit 0

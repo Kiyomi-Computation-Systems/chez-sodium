@@ -1,0 +1,14 @@
+ok: no page holds either floor's version text
+ok: README.org holds a floor only in its two Requirements lines
+ok: no page quotes a refusal's version text or a soname's releases
+ok: no banned word: ADR-, TODO, yet, unreleased, slice, .plans, a date
+ok: README.org holds no stale word: will, next, so far
+ok: every word holding CHEZ_ is CHEZ_SODIUM_LIBRARY
+ok: every CHEZ_SODIUM_LIBRARY= at a line's start or after a blank sets an absolute path
+ok: every line holding git clone is exactly the clone line
+ok: README.org and the quick start hold one clone line each, the other pages none
+ok: no absolute home path, and no host distribution named
+ok: no hash string is called printable ASCII
+ok: no link into .plans
+ok: a link to README.org takes no anchor
+failures: 0

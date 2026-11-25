@@ -1,5 +1,5 @@
 #!r6rs
-;;; The convention suite (ADR-0001, decision 10): every foreign-procedure form
+;;; The convention suite (ADR-0001): every foreign-procedure form
 ;;; under src/, read as data, held to a table with one row per binding. It never
 ;;; loads libsodium. tests/test-constants.sps holds each row's C prototype to
 ;;; sodium.h, and the map from its C types to its Chez types.
@@ -95,7 +95,7 @@
     "crypto_pwhash_passwd_max"))
 
 ;; collect-safe-names : (Listof String)
-;; The calls that can block (ADR-0001, decision 7): the two that run as long
+;; The calls that can block (ADR-0001): the two that run as long
 ;; as a hash's limits ask.
 (define collect-safe-names '("crypto_pwhash_str" "crypto_pwhash_str_verify"))
 

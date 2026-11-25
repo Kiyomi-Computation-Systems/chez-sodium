@@ -19,7 +19,8 @@
    ;; --- the byte verbs (chez-sodium private byte-verbs) ---
    ;; random-bytes : Natural -> Bytevector
    random-bytes
-   ;; blake2b : Bytevector [Natural] [Bytevector] -> Bytevector   ; input, size, key
+   ;; blake2b : Bytevector [Natural] [Bytevector] -> Bytevector
+   ;;   input, size, key
    blake2b
    ;; constant-time-bytevector=? : Bytevector Bytevector -> Boolean
    constant-time-bytevector=?
@@ -28,11 +29,14 @@
    ;;   Limits = (U 'interactive 'moderate 'sensitive Password-limits), by default 'interactive
    ;; password-hash : String [Limits] -> String
    password-hash
-   ;; password-verify : String String -> Boolean              ; hash, password
+   ;; password-verify : String String -> Boolean
+   ;;   hash, password
    password-verify
-   ;; password-needs-rehash? : String [Limits] -> Boolean      ; hash
+   ;; password-needs-rehash? : String [Limits] -> Boolean
+   ;;   hash
    password-needs-rehash?
-   ;; make-password-limits : Natural Natural -> Password-limits ; ops, memory in KiB
+   ;; make-password-limits : Natural Natural -> Password-limits
+   ;;   ops, memory in KiB
    make-password-limits
 
    ;; --- conditions (chez-sodium private conditions) ---

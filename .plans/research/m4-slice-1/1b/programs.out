@@ -1,0 +1,38 @@
+== programs at the profile
+ok profile passwords-4: prints its text block:
+    logged-in
+    #t
+    #f
+    refused
+    logged-in
+    refused
+    refused
+ok profile quickstart-3: prints its text block:
+    (#t #f 32)
+ok profile quickstart-6: exit 0, no stderr, printed:
+    "1.0.22"
+ok profile quickstart-6 refused: exit 0, no stderr, one refused datum:
+    (refused load-failed "/no/such/libsodium.so.26")
+ok profile tokens-1: prints its text block:
+    (64 "ada" #f #f)
+profile: failures 0
+exit 0
+== programs at the floor
+ok floor passwords-4: prints its text block:
+    logged-in
+    #t
+    #f
+    refused
+    logged-in
+    refused
+    refused
+ok floor quickstart-3: prints its text block:
+    (#t #f 32)
+ok floor quickstart-6: exit 0, no stderr, printed:
+    "1.0.18"
+ok floor quickstart-6 refused: exit 0, no stderr, one refused datum:
+    (refused load-failed "/no/such/libsodium.so.26")
+ok floor tokens-1: prints its text block:
+    (64 "ada" #f #f)
+floor: failures 0
+exit 0

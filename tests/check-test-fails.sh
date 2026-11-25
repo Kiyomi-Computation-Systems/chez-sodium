@@ -14,6 +14,11 @@
 #                inside a when                 no suite runs
 #   empty        an empty file (Chez fails     check-suites names it, and
 #                it, exit 255, unexplained)    no suite runs
+#   site-exit-   a docs site suite that ends   check-suites names it, and
+#   line         with the test suites' exit    no suite runs
+#                form
+#   site-no-exit a docs site suite with no     check-suites names it, and
+#                exit form                     no suite runs
 #   leaks        a suite whose tests pass,     make test names it FAIL, and
 #                but which counts a block      suite-exit-status names the
 #                up and never down             block left (ADR-0011)
@@ -25,22 +30,27 @@
 #                10.3.0, not the floor         and no suite runs
 #   floors-      a script under scripts/ci     check-floors names the line,
 #   script       writes the libsodium floor    and no suite runs
+#   floors-      SECURITY.md writes the       check-floors names the line,
+#   house        Chez floor                   and no suite runs
+#   floors-      a page of docs/ writes the   check-floors names the line,
+#   docs         libsodium floor              and no suite runs
 #   ci         job memory given a            check-ci names the key, and
 #                continue-on-error key         no suite runs
 #   no-suites    every suite deleted           make test refuses to pass
 #
 # The copy holds no real suite, so no slow one can run into the 5 s
-# TEST_TIMEOUT. The plant is tests/test-0-plant.sps. After it sorts
-# tests/test-1-after.sps, a suite that passes: in the first three cases its
-# pass line shows that make test runs the suites after a failure. Each plant
-# but no-tests has a passing test of its own, so only the planted fault can
-# fail it.
+# TEST_TIMEOUT. The plant is tests/test-0-plant.sps, or, in the two site
+# cases, tests/site-0-plant.sps beside the tree's own docs site suites. After
+# it sorts tests/test-1-after.sps, a suite that passes: in the first three
+# cases its pass line shows that make test runs the suites after a failure.
+# Each plant but no-tests and site-no-exit has a passing test of its own, so
+# only the planted fault can fail it.
 #
 # A case requires a non-zero exit, and compares the lines starting
 # "check-suites: " or "test: " as a whole: check-suites' verdict, the plant's
 # outcome, the after-suite's pass line, and the count. The leaks case also
 # compares the lines starting "suite-exit-status: ", whole, the seam case those
-# starting "check-seam: ", the floors and floors-script cases those starting
+# starting "check-seam: ", the floors, floors-script, floors-house and floors-docs cases those starting
 # "check-floors: ", and the ci case those starting "check-ci: ".
 #
 # The copy is the working tree without .git, build/ and .claude/ (Claude
@@ -230,9 +240,12 @@ fail=0
 ok()  { pass=$((pass + 1)); printf 'check-test-fails: ok %s\n' "$1"; }
 bad() { fail=$((fail + 1)); printf 'check-test-fails: FAILED %s\n' "$1" >&2; }
 
-# checked N: check-suites' line for a copy holding N tests/test-*.sps.
+# checked N: check-suites' line for a copy holding N tests/test-*.sps, and
+# the tree's docs site suites, every tests/site-*.sps, which the Makefile
+# always names to it.
+site_suites=$(cd "$copy" && ls tests/site-*.sps 2>/dev/null | wc -l)
 checked() {
-  printf 'check-suites: every suite ends with (exit (suite-exit-status runner)) (%d checked)\n' "$1"
+  printf 'check-suites: every suite ends with (exit (suite-exit-status runner)), and every site suite with (exit (site-exit-status runner)) (%d checked)\n' "$(($1 + site_suites))"
 }
 
 # expected PLANT-LINE FAILED HUNG: the lines a run must print with a plant
@@ -329,6 +342,46 @@ run_case "leaks: a suite whose tests pass, but which counts a block up and never
 # The plant is gone, so only the after-suite is left to check.
 rm -f "${copy:?}/${plant:?}"
 
+# The site cases: a docs site suite, tests/site-0-plant.sps, beside the
+# tree's own. A site suite runs on a Chez below the floor, so it ends with
+# (site-testing)'s form, never the test suites', whose counters that Chez
+# refuses. Without the Makefile naming every tests/site-*.sps to
+# check-suites, or check-suites holding a site suite to its own form, no
+# check sees either plant and make test passes: the case fails then. Each
+# plant is removed after its case.
+site_plant=tests/site-0-plant.sps
+cat >"$plant_dir/site-exit-line" <<'EOF'
+#!r6rs
+;;; Planted by tests/check-test-fails.sh: a docs site suite that ends with
+;;; the test suites' exit form, not its own.
+(import (rnrs) (srfi :64) (site-testing))
+(define runner (test-runner-simple))
+(test-runner-current runner)
+(test-begin "plant-site-exit-line")
+(test-assert "passes, so only check-suites can fail this suite" #t)
+(test-end "plant-site-exit-line")
+(exit (suite-exit-status runner))
+EOF
+cp "$plant_dir/site-exit-line" "$copy/$site_plant"
+run_case "site-exit-line: check-suites names a site suite that ends with the test suites' exit form, and no suite runs" \
+  "check-suites: $site_plant: its last datum is (exit (suite-exit-status runner)), not (exit (site-exit-status runner))"
+
+cat >"$plant_dir/site-no-exit" <<'EOF'
+#!r6rs
+;;; Planted by tests/check-test-fails.sh: a docs site suite with no exit
+;;; form, whose run would exit 0 whatever its tests did.
+(import (rnrs) (srfi :64) (site-testing))
+(define runner (test-runner-simple))
+(test-runner-current runner)
+(test-begin "plant-site-no-exit")
+(test-assert "fails" #f)
+(test-end "plant-site-no-exit")
+EOF
+cp "$plant_dir/site-no-exit" "$copy/$site_plant"
+run_case "site-no-exit: check-suites names a site suite with no exit form, and no suite runs" \
+  "check-suites: $site_plant: its last datum is (test-end \"plant-site-no-exit\"), not (exit (site-exit-status runner))"
+rm -f "${copy:?}/${site_plant:?}"
+
 # The seam case: a library under the copy's src/ imports a name from
 # (chezscheme) that only (chez-sodium private memory) may, and
 # check-seam names it by rule (f). The copy's src/ holds no memory library,
@@ -393,6 +446,33 @@ run_case "floors-script: check-floors names a script under scripts/ci that write
      echo 'check-floors: FAILED (problems: 1)')" \
   '^(check-suites|check-floors|test): '
 rm -f "${copy:?}/scripts/ci/plant.sh"
+
+# The floors-house and floors-docs cases: SECURITY.md writes the Chez floor,
+# and a page of docs/ writes the libsodium floor, each read from the copy's
+# floors file. check-floors reads the contributor files and every page under
+# docs/, so it names the line. Without CONTRIBUTING.md and SECURITY.md, or
+# docs, among the paths the Makefile runs check-floors on, no check sees the
+# plant and make test passes: the case fails then. check-floors passes before
+# and after: the plant is removed.
+cp "$root/SECURITY.md" "$copy/SECURITY.md"
+printf 'Chez version (%s or later),\n' "$chez_floor" >>"$copy/SECURITY.md"
+house_line=$(grep -c '' "$copy/SECURITY.md")
+run_case "floors-house: check-floors names SECURITY.md when it writes the Chez floor, and no suite runs" \
+  "$(checked 1
+     echo "check-floors: SECURITY.md: line $house_line contains the Chez floor $chez_floor, which no page may write: a page links to README.org's Requirements, which state it from packaging/floors.sexp"
+     echo 'check-floors: FAILED (problems: 1)')" \
+  '^(check-suites|check-floors|test): '
+cp "$root/SECURITY.md" "$copy/SECURITY.md"
+
+cp "$root/docs/tokens.md" "$copy/docs/tokens.md"
+printf 'It needs libsodium %s or later.\n' "$sodium_floor" >>"$copy/docs/tokens.md"
+docs_line=$(grep -c '' "$copy/docs/tokens.md")
+run_case "floors-docs: check-floors names a page of docs/ that writes the libsodium floor, and no suite runs" \
+  "$(checked 1
+     echo "check-floors: docs/tokens.md: line $docs_line contains the libsodium floor $sodium_floor, which no page may write: a page links to README.org's Requirements, which state it from packaging/floors.sexp"
+     echo 'check-floors: FAILED (problems: 1)')" \
+  '^(check-suites|check-floors|test): '
+cp "$root/docs/tokens.md" "$copy/docs/tokens.md"
 
 # The ci case: the copy's workflow gives job memory, the Valgrind gate, a
 # job-level continue-on-error key, which would let the gate fail and the run

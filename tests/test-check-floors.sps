@@ -1,7 +1,7 @@
 ;;; The suite for (floors) and tests/check-floors.sps, the program behind
 ;;; `make check-floors`. packaging/floors.sexp is the one file that writes the
 ;;; Chez and libsodium floors (ADR-0011), and check-floors holds README.org, the
-;;; workflows and the CI scripts to it. Without this suite, deleting a rule
+;;; workflows, the CI scripts and the docs to it. Without this suite, deleting a rule
 ;;; would leave `make test` green: the real files break none of them.
 ;;;
 ;;; Three layers, each asserting whole values written by hand here, never read
@@ -9,8 +9,8 @@
 ;;; rule produced the same words.
 ;;;
 ;;;   - the pure procedures, on texts held in this suite: every rule of the
-;;;     floors file, of the README comparison, of the workflows and of the CI
-;;;     scripts, one fault in an otherwise legal text;
+;;;     floors file, of the README comparison, of the workflows, of the CI
+;;;     scripts and of the docs, one fault in an otherwise legal text;
 ;;;   - the program, on the fixture directories under tests/fixtures/floors/,
 ;;;     and on paths that do not exist: its exit status, whole stdout and
 ;;;     whole stderr;
@@ -20,7 +20,9 @@
 ;;; The workflow rules hold every file under the workflow directory: no line
 ;;; may contain a floor's version text, and none may hold a backslash after a
 ;;; double quote. The scripts rules hold every file under scripts/ci, its name
-;;; included: no line may contain a floor's version text. The README rules hold
+;;; included: no line may contain a floor's version text. The docs rules hold
+;;; every file under docs/ the same way, a code block's lines as any other. The
+;;; README rules hold
 ;;; every line of README.org but its Requirements' list lines: none may hold a
 ;;; floor's version text, each held at every place in a line and beside every
 ;;; character. The same file tests the CI scripts that read the floors file or
@@ -1174,6 +1176,111 @@
   (list (literal body-line "libsodium" "8.1.2") (escaped wp body-line)))
 
 
+;; --- the docs directory: pure -----------------------------------------------------
+;; docs-problems holds every file under the docs directory, each as its path
+;; and text, as scripts-problems holds the scripts: no line, a code block's
+;; among them, and no file's name, may hold a floor's version text. A page
+;; names the floors by a link to README.org's Requirements. The rules about
+;; double quotes are YAML's, and no line is joined to the next: a page is read
+;; by its lines as written. The directory must hold a file. The base is the
+;; fixtures' floors, 10.9.1 and 8.1.2.
+
+(define dd "D")
+(define dp "D/page.md")
+
+(define docs-who
+  "no page may write: a page links to README.org's Requirements, which state it from")
+
+;; docs-said : String Natural String -> String
+;; The complaint about line N of the page PATH, which holds FORM.
+(define (docs-said path n form) (said docs-who fp path (string-append "line " (number->string n)) form))
+
+;; docs-name-said : String String -> String
+;; The complaint about the name of the file PATH, which holds FORM.
+(define (docs-name-said path form) (said docs-who fp path "its name" form))
+
+(define docs-no-files (string-append dd ": it holds no file, but must hold the docs' pages"))
+
+(define (docs-row name pages problems)
+  (test-equal (string-append "docs: " name)
+    (list 'returned problems)
+    (outcome (lambda () (docs-problems fp dd pages (parse-floors good))))))
+
+;; page : String ... -> String
+;; A page of a heading and a blank line, then LINES, the first of them line 3.
+(define (page . lines) (apply workflow (cons "# A page" (cons "" lines))))
+
+(docs-row "a page that names no floor of the file, the real floors and other versions among them, in prose and in a code block: nothing to report"
+  (list (list dp (page "Ubuntu 24.04's library is 1.0.18, the real floor, here no floor."
+                       "```text" "10.4.0 10.9 8.1 8.1.3 9.1.2" "```")))
+  '())
+
+(for-each
+ (lambda (form)
+   (docs-row (string-append form " in a page's prose, at the start, the middle and the end of a line: each line named")
+     (list (list dp (apply page (at-each-place form))))
+     (list (docs-said dp 3 form) (docs-said dp 4 form) (docs-said dp 5 form)))
+   (docs-row (string-append form " in a page's fenced code block, at each place: each line named")
+     (list (list dp (apply page (append (list "```sh") (at-each-place form) (list "```")))))
+     (list (docs-said dp 4 form) (docs-said dp 5 form) (docs-said dp 6 form)))
+   (docs-row (string-append form " in an indented code block of a page in a subdirectory: named by its path and line")
+     (list (list dp (page)) (list "D/guide/deep.md" (page (string-append "    (list " form ")"))))
+     (list (docs-said "D/guide/deep.md" 3 form)))
+   (docs-row (string-append "a file named for " form ", and a file in a directory named for it: named by their paths, not their lines")
+     (list (list dp (page)) (list (string-append "D/pin-" form ".md") (page))
+           (list (string-append "D/" form "/page.md") (page)))
+     (list (docs-name-said (string-append "D/" form "/page.md") form)
+           (docs-name-said (string-append "D/pin-" form ".md") form))))
+ the-forms)
+
+(docs-row "both floors on one line: the Chez floor, then the libsodium floor"
+  (list (list dp (page "8.1.2 10.9.1")))
+  (list (docs-said dp 3 "10.9.1") (docs-said dp 3 "8.1.2")))
+
+(docs-row "the floor inside a longer number is still the floor's text, before it and after it"
+  (list (list dp (page "110.9.1 and 8.1.23")))
+  (list (docs-said dp 3 "10.9.1") (docs-said dp 3 "8.1.2")))
+
+(docs-row "a version that holds the floor as a part, 18.1.2, is found; one that does not, 9.1.2 or 8.1.3, is not"
+  (list (list dp (page "18.1.2" "9.1.2 8.1.3")))
+  (list (docs-said dp 3 "8.1.2")))
+
+(docs-row "a backslash after a double quote and an odd number of double quotes are prose, not YAML: nothing to report"
+  (list (list dp (page "echo \"\\x38\"" "an \"open quote")))
+  '())
+
+(docs-row "a line ending in a backslash joins nothing in a page: a floor split there is no floor"
+  (list (list dp (page "v=8.1.\\" "2" "w=10.9\\" ".1")))
+  '())
+
+(docs-row "a hidden file, a file with no .md and a file in a subdirectory are each held, in path order, whatever order they come in"
+  (list (list "D/z.md" (page "8.1.2")) (list "D/.notes" "10.9.1\n") (list "D/a/b.txt" "\n8.1.2\n")
+        (list dp (page)))
+  (list (docs-said "D/.notes" 1 "10.9.1") (docs-said "D/a/b.txt" 2 "8.1.2") (docs-said "D/z.md" 3 "8.1.2")))
+
+(docs-row "a floor on the first line of a page, and on its last, which has no newline after it"
+  (list (list dp "8.1.2\n# A page\n\n10.9.1"))
+  (list (docs-said dp 1 "8.1.2") (docs-said dp 4 "10.9.1")))
+
+(docs-row "no file at all: the directory is named, once"
+  '()
+  (list docs-no-files))
+
+(docs-row "an unreadable page, #f, is not compared; an unreadable file's name is held"
+  (list (list dp #f) (list "D/8.1.2.md" #f))
+  (list (docs-name-said "D/8.1.2.md" "8.1.2")))
+
+(test-equal "docs: the directory's own name is no part of a file's name"
+  (list 'returned '())
+  (outcome (lambda () (docs-problems fp "D/8.1.2" (list (list "D/8.1.2/page.md" (page))) (parse-floors good)))))
+
+(test-equal "docs: the floors come from the floors file: libsodium 1.0.19 is found, and 8.1.2 is not"
+  (list 'returned
+        (list (string-append dp ": line 3 contains the libsodium floor 1.0.19, which " docs-who " " fp)))
+  (outcome (lambda ()
+             (docs-problems fp dd (list (list dp (page "1.0.19 8.1.2")))
+                            (parse-floors (floors-of "\"10.9.1\"" "\"1.0.19\""))))))
+
 ;; --- the program -----------------------------------------------------------------------
 
 ;; run : (Listof String) -> (U (List Integer String String) (List 'raised String))
@@ -1193,51 +1300,71 @@
 ;; a backslash after a double quote and an odd number of double quotes in it.
 (define clean-scripts (at "legal" "scripts"))
 
-;; readme-said-legal, scripts-wrote-legal : the complaints a case that takes
-;; the legal fixture's floors file (8.1.2) names a README's line, or a
-;; script's, by.
+;; clean-docs, clean-doc-names : String
+;; The docs directory the cases share, and the pages the program reads in it:
+;; one page, and one in a subdirectory, that name versions no floor of the
+;; fixtures equals, in prose and in a code block.
+(define clean-docs (at "legal" "docs"))
+(define clean-doc-names "page.md, sub/more.md")
+
+;; docs-said-legal, readme-said-legal, scripts-wrote-legal : the complaints a
+;; case that takes the legal fixture's floors file (8.1.2) names a page's
+;; line, a README's, or a script's, by.
+(define (docs-said-legal path n form)
+  (said docs-who (at "legal" "floors.sexp") path (string-append "line " (number->string n)) form))
 (define (readme-said-legal path n form)
   (said readme-who (at "legal" "floors.sexp") path (string-append "line " (number->string n)) form))
 (define (scripts-wrote-legal path n which version)
   (scripts-wrote-from (at "legal" "floors.sexp") path n which version))
 
 ;; both : String -> (Listof String)
-;; The four arguments the program takes for the fixture directory CASE: the
-;; floors file, the README, the workflow directory, and the shared scripts
-;; directory.
+;; The five arguments the program takes for the fixture directory CASE: the
+;; floors file, the README, the workflow directory, and the shared scripts and
+;; docs directories.
 (define (both case)
-  (list (at case "floors.sexp") (at case "README.org") (at case "workflows") clean-scripts))
+  (list (at case "floors.sexp") (at case "README.org") (at case "workflows") clean-scripts clean-docs))
 
 ;; with-scripts : String -> (Listof String)
-;; The four arguments for a case that holds only a scripts directory: the
-;; legal fixture's floors file, README and workflows, and CASE's scripts.
+;; The five arguments for a case that holds only a scripts directory: the
+;; legal fixture's floors file, README and workflows, CASE's scripts, and the
+;; shared docs.
 (define (with-scripts case)
   (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows")
-        (at case "scripts")))
+        (at case "scripts") clean-docs))
+
+;; with-docs : String -> (Listof String)
+;; The five arguments for a case that holds only a docs directory: the legal
+;; fixture's floors file, README, workflows and scripts, and CASE's docs.
+(define (with-docs case)
+  (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows")
+        clean-scripts (at case "docs")))
 
 ;; with-readme : String -> (Listof String)
-;; The four arguments for a case that holds only a README: the legal
-;; fixture's floors file, CASE's README, and the legal workflows and the
-;; shared scripts.
+;; The five arguments for a case that holds only a README: the legal
+;; fixture's floors file, CASE's README, and the shared directories.
 (define (with-readme case)
   (list (at "legal" "floors.sexp") (at case "README.org") (at "legal" "workflows")
-        clean-scripts))
+        clean-scripts clean-docs))
 
-;; holds-with : String String String String String String String -> (List 0 String "")
-;; What a pass prints: the README, the workflow directory and the scripts
-;; directory that hold the floors in the floors file, the files read in each
-;; directory, and the floors.
-(define (holds-with readme-path workflows-path names scripts-path script-names floors-path summary)
+;; holds-with : String String String String String String String String String -> (List 0 String "")
+;; What a pass prints: the README, the workflow directory, the scripts
+;; directory and the docs directory that hold the floors in the floors file,
+;; the files read in each directory, and the floors.
+(define (holds-with readme-path workflows-path names scripts-path script-names docs-path doc-names
+                    floors-path summary)
   (list 0
         (string-append "check-floors: " readme-path ", " workflows-path " (" names ")"
-                       " and " scripts-path " (" script-names ")"
+                       ", " scripts-path " (" script-names ")"
+                       " and " docs-path " (" doc-names ")"
                        " hold the floors in " floors-path " (" summary ")\n")
         ""))
 
 ;; holds : String String String String String -> (List 0 String "")
-;; The same, with the shared scripts directory, which holds floor.sh alone.
+;; The same, with the shared scripts directory, which holds floor.sh alone,
+;; and the shared docs directory.
 (define (holds readme-path workflows-path names floors-path summary)
-  (holds-with readme-path workflows-path names clean-scripts "floor.sh" floors-path summary))
+  (holds-with readme-path workflows-path names clean-scripts "floor.sh" clean-docs clean-doc-names
+              floors-path summary))
 
 ;; refused : Natural String ... -> (List 1 "" String)
 ;; What a failure prints: PROBLEMS, one line each, then the count. COUNT is
@@ -1264,7 +1391,7 @@
 (define usage
   (list 1
         ""
-        "check-floors: usage: scheme --libdirs tests --program tests/check-floors.sps FLOORS README WORKFLOWS SCRIPTS\n"))
+        "check-floors: usage: scheme --libdirs tests --program tests/check-floors.sps FLOORS README WORKFLOWS SCRIPTS DOCS...\n"))
 
 (define floors-summary "chez 10.9.1, sodium 8.1.2")
 
@@ -1407,6 +1534,41 @@
          (with-scripts "scripts-self-link")
          (refused 1 (string-append (at "scripts-self-link" "scripts")
                                    ": it cannot be read: Exception: it is a symbolic link, not a directory")))
+   (list "docs-sodium-literal"
+         "a page names the libsodium floor at the start of a line, in its middle and at its end"
+         (with-docs "docs-sodium-literal")
+         (refused 3 (docs-said-legal (at "docs-sodium-literal" "docs/page.md") 3 "8.1.2")
+                  (docs-said-legal (at "docs-sodium-literal" "docs/page.md") 4 "8.1.2")
+                  (docs-said-legal (at "docs-sodium-literal" "docs/page.md") 5 "8.1.2")))
+   (list "docs-code-block"
+         "a fenced code block of a page names the Chez floor"
+         (with-docs "docs-code-block")
+         (refused 1 (docs-said-legal (at "docs-code-block" "docs/page.md") 6 "10.9.1")))
+   (list "docs-nested"
+         "a page in a subdirectory, guide/deep.md, names the libsodium floor, beside a clean page"
+         (with-docs "docs-nested")
+         (refused 1 (docs-said-legal (at "docs-nested" "docs/guide/deep.md") 3 "8.1.2")))
+   (list "docs-longer-number"
+         "a page holds 18.1.25, a version that holds the libsodium floor as a part, beside 8.1.3 and 9.1.2, which hold none: only the first is found"
+         (with-docs "docs-longer-number")
+         (refused 1 (docs-said-legal (at "docs-longer-number" "docs/page.md") 4 "8.1.2")))
+   (list "docs-name-floor"
+         "a page named sodium-8.1.2.md, whose lines hold no floor: its name holds the libsodium floor"
+         (with-docs "docs-name-floor")
+         (refused 1 (said docs-who (at "legal" "floors.sexp") (at "docs-name-floor" "docs/sodium-8.1.2.md")
+                          "its name" "8.1.2")))
+   (list "docs-dir-link"
+         "a symbolic link to a directory among the pages is not followed: it is a file that cannot be read"
+         (with-docs "docs-dir-link")
+         (refused 1 (string-append
+                     (at "docs-dir-link" "docs/linked")
+                     ": it cannot be read: Exception in get-string-all: failed on #<binary input port "
+                     (at "docs-dir-link" "docs/linked") ">: is a directory")))
+   (list "docs-self-link"
+         "the docs directory is itself a symbolic link to a directory of clean pages: refused, not followed"
+         (with-docs "docs-self-link")
+         (refused 1 (string-append (at "docs-self-link" "docs")
+                                   ": it cannot be read: Exception: it is a symbolic link, not a directory")))
    (list "readme-status-chez"
          "README.org's Status section names the Chez floor, outside the Requirements' list lines"
          (with-readme "readme-status-chez")
@@ -1422,43 +1584,96 @@
 ;; of arguments.
 (define ad-hoc
   (list
-   (list "no file exists: all four named, the floors first, then the README, then the workflow directory, then the scripts directory"
-         (list (at "legal" "none.sexp") (at "legal" "none.org") (at "legal" "none") (at "legal" "nothing"))
-         (refused 4 (cannot-read (at "legal" "none.sexp"))
+   (list "no file exists: all five named, the floors first, then the README, then the workflow directory, then the scripts directory, then the docs directory"
+         (list (at "legal" "none.sexp") (at "legal" "none.org") (at "legal" "none") (at "legal" "nothing")
+               (at "legal" "nowhere"))
+         (refused 5 (cannot-read (at "legal" "none.sexp"))
                   (cannot-read (at "legal" "none.org"))
                   (cannot-list (at "legal" "none") "no such file or directory")
-                  (cannot-list (at "legal" "nothing") "no such file or directory")))
-   (list "a bad floors file, no README, no workflow or scripts directory: the floors problems, then the README, then the directories"
+                  (cannot-list (at "legal" "nothing") "no such file or directory")
+                  (cannot-read (at "legal" "nowhere"))))
+   (list "a bad floors file, no README, no workflow, scripts or docs directory: the floors problems, then the README, then the directories"
          (list (at "floors-invalid" "floors.sexp") (at "floors-invalid" "none.org")
-               (at "floors-invalid" "none") (at "floors-invalid" "nothing"))
-         (refused 5
+               (at "floors-invalid" "none") (at "floors-invalid" "nothing") (at "floors-invalid" "nowhere"))
+         (refused 6
                   (string-append (at "floors-invalid" "floors.sexp") ": the key python is extra: the keys are chez, sodium")
                   (string-append (at "floors-invalid" "floors.sexp")
                                  ": chez: the version \"10.9\" is not three dot-separated naturals, major.minor.patch")
                   (cannot-read (at "floors-invalid" "none.org"))
                   (cannot-list (at "floors-invalid" "none") "no such file or directory")
-                  (cannot-list (at "floors-invalid" "nothing") "no such file or directory")))
+                  (cannot-list (at "floors-invalid" "nothing") "no such file or directory")
+                  (cannot-read (at "floors-invalid" "nowhere"))))
    (list "a bad floors file and a scripts directory that names a floor: the scripts are not read against it"
          (list (at "floors-invalid" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows")
-               (at "scripts-sodium-literal" "scripts"))
+               (at "scripts-sodium-literal" "scripts") clean-docs)
+         (refused 2
+                  (string-append (at "floors-invalid" "floors.sexp") ": the key python is extra: the keys are chez, sodium")
+                  (string-append (at "floors-invalid" "floors.sexp")
+                                 ": chez: the version \"10.9\" is not three dot-separated naturals, major.minor.patch")))
+   (list "a bad floors file and a docs directory that names a floor: the pages are not read against it"
+         (list (at "floors-invalid" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows")
+               clean-scripts (at "docs-sodium-literal" "docs"))
          (refused 2
                   (string-append (at "floors-invalid" "floors.sexp") ": the key python is extra: the keys are chez, sodium")
                   (string-append (at "floors-invalid" "floors.sexp")
                                  ": chez: the version \"10.9\" is not three dot-separated naturals, major.minor.patch")))
    (list "a README with a problem and no workflow directory: both named, the README first"
-         (list (at "legal" "floors.sexp") (at "no-section" "README.org") (at "legal" "none") clean-scripts)
+         (list (at "legal" "floors.sexp") (at "no-section" "README.org") (at "legal" "none") clean-scripts clean-docs)
          (refused 2
                   (string-append (at "no-section" "README.org") ": it has no \"** Requirements\" section")
                   (cannot-list (at "legal" "none") "no such file or directory")))
    (list "the workflows argument names ci.yml itself, a file: it cannot be read as a directory"
-         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows/ci.yml") clean-scripts)
+         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows/ci.yml") clean-scripts clean-docs)
          (refused 1 (cannot-list (at "legal" "workflows/ci.yml") "not a directory")))
    (list "the scripts argument names floor.sh itself, a file: it cannot be read as a directory"
-         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") (at "legal" "scripts/floor.sh"))
+         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") (at "legal" "scripts/floor.sh")
+               clean-docs)
          (refused 1 (cannot-list (at "legal" "scripts/floor.sh") "not a directory")))
    (list "a scripts directory that is missing, with the rest right: named alone"
-         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") (at "legal" "nothing"))
+         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") (at "legal" "nothing")
+               clean-docs)
          (refused 1 (cannot-list (at "legal" "nothing") "no such file or directory")))
+   (list "a docs argument that is a file with no floor in it: read as one file, and passes"
+         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") clean-scripts
+               (at "legal" "docs/page.md"))
+         (list 0
+               (string-append "check-floors: " (at "legal" "README.org") ", " (at "legal" "workflows") " (ci.yml)"
+                              ", " clean-scripts " (floor.sh) and " (at "legal" "docs/page.md")
+                              " hold the floors in " (at "legal" "floors.sexp") " (" floors-summary ")\n")
+               ""))
+   (list "a file given directly, beside a directory, each clean: both named in the pass line, the directory with its files, the file alone"
+         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") clean-scripts
+               clean-docs (at "legal" "docs/page.md"))
+         (list 0
+               (string-append "check-floors: " (at "legal" "README.org") ", " (at "legal" "workflows") " (ci.yml)"
+                              ", " clean-scripts " (floor.sh), " clean-docs " (" clean-doc-names ") and "
+                              (at "legal" "docs/page.md")
+                              " hold the floors in " (at "legal" "floors.sexp") " (" floors-summary ")\n")
+               ""))
+   (list "a file given directly, holding the libsodium floor, beside a clean directory: named by its path and line"
+         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") clean-scripts
+               clean-docs (at "docs-sodium-literal" "docs/page.md"))
+         (refused 3 (docs-said-legal (at "docs-sodium-literal" "docs/page.md") 3 "8.1.2")
+                  (docs-said-legal (at "docs-sodium-literal" "docs/page.md") 4 "8.1.2")
+                  (docs-said-legal (at "docs-sodium-literal" "docs/page.md") 5 "8.1.2")))
+   (list "a file given directly, holding the Chez floor, before a clean directory: named by its path and line"
+         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") clean-scripts
+               (at "docs-code-block" "docs/page.md") clean-docs)
+         (refused 1 (docs-said-legal (at "docs-code-block" "docs/page.md") 6 "10.9.1")))
+   (list "a file given directly, and a missing path after it: the file's floor, then the missing path"
+         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") clean-scripts
+               (at "docs-code-block" "docs/page.md") (at "legal" "nowhere"))
+         (refused 2 (docs-said-legal (at "docs-code-block" "docs/page.md") 6 "10.9.1")
+                  (cannot-read (at "legal" "nowhere"))))
+   (list "a file given directly whose name holds a floor: its path is its name, held"
+         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") clean-scripts
+               (at "docs-name-floor" "docs/sodium-8.1.2.md"))
+         (refused 1 (said docs-who (at "legal" "floors.sexp") (at "docs-name-floor" "docs/sodium-8.1.2.md")
+                          "its name" "8.1.2")))
+   (list "a docs path that is missing, with the rest right: named alone, as a file that cannot be read"
+         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") clean-scripts
+               (at "legal" "nowhere"))
+         (refused 1 (cannot-read (at "legal" "nowhere"))))
    (list "no arguments: the usage line, exit 1" '() usage)
    (list "one argument: the usage line, exit 1" (list (at "legal" "floors.sexp")) usage)
    (list "two arguments: the usage line, exit 1"
@@ -1467,9 +1682,13 @@
    (list "three arguments: the usage line, exit 1"
          (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows"))
          usage)
-   (list "five arguments: the usage line, exit 1"
-         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") clean-scripts "extra")
-         usage)))
+   (list "four arguments, the old call: the usage line, exit 1"
+         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") clean-scripts)
+         usage)
+   (list "six arguments, the sixth a missing path: not the usage, a path that cannot be read"
+         (list (at "legal" "floors.sexp") (at "legal" "README.org") (at "legal" "workflows") clean-scripts clean-docs
+               "extra")
+         (refused 1 (cannot-read "extra")))))
 
 (for-each
  (lambda (row)
@@ -1494,7 +1713,7 @@
    (lambda ()
      (call-with-temp-directory
       (lambda (dir)
-        (let ((got (run (list (at "no-workflow" "floors.sexp") (at "no-workflow" "README.org") dir clean-scripts)))
+        (let ((got (run (list (at "no-workflow" "floors.sexp") (at "no-workflow" "README.org") dir clean-scripts clean-docs)))
               (want (refused 1 (string-append dir ": it holds no file, but must hold ci.yml,"
                                               " the workflow CI runs"))))
           (if (equal? got want) 'same (list 'got got 'want want))))))))
@@ -1507,9 +1726,21 @@
      (call-with-temp-directory
       (lambda (dir)
         (let ((got (run (list (at "legal" "floors.sexp") (at "legal" "README.org")
-                              (at "legal" "workflows") dir)))
+                              (at "legal" "workflows") dir clean-docs)))
               (want (refused 1 (string-append dir ": it holds no file, but must hold floor.sh,"
                                               " the script CI reads the floors through"))))
+          (if (equal? got want) 'same (list 'got got 'want want))))))))
+
+;; The same for the docs directory.
+(test-equal "program: an empty docs directory: named, once, and nothing else"
+  '(returned same)
+  (outcome
+   (lambda ()
+     (call-with-temp-directory
+      (lambda (dir)
+        (let ((got (run (list (at "legal" "floors.sexp") (at "legal" "README.org")
+                              (at "legal" "workflows") clean-scripts dir)))
+              (want (refused 1 (string-append dir ": it holds no file, but must hold the docs' pages"))))
           (if (equal? got want) 'same (list 'got got 'want want))))))))
 
 ;; The program and the pure procedure agree on the fixtures: each answer above
@@ -1528,6 +1759,14 @@
              (scripts-problems "f" "s"
                                (list (list "s/floor.sh" (file-text (at "legal" "scripts/floor.sh"))))
                                (parse-floors (file-text (at "legal" "floors.sexp")))))))
+
+(test-equal "the legal fixture's docs pass the pure procedure"
+  '(returned ())
+  (outcome (lambda ()
+             (docs-problems "f" "d"
+                            (list (list "d/page.md" (file-text (at "legal" "docs/page.md")))
+                                  (list "d/sub/more.md" (file-text (at "legal" "docs/sub/more.md"))))
+                            (parse-floors (file-text (at "legal" "floors.sexp")))))))
 
 ;; A fixture nothing runs guards nothing, and a case with no fixture runs on a
 ;; missing directory.

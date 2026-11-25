@@ -5,7 +5,7 @@
 ;;; foreign memory of its own: native binds libsodium and makes every block,
 ;;; and this library reads foreign memory only through native's helpers.
 ;;;
-;;; Each verb has the shape of the byte verbs (ADR-0007, decisions 1 to 4):
+;;; Each verb has the shape of the byte verbs (ADR-0007):
 ;;;
 ;;;   1. its arguments are checked, left to right, each one's type before its
 ;;;      range, and the first mistake is refused before any block exists. A
@@ -75,14 +75,15 @@
   (define (least-kib) (div (+ pwhash-memlimit-min 1023) 1024))
   (define (greatest-kib) (div pwhash-memlimit-max 1024))
 
-  ;; make-password-limits : Natural Natural -> Password-limits   ; ops, memory in KiB
+  ;; make-password-limits : Natural Natural -> Password-limits
+  ;;   ops, memory in KiB
   ;; Limits for password-hash and password-needs-rehash?: OPS passes of the
   ;; hash and MEMORY-KIB KiB of memory, each within libsodium's range, so a
-  ;; Password-limits is always in range. Its first call reads native's numbers,
-  ;; which runs the load. Refused from make-password-limits, assertion
-  ;; violations, irritants (RULE PARAMETER V), V by shown-value: not-a-natural
-  ;; and ops-out-of-range for OPS, then not-a-natural and memory-out-of-range
-  ;; for MEMORY-KIB.
+  ;; Password-limits is always in range. Any reference to it runs the load,
+  ;; since a library's body runs when a program that names it is loaded.
+  ;; Refused from make-password-limits, assertion violations, irritants (RULE
+  ;; PARAMETER V), V by shown-value: not-a-natural and ops-out-of-range for
+  ;; OPS, then not-a-natural and memory-out-of-range for MEMORY-KIB.
   (define (make-password-limits ops memory-kib)
     (unless (natural? ops)
       (assertion-violation 'make-password-limits "ops is not an exact natural"
@@ -172,7 +173,8 @@
                (else
                 (refuse-secret 'password-hash 'changed-during-call 'password password)))))))
 
-  ;; password-verify : String String -> Boolean   ; hash, password
+  ;; password-verify : String String -> Boolean
+  ;;   hash, password
   ;; Whether PASSWORD is the one HASH was made from. #f for a wrong password,
   ;; and for a HASH libsodium cannot read or that fails the pre-check, which
   ;; calls no C, and for any other answer of libsodium, short memory included.
@@ -204,13 +206,15 @@
                   (else
                    (refuse-secret 'password-verify 'changed-during-call 'password password)))))))
 
-  ;; password-needs-rehash? : String [Limits] -> Boolean   ; hash
-  ;; #t for any HASH that is not what password-hash would make now at LIMITS:
-  ;; other limits, a string libsodium cannot read, one that fails the pre-check,
-  ;; a prefix other than the loaded library's, or parameters that do not read
-  ;; p=1; #f otherwise. The last three are answered without a section and
-  ;; without C. It never raises because of HASH, a HASH another thread changed
-  ;; during the call included, which answers #t. Refused from
+  ;; password-needs-rehash? : String [Limits] -> Boolean
+  ;;   hash
+  ;; #t for any HASH not made with today's algorithm, parallelism and LIMITS,
+  ;; or that libsodium cannot read: other limits, a string libsodium cannot
+  ;; read, one that fails the pre-check, a prefix other than the loaded
+  ;; library's, or parameters that do not read p=1; #f otherwise. The last
+  ;; three are answered without a section and without C. It never raises
+  ;; because of HASH, a HASH another thread changed during the call included,
+  ;; which answers #t. Refused from
   ;; password-needs-rehash?, assertion violations: not-a-string for HASH,
   ;; irritants (not-a-string hash (kind K)), then not-password-limits for LIMITS.
   (define password-needs-rehash?

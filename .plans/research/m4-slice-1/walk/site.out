@@ -1,0 +1,19 @@
++ chezscheme --version
+9.5.8
+fetch-akku-lock: all checks passed
+fetch-akku-lock: chez-cmark-gfm unpacked to build/akku/chez-cmark-gfm
+fetch-akku-lock: chez-cmark-gfm is up to date (build/akku/chez-cmark-gfm)
+check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label -- all green
+fetch-akku-lock: chez-cmark-gfm is up to date (build/akku/chez-cmark-gfm)
+site: wrote 5 pages to build/site
+fetch-akku-lock: chez-cmark-gfm is up to date (build/akku/chez-cmark-gfm)
+check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label -- all green
+fetch-akku-lock: chez-cmark-gfm is up to date (build/akku/chez-cmark-gfm)
+site: wrote 5 pages to build/site
++ grep -o 'blob/v0.1.0/[^"]*' build/site/finding-libsodium.html build/site/index.html build/site/passwords.html build/site/reference.html build/site/tokens.html
+build/site/finding-libsodium.html:blob/v0.1.0/README.org
+build/site/index.html:blob/v0.1.0/README.org
+build/site/reference.html:blob/v0.1.0/README.org
++ echo 'SITE DONE'
+SITE DONE
+exit 0

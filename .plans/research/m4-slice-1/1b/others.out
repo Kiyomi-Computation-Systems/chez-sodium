@@ -1,0 +1,9 @@
+check-floors: README.org, .github/workflows (ci.yml, pages.yml), scripts/ci (build-chez.sh, build-sodium.sh, check-action-pins.sh, check-chez.sh, check-sodium.sh, floor.sh, report-sodium.sh) and docs (finding-libsodium.md, passwords.md, quickstart.md, reference.md, tokens.md) hold the floors in packaging/floors.sexp (chez 10.4.0, sodium 1.0.18)
+check-floors exit 0
+check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label -- all green
+check-site exit 0
+%%%% Starting test manifest
+# of expected passes      107
+test-manifest exit 0
+# of expected passes      127
+test-docs (in progress) exit 0

@@ -193,7 +193,7 @@
 ;; chez-type : String -> (U Symbol #f)
 ;; The Chez type a C type is bound as: int is int, size_t is size_t,
 ;; unsigned long long is unsigned-64, and any pointer, const char * among
-;; them, is the address itself, uptr (ADR-0001, decisions 3 and 4). Any other
+;; them, is the address itself, uptr (ADR-0001). Any other
 ;; C type has no mapping, and a row that writes one fails until a record
 ;; decides it.
 (define (chez-type c-type)

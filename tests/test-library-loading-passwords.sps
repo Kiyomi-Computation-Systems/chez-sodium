@@ -396,7 +396,7 @@
   "every refusal of the table is (refused WHO IRRITANTS) whole, a refusal comes before another's pre-check; a hash string that fails the pre-check, or the shape check, is #f from password-verify and #t from password-needs-rehash?, a byte of 0x80 and a NUL among them; and the log gains nothing: no block, no call, no wipe"
   (table-lines no-c-table))
 
-;; --- crypto_pwhash_str's other answers (row 17) ------------------------------------------------
+;; --- crypto_pwhash_str's other answers ------------------------------------------------
 
 (define (failing-table code)
   (list

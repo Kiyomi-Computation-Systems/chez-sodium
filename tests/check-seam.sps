@@ -34,7 +34,7 @@
 ;;;       allowed-chez-names at all, so it is refused everywhere, the
 ;;;       libraries above among them: define-ftype (nothing here reads a C
 ;;;       struct, and a function ftype would bind a C entry point around
-;;;       foreign-procedure), lock-object (ADR-0001, decision 8),
+;;;       foreign-procedure), lock-object (ADR-0001),
 ;;;       foreign-callable and foreign-callable-entry-point (nothing here
 ;;;       takes a callback), fork-thread (no verb starts a thread);
 ;;;   (g) a library exports a name it imports from (chezscheme), as an
@@ -72,8 +72,7 @@
 ;;;       (chez-sodium private memory): a macro native exports whose template
 ;;;       uses foreign-block is not read here. test-native's row, which reads
 ;;;       native's body, macro templates included, holds foreign-block and
-;;;       free-foreign-block! to call-with-block's definition (ADR-0012,
-;;;       decision 7);
+;;;       free-foreign-block! to call-with-block's definition (ADR-0012);
 ;;;   (m) only the libraries of memory-importers import (chez-sodium private
 ;;;       memory), and no library exports a name it imports from it. Every
 ;;;       block is made and freed through native's call-with-block, which
@@ -192,7 +191,7 @@
 ;; load-shared-object loads the library (a second one, or anything else,
 ;; loaded elsewhere would escape ADR-0002's one load), and foreign-ref and
 ;; foreign-set! read and write foreign memory, the copy of every string
-;; passed to libsodium (ADR-0001, decision 4) among it. getenv and
+;; passed to libsodium (ADR-0001) among it. getenv and
 ;; machine-type are the inputs discovery is given, read by native alone so that
 ;; discovery stays a pure function (ADR-0002). format, format-condition? and
 ;; display-condition render the loader's refusal as the detail of load-failed:

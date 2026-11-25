@@ -58,7 +58,7 @@ MEMORY_LOGS := build/memory
 
 # One physical line: check-help reads it with awk, and fails if it ends in
 # a backslash.
-.PHONY: help check-help check-guix check-guix-inside deps build dev check-dev check-pins test check-suites check-seam check-floors check-ci check-nothreads check-test-fails test-memory check-memory-gate clean check-clean
+.PHONY: help check-help check-guix check-guix-inside deps build dev check-dev check-pins test check-suites check-seam check-floors check-ci check-nothreads check-test-fails test-memory check-memory-gate site-deps site check-site check-site-deps clean check-clean
 
 .DEFAULT_GOAL := help
 
@@ -252,14 +252,15 @@ test: deps check-help check-suites check-seam check-floors check-ci ## Run every
 	echo "test: ran $$((passed + failed + hung)), passed $$passed, failed $$failed, hung $$hung"; \
 	[ $$failed -eq 0 ] && [ $$hung -eq 0 ]
 
-# Reads every suite as data, and fails unless each one's last datum is its
+# Reads every suite as data, the docs site's among them, and fails unless each one's last datum is its
 # exit form, and no datum before it holds an exit form but (exit 1), naming
 # each suite that breaks either rule (tests/check-suites.sps). A
 # tests/test-*.sps ends with the shared exit form, (chez-sodium-testing)'s
-# suite-exit-form. With no suite it passes: make test fails that case itself.
-check-suites: deps ## Fail unless every tests/test-*.sps ends with the shared exit form
+# suite-exit-form, and a tests/site-*.sps with (site-testing)'s
+# site-exit-form. With no suite it passes: make test fails that case itself.
+check-suites: deps ## Fail unless every tests/test-*.sps ends with the shared exit form, and every tests/site-*.sps with the site's
 	@scripts/require-tools "$(GOAL)" $(CHEZ)
-	@$(CHEZ) --libdirs $(LIBDIRS) --program tests/check-suites.sps $(SUITES)
+	@$(CHEZ) --libdirs $(LIBDIRS) --program tests/check-suites.sps $(SUITES) $(SITE_SUITES)
 
 # Reads every library under src/ as data, and fails unless each keeps to the
 # seam (ADR-0012, tests/check-seam.sps): the family, the import lists, the
@@ -272,28 +273,31 @@ check-seam: ## Fail unless every library under src/ keeps to the seam: the famil
 	@scripts/require-tools "$(GOAL)" $(CHEZ)
 	@$(CHEZ) --program tests/check-seam.sps src
 
-# Holds README.org, and every file under .github/workflows and scripts/ci, to
-# packaging/floors.sexp, the one file that writes the floors (ADR-0011,
-# tests/check-floors.sps): the list lines of README.org's Requirements section
-# must state them, and no other line of README.org may; no workflow line or CI
-# script line may write either floor's version, since CI reads them through
-# scripts/ci/floor.sh. It needs no deps: (floors) imports only (rnrs) and a few
-# of Chez's own bindings.
-check-floors: ## Fail unless README.org's Requirements state the floors in packaging/floors.sexp, and nothing else in README.org, no workflow and no CI script does
+# Holds README.org, every file under .github/workflows, scripts/ci and docs,
+# and CONTRIBUTING.md and SECURITY.md, to packaging/floors.sexp, the one file
+# that writes the floors (ADR-0011, tests/check-floors.sps): the list lines of
+# README.org's Requirements section must state them, and no other line of
+# README.org may; no workflow line or CI script line may write either floor's
+# version, since CI reads them through scripts/ci/floor.sh; and no page and no
+# contributor's file may, since each names the floors by a link to README.org.
+# It needs no deps: (floors) imports only (rnrs) and a few of Chez's own
+# bindings.
+check-floors: ## Fail unless README.org's Requirements state the floors in packaging/floors.sexp, and nothing else in README.org, no workflow, no CI script, no page of docs/, CONTRIBUTING.md or SECURITY.md does
 	@scripts/require-tools "$(GOAL)" $(CHEZ)
-	@$(CHEZ) --libdirs tests --program tests/check-floors.sps packaging/floors.sexp README.org .github/workflows scripts/ci
+	@$(CHEZ) --libdirs tests --program tests/check-floors.sps packaging/floors.sexp README.org .github/workflows scripts/ci docs CONTRIBUTING.md SECURITY.md
 
 # Holds .github/workflows/ci.yml to the one shape tests/check-ci.sh reads
-# (ADR-0011): its triggers, its five jobs and every key in them, each check
+# (ADR-0011): its triggers, its six jobs and every key in them, each check
 # as a step's whole run line, no if: but on the caches' own steps, no variable
 # that steers a check but the floor and current lanes' two, and no key spelled
-# so that a text check would miss it. make
+# so that a text check would miss it. It holds pages.yml, the docs site's
+# deploy, line for line to the copy tests/check-ci.sh keeps. make
 # test runs it, so every make test, the container's self-test and CI's main
 # job among them, holds the workflow. tests/test-check-ci.sps plants each fault
 # in a copy of the real file. It reads text with sh and awk, and needs no deps.
 # The recipe sets CHECK_CI_ROOT empty, which check-ci reads as unset, so a
 # host's own value never points the execute-bit rule at another tree.
-check-ci: ## Fail unless .github/workflows holds ci.yml alone, in the one shape tests/check-ci.sh reads
+check-ci: ## Fail unless .github/workflows holds ci.yml, in the one shape tests/check-ci.sh reads, and pages.yml, as its copy, and nothing else
 	@CHECK_CI_ROOT= sh tests/check-ci.sh .github/workflows
 
 # Imports every library under src/, private ones too, and requires each
@@ -648,6 +652,71 @@ test-memory: deps ## Run every MEMORY_SUITES suite under Valgrind, printing its 
 check-memory-gate: ## Plant a heap overrun and a leak; make test-memory must fail on each, by name
 	@scripts/require-tools "$(GOAL)" $(firstword $(VALGRIND)) $(TIMEOUT) $(CHEZ)
 	@MAKE='$(MAKE)' TIMEOUT='$(TIMEOUT)' CHEZ='$(CHEZ)' VALGRIND='$(VALGRIND)' LIBDIRS='$(LIBDIRS)' sh tests/check-memory-gate.sh
+
+# --- the docs site ------------------------------------------------------------
+# docs/*.md rendered to build/site/ through chez-cmark-gfm. Akku.lock pins
+# chez-cmark-gfm for the site alone: nothing under src/, nor any
+# tests/test-*.sps, imports it, so make test needs none of this (ADR-0011).
+# The site needs the system cmark-gfm library (`cmark-gfm` from apt). In the container, scripts/guix-env-enter hands chez-cmark-gfm the
+# profile's by absolute path (CHEZ_CMARK_GFM_LIBS, ADR-0011).
+#
+# chez-cmark-gfm comes from the archive Akku.lock pins, downloaded and checked
+# against the lock's sha256 by scripts/fetch-akku-lock, and unpacked under
+# build/akku. Run make site-deps on the host, where the network is: once, and
+# again after make clean, which removes the archive with build/. In between it
+# needs none, and the container finds the tree under build/, held to the
+# archive it keeps there.
+SITE_CMARK   := build/akku/chez-cmark-gfm/src
+SITE_LIBDIRS := .:$(SITE_CMARK)
+SITE_REF     ?= main
+# Exported, so the generator reads the ref from its environment. It stays out
+# of every recipe's text: there a tag name's backtick would run as shell code.
+export SITE_REF
+
+# The generator's suites, every tests/site-*.sps: SRFI-64 under
+# (site-testing), each ending with its site-exit-form (check-suites), and each
+# run by check-site. They run on Ubuntu's Chez in CI, below chez-sodium's
+# floor, so src/ is on no site suite's path, and one that imports a library
+# of chez-sodium's fails at import, here too. site-unit's path has no
+# chez-cmark-gfm either, so a pure library of the site's that starts
+# importing (cmark gfm) fails there, at import.
+SITE_SUITES := $(sort $(wildcard tests/site-*.sps))
+
+site-deps: ## (host, once) Get chez-cmark-gfm as Akku.lock pins it, from its locked archive, into build/akku
+	@AKKU_DEST=build/akku sh scripts/fetch-akku-lock chez-cmark-gfm
+
+# Overwrites the pages it writes and never removes one: a page renamed or
+# dropped since the last render stays in build/site until make clean.
+# Renders with no suite's libraries on its path: the generator imports
+# (rnrs), a few of Chez's own bindings, (site ...) and (cmark gfm), so any
+# Chez runs it, CI's site job and the Pages workflow on Ubuntu's, which is
+# below chez-sodium's floor.
+site: site-deps ## Render docs/ into build/site/ (open build/site/index.html); SITE_REF=<tag> pins links to repository files
+	@scripts/require-tools "$(GOAL)" $(CHEZ)
+	@mkdir -p build/site
+	@SITE_OUT=build/site \
+	  $(CHEZ) --libdirs $(SITE_LIBDIRS) --program build-site.sps
+	@cp site/style.css build/site/style.css
+	@echo "site: build/site ready (open build/site/index.html)"
+
+# The generator's own suites, each in turn, stopping at the first that
+# fails, then the real site, rendered in memory and checked by
+# tests/check-site.sps, which exits 1 naming the first invariant that fails,
+# and prints one line only when every one held.
+check-site: site-deps deps ## Test the site generator, then render docs/ in memory: nav, links, anchors, no .md leak, no <pre> reflow
+	@scripts/require-tools "$(GOAL)" $(CHEZ)
+	@if [ -z "$(SITE_SUITES)" ]; then echo "check-site: no suites: nothing matches tests/site-*.sps" >&2; exit 1; fi; \
+	for t in $(SITE_SUITES); do \
+	  case $$t in \
+	    tests/site-unit.sps) libs=".:tests:$(SRFI_LIBS)" ;; \
+	    *) libs="$(SITE_LIBDIRS):tests:$(SRFI_LIBS)" ;; \
+	  esac; \
+	  $(CHEZ) --libdirs "$$libs" --program $$t || exit 1; \
+	done
+	@$(CHEZ) --libdirs $(SITE_LIBDIRS) --program tests/check-site.sps
+
+check-site-deps: ## Test scripts/fetch-akku-lock offline, against a local archive and lock of its own
+	@sh tests/fetch-akku-lock.sh
 
 # Removes build/, and nothing else: make deps' links (the links, never what
 # they name, since rm does not follow a link), the memory gate's logs and

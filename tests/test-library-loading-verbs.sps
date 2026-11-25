@@ -298,7 +298,7 @@
   "the default size is 33; sizes 7 and 81 are refused, 8, 65 and 80 accepted; keys of 8 and 82 are refused, 9, 15 and 81 accepted; each log line whole, so a length that goes to the wrong place shows"
   (table-lines sizes-other-table))
 
-;; --- crypto_generichash's other answers (row 17) -------------------------------------------------
+;; --- crypto_generichash's other answers -------------------------------------------------
 
 ;; failed-line : Integer Natural Natural Natural -> (List Any String)
 ;; A &sodium-failed of blake2b over crypto_generichash, its code the answer;
