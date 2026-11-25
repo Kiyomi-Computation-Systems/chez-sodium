@@ -1,0 +1,10 @@
+== libsodium at <profile>/lib/libsodium.so.26
+(interactive length 97)
+(moderate length 98)
+(sensitive length 99)
+== exit 0
+== libsodium at <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+(interactive length 97)
+(moderate length 98)
+(sensitive length 99)
+== exit 0

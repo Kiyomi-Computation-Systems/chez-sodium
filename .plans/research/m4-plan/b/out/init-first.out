@@ -1,0 +1,12 @@
+== libsodium at /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26
+(first-sodium-init 0)
+(chez-sodium-loads ("1.0.22" 4))
+(init-recorded-by-the-load 1)
+(later-sodium-init 1)
+== exit 0
+== libsodium at <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+(first-sodium-init 0)
+(chez-sodium-loads ("1.0.18" 4))
+(init-recorded-by-the-load 1)
+(later-sodium-init 1)
+== exit 0

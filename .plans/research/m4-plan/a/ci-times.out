@@ -1,0 +1,55 @@
+# CI run 45539692740, main's push of d53e83c: each job's start and end (gh run view --json jobs)
+current (the suites against libsodium at the current release, built from source): 2026-11-25T03:23:57Z to 2026-11-25T03:26:11Z, success
+floor (the suites against libsodium at its floor, built from source): 2026-11-25T03:23:57Z to 2026-11-25T03:25:58Z, success
+main (checks and suites, Chez built from source): 2026-11-25T03:23:57Z to 2026-11-25T03:25:51Z, success
+nothreads (every library is refused on a Chez without threads): 2026-11-25T03:23:57Z to 2026-11-25T03:24:30Z, success
+memory (the Valgrind gate): 2026-11-25T03:23:57Z to 2026-11-25T03:51:12Z, success
+
+# its memory job's log (gh api .../actions/jobs/138954891671/logs): each suite's time under the gate, slowest first
+tests/test-check-ci.sps 111 s
+tests/test-no-memory.sps 92 s
+tests/test-library-loading-passwords.sps 90 s
+tests/test-library-loading-decoys.sps 87 s
+tests/test-library-loading-combined.sps 82 s
+tests/test-library-loading-missing-passwords.sps 75 s
+tests/test-library-loading-missing-verbs.sps 64 s
+tests/test-library-loading-real.sps 59 s
+tests/test-library-loading-password-entries.sps 59 s
+tests/test-library-loading-missing.sps 59 s
+tests/test-library-loading-missing-limits.sps 59 s
+tests/test-library-loading-preflight.sps 56 s
+tests/test-library-loading-verbs.sps 49 s
+tests/test-collect-safe.sps 40 s
+tests/test-ci-sodium.sps 26 s
+tests/test-library-loading-discovery.sps 21 s
+tests/test-check-floors.sps 21 s
+tests/test-never-loads.sps 20 s
+tests/test-library-loading-password-limits.sps 19 s
+tests/test-native.sps 18 s
+tests/test-conventions.sps 18 s
+tests/test-check-seam.sps 16 s
+tests/test-blocks.sps 14 s
+tests/test-password-oracle.sps 13 s
+tests/test-password-verbs.sps 12 s
+tests/test-chez-sodium-testing.sps 12 s
+tests/test-byte-verbs.sps 11 s
+tests/test-require-threaded.sps 9 s
+tests/test-public.sps 9 s
+tests/test-native-codes.sps 9 s
+tests/test-discovery.sps 9 s
+tests/test-counters.sps 9 s
+tests/test-wipe.sps 8 s
+tests/test-verify.sps 8 s
+tests/test-password-text.sps 8 s
+tests/test-manifest.sps 8 s
+tests/test-load-state.sps 8 s
+tests/test-decoy-source.sps 8 s
+tests/test-constants.sps 8 s
+tests/test-conditions.sps 8 s
+tests/test-check-nothreads.sps 8 s
+41 suites, 1320 s in all
+
+# test-check-ci outside the gate, in the container (Chez 10.4.0): rows and wall time
+$ scripts/guix-env sh -c '"$CHEZ" --libdirs src:tests:build/scheme-libs --program tests/test-check-ci.sps'
+exit 0, 29416 ms
+# of expected passes      766

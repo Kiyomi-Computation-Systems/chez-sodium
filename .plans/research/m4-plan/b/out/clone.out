@@ -1,0 +1,43 @@
+sh: line 1: /usr/bin/env: No such file or directory
+sh: line 1: /usr/bin/env: No such file or directory
+sh: line 1: /usr/bin/env: No such file or directory
+("1.0.18" #t #f 32)
+exit 0
+make: Entering directory '<repo>/build/m4-plan/b/clone'
+chez-sodium: libsodium loaded and accepted
+  path:       /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26 (override)
+  version:    1.0.22 (library 26.4)
+  counts:     ((block . 0))
+make: Leaving directory '<repo>/build/m4-plan/b/clone'
+ls: cannot access 'clone/src/chez-sodium/private/*.so': No such file or directory
+("1.0.22" #t #f 32)
+
+real	0m0.277s
+user	0m0.210s
+sys	0m0.067s
+("1.0.22" #t #f 32)
+
+real	0m0.289s
+user	0m0.220s
+sys	0m0.069s
+("1.0.22" #t #f 32)
+
+real	0m0.287s
+user	0m0.208s
+sys	0m0.079s
+--- a program that only imports and prints the version
+1.0.22
+
+real	0m0.117s
+user	0m0.089s
+sys	0m0.027s
+1.0.22
+
+real	0m0.109s
+user	0m0.088s
+sys	0m0.020s
+1.0.22
+
+real	0m0.105s
+user	0m0.082s
+sys	0m0.023s

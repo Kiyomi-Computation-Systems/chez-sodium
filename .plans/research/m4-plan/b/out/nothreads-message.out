@@ -1,0 +1,2 @@
+Exception in chez-sodium: chez-sodium needs a threaded Chez Scheme, and (threaded?) is #f in this one. Chez builds threaded unless configured with --nothreads (require-supported-chez)
+(syntax-violation? #t who chez-sodium)

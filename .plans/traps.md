@@ -186,6 +186,23 @@ chez-sodium, M1's plan.
 - **The rule:** the wipe row's child sets `LD_PRELOAD` to the interposer alone, never appended
   ([ADR-0011], amended).
 
+### A variable set on the host never reaches the container
+
+chez-sqlite3 `.plans/traps.md`, "A variable set on the host doesn't reach `scripts/guix-env`'s
+container"; copied for chez-sodium in M4's slice 0 review (M4S0-F19).
+
+- **What happens.** `scripts/guix-env` preserves only `TERM`, `COLORTERM` and `LANG`, and
+  `guix-env-enter` exports its own `CHEZ_SODIUM_LIBRARY`, the profile's. So
+  `SITE_REF=v0.1.0 scripts/guix-env make site` renders `main`, and
+  `CHEZ_SODIUM_LIBRARY=<floor> scripts/guix-env sh -c 'make test'` runs at the profile's 1.0.22,
+  green on the wrong library.
+- **Reproduced** in M4's slice 0: `CHEZ_SODIUM_LIBRARY=/no/such scripts/guix-env sh -c 'echo
+  "$CHEZ_SODIUM_LIBRARY"'` prints the profile's `/gnu/store/…/lib/libsodium.so.26`, and
+  `SITE_REF=v0.1.0 scripts/guix-env sh -c 'echo "${SITE_REF-unset}"'` prints `unset`.
+- **The rule:** set a variable inside the container's `sh -c`, as
+  `scripts/guix-env sh -c 'SITE_REF=v0.1.0 make site'`, and read the version a suite prints
+  before trusting a lane.
+
 ### A stacked PR conflicts once the one below is squash-merged
 
 chez-sodium, M1's merges of #3 to #7.

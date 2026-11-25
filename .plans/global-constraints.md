@@ -6,7 +6,8 @@ record it comes from, and where a rule and its record disagree, the record wins.
 ## Platforms and versions
 
 - **Linux only.** No macOS or Windows code paths, no macOS or Windows CI, and no abstraction kept
-  only so another platform could come later ([ADR-0010]).
+  only so another platform could come later ([ADR-0010]). A release claims Linux on x86_64, and
+  names arm64 as not run ([ADR-0010], amended).
 - **libsodium and a threaded Chez, each at its floor in `packaging/floors.sexp`.**
   `(chez-sodium private require-threaded)` refuses an unthreaded Chez, and one below its floor,
   by name while it is expanded, and every library under `src/` imports it first ([ADR-0004]).
@@ -205,10 +206,12 @@ record it comes from, and where a rule and its record disagree, the record wins.
 
 ## Passwords
 
-- **`password-needs-rehash?` answers `#t` for any hash that is not what `password-hash` would
-  make now:** the limits differ; libsodium cannot read it; it fails the pre-check; its prefix is
-  not the loaded library's `crypto_pwhash_strprefix()`; or its parameters do not read `p=1`. It
-  answers `#f` only otherwise, and never raises because of the hash ([ADR-0009]).
+- **`password-needs-rehash?` answers `#t` for a hash not made with today's algorithm,
+  parallelism and limits:** the limits differ; libsodium cannot read it; it fails the
+  pre-check; its prefix is not the loaded library's `crypto_pwhash_strprefix()`; or its
+  parameters do not read `p=1`. It answers `#f` only otherwise, and never raises because of the
+  hash. It reads no salt or tag size, so it is no check that a hash is whole, and the documents
+  say so ([ADR-0009], amended).
 - **Custom limits are made by `make-password-limits`, with memory in KiB,** each range checked
   when it is called, so a `Password-limits` is always in range. The default is `'interactive`
   ([ADR-0009], amended).
@@ -248,9 +251,9 @@ record it comes from, and where a rule and its record disagree, the record wins.
   chez-sqlite3 ADR-0007).
 - **Password rows hash at libsodium's minimum limits,** read from `_opslimit_min` and
   `_memlimit_min`, but for one cheap pair that is neither the minimum nor a preset, one hash at
-  the default, and row 22's code rows at the few cheap limits each code needs. Only the
-  no-memory rows hash at a high limit, `'sensitive`, in gated children under a memory cap
-  ([ADR-0011], amended).
+  the default, row 22's code rows at the few cheap limits each code needs, and the docs'
+  password examples, which `test-docs` runs at the default. Only the no-memory rows hash at a
+  high limit, `'sensitive`, in gated children under a memory cap ([ADR-0011], amended).
 
 ## Memory and CI
 
@@ -292,7 +295,33 @@ record it comes from, and where a rule and its record disagree, the record wins.
   of blocks ([ADR-0011], amended).
 - **CI's workflow has one shape, which `make check-ci` holds and `make test` runs.** M0's shape
   is `main`, without `make build` and `check-dev`; `memory`; and `nothreads`. M1 adds `floor` and
-  `current`. Actions are pinned by SHA ([ADR-0011]; chez-sqlite3 ADR-0005, amended).
+  `current`, and M4 `site`. `pages.yml` is held line for line. Actions are pinned by SHA
+  ([ADR-0011], amended; chez-sqlite3 ADR-0005, amended).
+
+## Docs, site and release
+
+- **`docs/` is five pages,** a quick start, passwords, tokens, finding libsodium and the
+  reference, in that order. `site/pages.sls` writes the order once, and README.org's Documentation
+  list holds it ([ADR-0013]).
+- **The reference holds one `` ### `NAME` `` entry per export,** whose one `text` line equals the
+  export's signature comment, character for character. A signature comment is `;; NAME : TYPE`
+  alone; a note goes on a line of its own ([ADR-0013]; [ADR-0012], amended).
+- **`test-docs` holds every page:** block kinds, links and anchors, README.org's twin, the
+  banned words, the export spans, run blocks evaluated, whole programs run through
+  `gated-command`, and `finding-libsodium.md`'s tables against discovery's code. No page links
+  into `.plans/`, or says `ADR-`, `TODO`, "yet", "unreleased", "slice" or a date ([ADR-0013]).
+- **No page restates a floor:** `check-floors` reads `docs/`, and a page names a floor by a link
+  to README.org's Requirements ([ADR-0011], amended).
+- **Installing is a clone, with nothing built.** Every `git clone` line names the manifest's
+  version's tag, or no branch at 0.0.0, and `test-manifest` holds it ([ADR-0013]).
+- **The site's generator and its suites import nothing under `src/`,** so Ubuntu's Chez runs them.
+  chez-cmark-gfm is a `depends/dev`, fetched on the host by `make site-deps` ([ADR-0011],
+  amended).
+- **A release is a signed, annotated tag the owner makes and pushes,** with its CHANGELOG entry,
+  `Akku.manifest`'s version and the clone lines moved together, and a GitHub Release whose notes
+  are the entry, read back byte for byte. `pages.yml` deploys the site on the tag's push
+  ([ADR-0013]).
+- **No Akku publish** until a later decision (brief §11.8; [ADR-0013]).
 
 [ADR-0001]: decisions/0001-bind-libsodium-directly.md
 [ADR-0002]: decisions/0002-runtime-discovery-and-the-sonames.md
@@ -306,3 +335,4 @@ record it comes from, and where a rule and its record disagree, the record wins.
 [ADR-0010]: decisions/0010-linux-only.md
 [ADR-0011]: decisions/0011-the-harness-after-chez-sqlite3.md
 [ADR-0012]: decisions/0012-the-public-library-and-the-seam.md
+[ADR-0013]: decisions/0013-the-first-release.md

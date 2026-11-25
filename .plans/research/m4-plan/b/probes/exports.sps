@@ -1,0 +1,5 @@
+(import (chezscheme))
+(environment (quote (chez-sodium)))
+(for-each (lambda (n) (write n) (newline)) (list-sort (lambda (a b) (string<? (symbol->string a) (symbol->string b))) (library-exports (quote (chez-sodium)))))
+(write (list (quote count) (length (library-exports (quote (chez-sodium))))))
+(newline)

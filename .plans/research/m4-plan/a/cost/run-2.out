@@ -1,0 +1,31 @@
+## in process, plain
+first-reference 0 ms 6
+min-hash-verify 1 ms #t
+default-hash 56 ms 97
+default-verify 56 ms #t
+default-verify-wrong 58 ms #f
+needs-rehash 0 ms #f
+login-block 114 ms #t
+random-and-blake2b 0 ms 32
+compare 0 ms #t
+## in process, under the gate's Valgrind
+first-reference 64 ms 6
+min-hash-verify 77 ms #t
+default-hash 705 ms 97
+default-verify 683 ms #t
+default-verify-wrong 703 ms #f
+needs-rehash 7 ms #f
+login-block 1355 ms #t
+random-and-blake2b 13 ms 32
+compare 2 ms #t
+exit 0 wall 8490 ms
+ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+whole plain: exit 0 out #t wall 214 ms
+whole gate: exit 0 out #t wall 6301 ms
+ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+whole-min plain: exit 0 out #t wall 111 ms
+whole-min gate: exit 0 out #t wall 4934 ms
+ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+whole-none plain: exit 0 out 32 wall 109 ms
+whole-none gate: exit 0 out 32 wall 4887 ms
+ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)

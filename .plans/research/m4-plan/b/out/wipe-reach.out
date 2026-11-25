@@ -1,0 +1,14 @@
+== libsodium at /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26
+(password-after-hash "correct horse")
+(after-string-fill! (#\nul #\nul #\nul #\nul #\nul #\nul #\nul #\nul #\nul #\nul #\nul #\nul #\nul))
+(still-verifies-the-original #t)
+(string-fill!-on-a-literal wiped)
+(random-bytes-is-the-callers-to-wipe #t copy-untouched #t)
+== exit 0
+== libsodium at <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+(password-after-hash "correct horse")
+(after-string-fill! (#\nul #\nul #\nul #\nul #\nul #\nul #\nul #\nul #\nul #\nul #\nul #\nul #\nul))
+(still-verifies-the-original #t)
+(string-fill!-on-a-literal wiped)
+(random-bytes-is-the-callers-to-wipe #t copy-untouched #t)
+== exit 0

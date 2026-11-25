@@ -61,8 +61,10 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
     - `test-no-memory` holds the no-memory codes, its children gated, under `ulimit -v`.
   - **Techo's question,** whether verify can tell short memory from a wrong password, is
     answered: no change in M3, and Techo's session was told.
-- **Next: M4,** `docs/`, `docs/reference.md` with `test-reference`, the site, `CHANGELOG.md` and
-  release 0.1.0 (brief §9). Its plan starts from "Owed to M4" below.
+- **M4 is under way:** `docs/`, `docs/reference.md` with `test-reference`, the site, `CHANGELOG.md`
+  and release 0.1.0 (brief §9; [the M4 plan](2026-11-25-m4-plan.md); ADR-0013). Slice 0, the plan
+  and the records, is on `m4-slice-0`. The owner allowed stacked PRs for M4 on 2026-11-25, as for
+  M3.
 
 ## Answered for M1
 
@@ -150,7 +152,30 @@ its questions on 2026-11-24, accepting every recommendation:
     two one, so the owner chose no change in M3: `#f` covers all three causes, and the documents
     give Techo's fallback (plan §4.2, item 4; ADR-0006, amended). Techo's session was told.
 
+## Answered for M4
+
+The M4 plan's pre-work, [research/m4-plan/](research/m4-plan/), set A for the site and the
+release and set B for the pages' facts, raised four questions. The owner answered them on
+2026-11-25:
+
+- **needs-rehash's rule: restated, not tightened** ("go with A", after discussing the trade-offs).
+  It never reads the salt's or the tag's size, so it is no check that a hash is whole (the M4
+  plan, §2.2; ADR-0009, amended).
+- **Five pages:** a quick start, passwords, tokens, finding libsodium, and the reference (ADR-0013,
+  decision 2).
+- **The docs' password examples run at the default,** a named exception to the limits rule
+  (ADR-0011, amended).
+- **The rest, accepted:** a GitHub Release for every tag; README.org's example a twin; the
+  signature comments' notes on lines of their own; Linux on x86_64 claimed, arm64 named not run;
+  the tag signed by the owner; `main` protected and a tag ruleset (ADR-0013; ADR-0010 and
+  ADR-0012, amended).
+
 ## Owed to M4
+
+Every note below was checked against the code and the real library by the M4 plan's set B, and is
+stated here as the plan's §3 states it, which the pages follow. Six were corrected: the
+interrupts' times, the entropy abort, an unknown account's dummy, the stored hash, the over-cap
+password, and the fallback's reach.
 
 - **The documents' notes from M1:**
   - the first reference under an engine (ADR-0007, amended);
@@ -158,33 +183,35 @@ its questions on 2026-11-24, accepting every recommendation:
   - `sodium_init`'s 1;
   - what wiping cannot reach.
 - **The documents' notes from M2:** what the cap is; that the compare leaks only the lengths;
-  that `random-bytes` aborts the process without an entropy source; that `blake2b` can raise
-  `&sodium-failed`.
-- **The documents' notes from M3** (plan §3):
+  that with no entropy source the process aborts at the load, and `random-bytes` only if the
+  source fails later; that `blake2b` can raise `&sodium-failed`.
+- **The documents' notes from M3** (M3 plan §3, as the M4 plan's §3 corrects them):
   - `password-verify` answers `#f` for a wrong password, an unreadable hash and short memory
-    alike, with a caller's fallback: after a `#f`, hash a throwaway string at the same limits.
-    It sees only a failure libsodium is told of, under `ulimit` or with no overcommit, since a
-    container's memory limit kills the process instead, and it fits only hashes made at the
-    caller's current limits;
+    alike, with a caller's fallback: after a `#f`, hash a throwaway string at the current limits.
+    It sees only a failure libsodium is told of, as under `ulimit -v`; under short memory a wrong
+    password reads as short memory too; and it fits only hashes made at the caller's current
+    limits;
   - a hash's own limits set what verifying it costs, so hashes come from trusted storage;
-  - a container's memory limit can get the process killed;
+  - a container's memory limit kills the process, exit 137, with nothing raised (measured);
   - the login pattern: `password-needs-rehash?` only after `password-verify` answers `#t`;
   - a password changed by another thread during the call is refused;
-  - a password over the cap is refused by `password-verify`, not answered `#f`, so a login form
-    bounds or catches it first;
-  - a hash string is stored exactly: a stray space or newline verifies `#f` for ever;
-  - the calling thread's interrupts wait while a hash runs: about 55 ms at `'interactive`,
-    seconds at `'sensitive` (M3S2-F4).
-  - an unknown account is checked against a real hash made at the current limits, never a
-    string the pre-check refuses, which answers at once and tells accounts apart by time;
+  - a password over the cap, or one that is no string, is refused by `password-verify`, not
+    answered `#f`, so a login form checks for a string of at most 16384 characters first, or
+    catches the refusal;
+  - a hash string is stored exactly: any change verifies `#f` for ever, and
+    `password-needs-rehash?` may still answer `#f`;
+  - the calling thread's interrupts wait while a hash runs: about 50 ms at `'interactive`, about
+    2 s at `'sensitive`, here (M3S2-F4);
+  - an unknown account is checked against a real hash made at the current limits. Any string that
+    is not a real hash answers in microseconds and tells accounts apart by time;
   - custom limits go to both `password-hash` and `password-needs-rehash?`, or every login
     rehashes;
   - the binding never normalises a password: NFC and NFD forms do not verify against each other;
   - the login pattern's rehash can raise `&sodium-failed` after a `#t` verify, and a failed
     rehash need not fail the login (M3C-F4).
-- **The docs rule of `check-floors`** waits for `docs/`.
-- **The install-line checks of `test-manifest`** wait for the first release, which writes the
-  install lines.
+- **The docs rule of `check-floors`,** built in M4's slice 1 (the M4 plan, §4.5).
+- **The clone-line check of `test-manifest`,** built in M4's slice 1 at 0.0.0, with no branch,
+  and moved to the tag by the release (the M4 plan, §4.4).
 
 ## Close-outs
 

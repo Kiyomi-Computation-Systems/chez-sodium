@@ -1,0 +1,20 @@
+== libsodium at /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26
+(32 equal answer #t median-us 3.0)
+(32 differ-first answer #f median-us 2.9)
+(32 differ-last answer #f median-us 3.0)
+(32 one-byte-shorter answer #f median-us 0.0)
+(65536 equal answer #t median-us 3784.2)
+(65536 differ-first answer #f median-us 3764.4)
+(65536 differ-last answer #f median-us 3735.4)
+(65536 one-byte-shorter answer #f median-us 0.0)
+== exit 0
+== libsodium at <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+(32 equal answer #t median-us 2.8)
+(32 differ-first answer #f median-us 2.9)
+(32 differ-last answer #f median-us 2.9)
+(32 one-byte-shorter answer #f median-us 0.0)
+(65536 equal answer #t median-us 3651.7)
+(65536 differ-first answer #f median-us 3782.1)
+(65536 differ-last answer #f median-us 3688.1)
+(65536 one-byte-shorter answer #f median-us 0.0)
+== exit 0

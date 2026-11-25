@@ -13,6 +13,8 @@
   ([amendment](#amendment-2026-11-24-m3s-plan)).
   Its last points added after M3's slice reviews, its closing review and that review's
   re-review; gating the no-memory children is the owner's choice of 2026-11-24.
+  Amended 2026-11-25 in M4's plan, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-25-the-docs-and-the-site-m4s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** development tooling, the suites and CI; no library change
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §7, §8.2, §9's M0, and
@@ -263,9 +265,47 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
   `channels.scm` bump that moves Guix's libsodium, or a distribution's package (M3C-F3,
   M3C2-F3).
 
+## Amendment, 2026-11-25: the docs and the site (M4's plan)
+
+Accepted (the owner, 2026-11-25), proposed in [the M4 plan](../2026-11-25-m4-plan.md), §4.3 to
+§4.7, with [ADR-0013].
+
+- **Decisions 2 and 3's M4 parts, as built from chez-sqlite3's:**
+  - the manifest gains `cmark-gfm`, `tar` and `xz`. `guix-env-enter` requires both cmark-gfm
+    libraries and exports `CHEZ_CMARK_GFM_LIBS`, the core first, and the self-test checks that it
+    names two files Chez loads;
+  - chez-cmark-gfm joins `depends/dev`, and `Akku.lock` locks it, chez-sqlite3's entry byte for
+    byte. `scripts/fetch-akku-lock` fetches it into `build/akku`, on the host, by `make site-deps`;
+  - the generator and its suites import nothing under `src/`, so Ubuntu's Chez, below the floor,
+    runs them in CI. `tests/test-site-testing.sps`, which imports the testing library, runs in
+    `make test`.
+- **The docs' password examples hash at the default,** a named exception to decision 1's limits
+  rule. The owner chose this on 2026-11-25, so the examples show the call a reader copies.
+  - `test-docs` runs them at `'interactive`, in process for a `scheme run` block, and through
+    `gated-command` for a whole program.
+  - Measured under the gate (pre-work A, §4.2): about 0.7 s a hash or a verify in process, and
+    about 4.9 s for each gated whole program before it does anything.
+  - No docs example hashes above the default.
+- **`check-floors` reads `docs/`:** no line of a page holds either floor's dotted text, so a page
+  names a floor by a link to README.org's Requirements. Decision 4's dotted form is the one form
+  refused, as everywhere `check-floors` reads.
+- **`test-manifest` holds the clone lines,** as "Owed to M4" asked: every `git clone` line of
+  README.org and `docs/` clones the repository at `--branch vX.Y.Z`, the manifest's version, or
+  with no branch at 0.0.0. It is held on fixture trees first.
+- **CI gains a sixth job, `site`, and a second workflow, `pages.yml`.** `check-ci` holds both:
+  - `ci.yml`'s shape, `site` with `timeout-minutes: 10`, and the image step in every job, `site`
+    included, so the rule keeps no exception;
+  - `pages.yml` line for line against `check-ci.sh`'s copy, but for comments and blank lines
+    outside a run block;
+  - `SITE_REF` and `CHEZ_CMARK_GFM_LIBS` among the banned words;
+  - `packaging/debian-site-prereqs.txt` as the site's one package list, read by both workflows.
+- **`test-check-ci`'s time is read after the port.** It splits if it passes a third of
+  `MEMORY_TIMEOUT`.
+
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0003]: 0003-libsodium-floor-1-0-18.md
 [ADR-0004]: 0004-a-threaded-chez.md
 [ADR-0006]: 0006-errors-and-no-secret-shown.md
 [ADR-0008]: 0008-every-block-wiped-before-free.md
 [ADR-0010]: 0010-linux-only.md
+[ADR-0013]: 0013-the-first-release.md

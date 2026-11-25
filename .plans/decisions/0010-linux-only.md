@@ -1,6 +1,8 @@
 # ADR-0010: Linux only
 
-- **Status:** Accepted (the owner, 2026-11-22), approved with the brief.
+- **Status:** Accepted (the owner, 2026-11-22), approved with the brief. Amended 2026-11-25 in
+  M4's plan, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-25-what-010-claims-m4s-plan)).
 - **Date:** 2026-11-22
 - **Scope:** chez-sodium, until a later decision record reverses this one
 - **Settles:** [brief](../2026-11-22-chez-sodium-project-brief.md) §7.2 (Techo ADR-0001)
@@ -30,4 +32,18 @@ later.
 - **Nothing is promised or tested on another platform.**
 - **Reversing this takes its own decision record, and real work.**
 
+## Amendment, 2026-11-25: what 0.1.0 claims (M4's plan)
+
+Accepted (the owner, 2026-11-25), proposed in [the M4 plan](../2026-11-25-m4-plan.md), §2.1, Q4
+item 4, with [ADR-0013], decision 9.
+
+- **0.1.0 claims Linux on x86_64,** with the libsodiums CI runs: Ubuntu 24.04's package, found by
+  discovery, and the floor and the current release, each built from source. The development
+  container runs Guix's, which no CI job runs. Every CI job runs on `ubuntu-24.04`, x86_64.
+- **Linux on arm64 is named as not run,** in README.org's Status and the changelog's Known
+  limitations. Discovery's `aarch64-linux-gnu` directory is written, but no run has reached it.
+- **No arm64 job is added.** One would be a seventh job, a change to `check-ci`'s shape, for a
+  platform Techo does not run. A later record can add one.
+
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md
+[ADR-0013]: 0013-the-first-release.md

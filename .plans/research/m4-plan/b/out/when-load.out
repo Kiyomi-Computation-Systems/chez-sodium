@@ -1,0 +1,7 @@
+== when-limits-named, CHEZ_SODIUM_LIBRARY=/no/such.so
+Exception in chez-sodium: the loader refused this libsodium; name one this Chez can load with CHEZ_SODIUM_LIBRARY, an absolute path with irritant "/no/such.so"
+exit 255
+== when-predicate-only, CHEZ_SODIUM_LIBRARY=/no/such.so
+first line ran
+#f
+exit 0

@@ -58,7 +58,7 @@ decision (§11.4).
 | `sodium_version_string`, `sodium_library_version_major`, `_minor` | `sodium-version` | the load's floor check, from the string (§7.2), and a report for bug reports |
 | `crypto_pwhash_str` | `password-hash` | hash a password at account creation and at a password change |
 | `crypto_pwhash_str_verify` | `password-verify` | check a login |
-| `crypto_pwhash_str_needs_rehash`, `crypto_pwhash_strprefix` | `password-needs-rehash?` | at login, re-hash a hash that is not what `password-hash` would make now (§4.2) |
+| `crypto_pwhash_str_needs_rehash`, `crypto_pwhash_strprefix` | `password-needs-rehash?` | at login, re-hash a hash not made with today's algorithm, parallelism and limits (§4.2) |
 | `crypto_pwhash_strbytes`, `_opslimit_*`, `_memlimit_*`, `_passwd_min`, `_passwd_max` | the limits | ranges, and the three presets: interactive, moderate, sensitive |
 | `randombytes_buf` | `random-bytes` | make an API key |
 | `crypto_generichash`, with `_bytes`, `_bytes_min`, `_bytes_max`, `_keybytes_min` and `_keybytes_max` (ADR-0005, amended) | `blake2b` | store an API key as its BLAKE2b hash |
@@ -144,7 +144,7 @@ Specified now so the design leaves room; built when Techo needs it.
 | `sodium_library_version_major`, `_minor` | `int (void)` | libtool numbers, not the release: 10.3 at 1.0.18; 26.1 to 26.4 at 1.0.19 to 1.0.22 (L-F14). Answer before `sodium_init`. |
 | `crypto_pwhash_str` | `int (char out[STRBYTES], const char *passwd, unsigned long long passwdlen, unsigned long long opslimit, size_t memlimit)` | 0; or -1 for limits out of range or no memory, with `out` zeroed. All of `out` is written either way: the string and zeros after it, or zeros (M3 plan §5.1). Memory is floored to whole KiB. `nonnull` on every pointer. |
 | `crypto_pwhash_str_verify` | `int (const char str[STRBYTES], const char *passwd, unsigned long long passwdlen)` | 0 on a match. -1 for a wrong password, a string it cannot parse, **and no memory**: at 1.0.18 errno reads `EINVAL` either way (L-F2). At 1.0.22 errno reads `ENOMEM` for no memory, which the binding does not read (M3 plan §4.2, item 4). `str` is an array of `STRBYTES` at 1.0.18 and a pointer at 1.0.22, `nonnull` at both. Reads `str` to its first NUL, and refuses any byte after the hash (L-F1). Costs what the string's own t and m say. |
-| `crypto_pwhash_str_needs_rehash` | `int (const char str[STRBYTES], unsigned long long opslimit, size_t memlimit)` | 0 when t and m/1024 match; 1 when either differs, lower or higher; -1 when it cannot parse the string, even a long one verify accepts, and for any string of `strbytes` characters or more, a salt or tag of the wrong length, or ops above 2³²−1. Ignores the algorithm, since it dispatches on the prefix: an argon2i hash at ops 3 or more answers 0. Ignores p where the string decodes: `p=4` at 32 KiB or more answers 0 (L-F6; M3 plan §5.1). A byte of 0x80 or more in the salt answers 0 at 1.0.18 and -1 at 1.0.22. |
+| `crypto_pwhash_str_needs_rehash` | `int (const char str[STRBYTES], unsigned long long opslimit, size_t memlimit)` | 0 when t and m/1024 match; 1 when either differs, lower or higher; -1 when it cannot parse the string, even a long one verify accepts, and for any string of `strbytes` characters or more, a salt under 8 bytes or a tag under 16, base64 it cannot decode, spare bits that are not zero among it, or ops above 2³²−1. No other salt or tag length is refused: a 16-byte tag parses (ADR-0009, amended 2026-11-25). Ignores the algorithm, since it dispatches on the prefix: an argon2i hash at ops 3 or more answers 0. Ignores p where the string decodes: `p=4` at 32 KiB or more answers 0 (L-F6; M3 plan §5.1). A byte of 0x80 or more in the salt answers 0 at 1.0.18 and -1 at 1.0.22. |
 | `crypto_pwhash_strprefix` | `const char *(void)` | `"$argon2id$"` at 1.0.18 and 1.0.22: the default algorithm's prefix |
 | `crypto_pwhash_strbytes`, `_opslimit_{min,max,interactive,moderate,sensitive}`, `_memlimit_{min,max,interactive,moderate,sensitive}`, `_passwd_min`, `_passwd_max` | `size_t (void)` | At 1.0.18: ops 1 to 2³²−1; memory 8192 to 4398046510080 bytes; password 0 to 2³²−1 bytes; `strbytes` 128. The presets are interactive (2, 64 MiB), moderate (3, 256 MiB) and sensitive (4, 1 GiB). **An opslimit comes back as `size_t` and is passed as `unsigned long long`;** every value fits both. The same at 1.0.22, each equal to its header macro, and every memory constant a whole number of KiB (M3 plan §5.1). |
 | `randombytes_buf` | `void (void *buf, size_t size)` | Backed by `getrandom`, with no state, so safe across threads and `fork`. `nonnull` even at size 0. Aborts if no entropy source is available. Its bound, `randombytes_BYTES_MAX`, is a macro only: 2³²−1 at 1.0.18 and 1.0.22. |
@@ -177,13 +177,16 @@ What this changes in the brief:
 ;; password-verify : String String -> Boolean            ; hash, password
 ;; password-needs-rehash? : String [Limits] -> Boolean    ; hash
 ;; Limits is (U 'interactive 'moderate 'sensitive Password-limits); the default is 'interactive
-;; make-password-limits : Nat Nat -> Password-limits      ; ops, memory in KiB
+;; make-password-limits : Natural Natural -> Password-limits ; ops, memory in KiB
 
-;; random-bytes : Nat -> Bytevector
-;; blake2b : Bytevector [Nat] [Bytevector] -> Bytevector   ; input, size, key
+;; random-bytes : Natural -> Bytevector
+;; blake2b : Bytevector [Natural] [Bytevector] -> Bytevector   ; input, size, key
 ;; constant-time-bytevector=? : Bytevector Bytevector -> Boolean
 ```
 
+- **This is a sketch.** The signature comments of `src/chez-sodium.sls` are the contract,
+  and `docs/reference.md` is held to them: each is `;; NAME : TYPE` alone, its note on a line
+  of its own (ADR-0012, amended 2026-11-25).
 - The names are decided (§11.5, §11.7). None clashes with a name `(chezscheme)`
   exports. They carry no prefix, as chez-sqlite3's carry none. A user who wants one
   adds it on import: `(import (prefix (chez-sodium) sodium:))`.
@@ -226,16 +229,19 @@ What this changes in the brief:
 
 ### 4.2 `password-needs-rehash?`
 
-**What `#t` means:** this hash is not what `password-hash` would make now, at these
-limits. The caller replaces it, using the password it has just verified.
+**What `#t` means:** this hash was not made with today's algorithm, parallelism and
+limits, or libsodium cannot read it. The caller replaces it, using the password it has
+just verified. It is no check that the hash is whole: it never reads the salt's or the
+tag's size, so a damaged hash that libsodium still parses can answer `#f`. Only
+`password-verify`, with the password, finds damage (ADR-0009, amended 2026-11-25).
 
 It answers `#t` when any of these holds:
 
 1. **The limits differ.** libsodium answers 1 because t or memory differs from the
    limits given, higher or lower.
-2. **libsodium cannot read the hash.** It answers -1: the string is corrupt, truncated,
-   or made elsewhere with a salt or tag it does not parse. Such a hash can still verify
-   (L-F7).
+2. **libsodium cannot read the hash.** It answers -1: a string it does not parse, or one
+   of `strbytes` characters or more. Such a hash can still verify (L-F7). A corrupt or
+   truncated string it still parses is not among them (ADR-0009, amended).
 3. **The string fails the pre-check** of §4.1.
 4. **The algorithm or parallelism differs.** The string does not begin with
    `crypto_pwhash_strprefix()`, or its parameters do not read `p=1`. libsodium ignores
@@ -269,7 +275,8 @@ pattern:
   verified against an imported hash (§11.1).
 - **A batch job** that checks stored hashes without passwords gets `#t` for stale and
   unreadable hashes alike. Both read as "replace at the next login". If a job ever
-  needs to tell them apart, that is a new verb with three answers, not a raise.
+  needs to tell them apart, that is a new verb with three answers, not a raise. It cannot
+  find a damaged hash that libsodium still parses.
 - **libsodium's default algorithm** is argon2id at 1.0.18 and 1.0.22.
   `password-hash` uses whatever the library's default is. `password-needs-rehash?`
   reads the expected prefix from that same library, so if a future release changes the
@@ -601,8 +608,8 @@ it catches.
 
 - **Password rows hash at libsodium's minimum**, read from `_opslimit_min` and
   `_memlimit_min`. The exceptions are row 5's cheap pair, row 7's one default hash, row 22's
-  code rows at the few cheap limits each code needs, and the no-memory rows (ADR-0011,
-  amended).
+  code rows at the few cheap limits each code needs, the no-memory rows, and the docs'
+  password examples, which `test-docs` runs at the default (ADR-0011, amended).
   Under Valgrind, a minimum hash takes about 0.4 ms, and an interactive one about 0.7 s
   (M3 plan §5.1; the review's 5 ms and 0.8 s were (P)'s).
 - **Only the no-memory rows use a high limit:** two hashes at `'sensitive`, in gated children

@@ -1,0 +1,22 @@
+chez-sodium: libsodium loaded and accepted
+  path:       /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26 (override)
+  version:    1.0.22 (library 26.4)
+  counts:     ((block . 0))
+chez-sodium: libsodium loaded and accepted
+  path:       <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23 (override)
+  version:    1.0.18 (library 10.3)
+  counts:     ((block . 0))
+chez-sodium: libsodium loaded and accepted
+  path:       /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26 (guix-environment)
+  version:    1.0.22 (library 26.4)
+  counts:     ((block . 0))
+chez-sodium: libsodium refused
+(reason . load-failed)
+  path:       /no/such.so
+  source:     override
+  detail:     (while loading /no/such.so) /no/such.so: cannot open shared object file: No such file or directory
+  candidates: none
+  remedy:     the loader refused this libsodium; name one this Chez can load with CHEZ_SODIUM_LIBRARY, an absolute path
+  counts:     ((block . 0))
+make: *** [Makefile:147: build] Error 1
+exit 0

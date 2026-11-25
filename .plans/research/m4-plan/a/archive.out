@@ -1,0 +1,15 @@
+# git archive listings, on the host, at <repo> (read-only).
+$ git archive 527170d | tar -t | grep -c -E "^(\.plans/.|AGENTS\.md$)"   # before .gitattributes
+71
+$ git archive 0b800ed | tar -t | grep -c -E "^(\.plans/.|AGENTS\.md$)"   # the commit that added it
+0
+$ git archive d53e83c | tar -t | grep -c -E "^(\.plans/.|AGENTS\.md$)"
+0
+$ git archive d53e83c | tar -t | wc -l
+653
+$ git archive d53e83c | tar -t | grep -E "^vendor/"
+vendor/
+vendor/chez-srfi/
+$ git ls-files | wc -l; git ls-files .plans | wc -l
+630
+269

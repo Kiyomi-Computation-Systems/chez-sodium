@@ -1,0 +1,30 @@
+# Read-only GETs, 2026-11-25, with gh api. Long answers cut to the fields shown.
+$ gh api repos/Kiyomi-Computation-Systems/chez-sodium/pages
+{"message":"Not Found","documentation_url":"https://docs.github.com/rest/pages/pages#get-a-apiname-pages-site","status":"404"}gh: Not Found (HTTP 404)
+
+$ gh api repos/Kiyomi-Computation-Systems/chez-sodium/branches/main/protection
+{"message":"Branch not protected","documentation_url":"https://docs.github.com/rest/branches/branch-protection#get-branch-protection","status":"404"}gh: Branch not protected (HTTP 404)
+
+$ gh api repos/Kiyomi-Computation-Systems/chez-sodium/rulesets
+[]
+$ gh api repos/Kiyomi-Computation-Systems/chez-sodium/environments
+{"total_count":0,"environments":[]}
+$ gh api repos/Kiyomi-Computation-Systems/chez-sodium/tags
+[]
+$ gh api repos/Kiyomi-Computation-Systems/chez-sodium/releases
+[]
+$ gh api repos/Kiyomi-Computation-Systems/chez-sodium/rules/branches/main
+[]
+$ gh api repos/Kiyomi-Computation-Systems/chez-sodium --jq '{private, visibility, default_branch, has_pages, delete_branch_on_merge}'
+{"default_branch":"main","delete_branch_on_merge":false,"has_pages":false,"private":false,"visibility":"public"}
+$ gh api repos/Kiyomi-Computation-Systems/chez-sodium/actions/permissions/workflow
+{"default_workflow_permissions":"read","can_approve_pull_request_reviews":false}
+# The sibling, for comparison
+$ gh api repos/Kiyomi-Computation-Systems/chez-sqlite3/pages --jq '{build_type, html_url}'
+{"build_type":"workflow","html_url":"https://kiyomi-computation-systems.github.io/chez-sqlite3/"}
+$ gh api repos/Kiyomi-Computation-Systems/chez-sqlite3/environments/github-pages/deployment-branch-policies --jq '.branch_policies[] | {name, type}'
+{"name":"v*","type":"tag"}
+$ gh api repos/Kiyomi-Computation-Systems/chez-sqlite3/rulesets --jq '.[] | {id, name, target, enforcement}'
+{"enforcement":"active","id":27776633,"name":"release tags","target":"tag"}
+$ gh api repos/Kiyomi-Computation-Systems/chez-sqlite3/branches/main/protection --jq '{contexts: .required_status_checks.contexts, strict: .required_status_checks.strict}'
+{"contexts":["main (checks and suites, Chez built from source)","nothreads (every library is refused on a Chez without threads)","floor (the suites against SQLite at its floor, built from source)","current (the suites against the current SQLite, built from source)","memory-1 (the Valgrind gate, shard 1 of 2)","memory-2 (the Valgrind gate, shard 2 of 2)","site (the docs site, on Ubuntu's Chez)"],"strict":true}

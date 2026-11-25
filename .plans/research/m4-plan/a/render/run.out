@@ -1,0 +1,70 @@
+10.4.0
+site: wrote 2 pages to out-main
+site: wrote 2 pages to out-tag
+out-main:
+index.html
+reference.html
+style.css
+
+out-tag:
+index.html
+reference.html
+style.css
+== links, SITE_REF=main
+href="#hash-a-password"
+href="https://github.com/Kiyomi-Computation-Systems/chez-sodium"
+href="https://github.com/Kiyomi-Computation-Systems/chez-sodium/blob/main/README.org#requirements"
+href="index.html"
+href="#install"
+href="reference.html"
+href="reference.html#password-hash"
+href="style.css"
+== links, SITE_REF=v0.1.0
+href="#hash-a-password"
+href="https://github.com/Kiyomi-Computation-Systems/chez-sodium"
+href="https://github.com/Kiyomi-Computation-Systems/chez-sodium/blob/v0.1.0/README.org#requirements"
+href="index.html"
+href="#install"
+href="reference.html"
+href="reference.html#password-hash"
+href="style.css"
+== the code block and the callout, as rendered
+<pre><code class="language-sh">
+<pre><code class="language-scheme">
+<pre><code class="language-scheme">(let ((hash (password-hash "pässwörd€" (make-password-limits 1 8))))
+<div class="callout warning">
+== check-site
+check-site: README.org has no "** Documentation" section, the list of the pages the nav is held to
+check-site exit 1
+== README.org as Markdown, its first 12 lines of HTML
+<ul><li>chez-sodium</li></ul>
+<p>Password hashing, random bytes and fast hashing for Chez Scheme, through
+[[https://doc.libsodium.org/][libsodium]]'s C library.</p>
+<p>#+begin_quote
+✨ <em>AI Disclosure:</em> LLMs are used extensively in the planning and development of this project.
+#+end_quote</p>
+<p>chez-sodium will bind a small part of =libsodium= through Chez's foreign
+interface, and load it when your program runs: there will be nothing to
+compile. It covers four jobs:</p>
+<ul><li>hash a password with argon2id, check it, and tell when a hash needs
+redoing because its limits were raised;</li><li>make random bytes from the system, for keys and tokens;</li><li>hash bytes fast with BLAKE2b, for storing a long random key without storing
+the key;</li><li>compare two secrets in constant time.</li></ul>
+== slugs
+sodium-version -> sodium-version
+random-bytes -> random-bytes
+blake2b -> blake2b
+constant-time-bytevector=? -> constant-time-bytevector
+password-hash -> password-hash
+password-verify -> password-verify
+password-needs-rehash? -> password-needs-rehash
+make-password-limits -> make-password-limits
+chez-sodium-error? -> chez-sodium-error
+sodium-library-unavailable? -> sodium-library-unavailable
+sodium-library-unavailable-reason -> sodium-library-unavailable-reason
+sodium-library-unavailable-path -> sodium-library-unavailable-path
+sodium-library-unavailable-source -> sodium-library-unavailable-source
+sodium-library-unavailable-detail -> sodium-library-unavailable-detail
+sodium-library-unavailable-candidates -> sodium-library-unavailable-candidates
+sodium-failed? -> sodium-failed
+sodium-failed-function -> sodium-failed-function
+sodium-failed-code -> sodium-failed-code

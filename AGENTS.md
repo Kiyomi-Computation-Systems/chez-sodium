@@ -2,23 +2,24 @@
 
 ## Where the project stands
 
-* **M3 is done: the password verbs.** M0 built the records, the container, the test
-  harness, the memory gate and CI. M1 built the load, the block helper and CI's `floor`
+* **M4 is under way: the docs, the site and release 0.1.0.** M0 built the records,
+  the container, the test harness, the memory gate and CI. M1 built the load, the block helper and CI's `floor`
   and `current` lanes (its plan is `.plans/2026-11-22-m1-plan.md`). M2 built
   `random-bytes`, `blake2b` and `constant-time-bytevector=?` in
   `(chez-sodium private byte-verbs)` (its plan is `.plans/2026-11-23-m2-plan.md`). M3
   built `password-hash`, `password-verify`, `password-needs-rehash?` and
   `make-password-limits` in `(chez-sodium private password-verbs)`, beside native, on a
   pure core, `(chez-sodium private password-text)` (its plan is
-  `.plans/2026-11-24-m3-plan.md`). M4 comes next: `docs/`, `docs/reference.md` with
-  `test-reference`, the site, `CHANGELOG.md` and release 0.1.0. `.plans/progress.md` says
+  `.plans/2026-11-24-m3-plan.md`). M4 writes `docs/`, five pages held to the code by
+  `test-reference` and `test-docs`, the site and its CI, and release 0.1.0 (its plan is
+  `.plans/2026-11-25-m4-plan.md`; its record is ADR-0013). `.plans/progress.md` says
   where the project stands and what comes next.
 * The plan is the brief, `.plans/2026-11-22-chez-sodium-project-brief.md`. Read it before
   any work.
   - Its §11 holds the owner's decisions; its §10 records that nothing is open.
   - Its adversarial review, every finding with its evidence and probes, is in
     `.plans/research/brief-review/`.
-* The records are `.plans/decisions/`, ADR-0001 to ADR-0012.
+* The records are `.plans/decisions/`, ADR-0001 to ADR-0013.
   `.plans/global-constraints.md` holds their hard rules, and binds every task brief.
 * The brief's pattern is chez-sqlite3, at `../chez-sqlite3`. Its FFI rules come from
   chez-sqlite3 and chez-libuv, at `../chez-libuv`. Read the file there before copying
@@ -72,15 +73,17 @@
     `password-needs-rehash?` answers `#t`. The documents say what
   wiping cannot reach: the caller's copies, the bytevectors a verb returns, and copies
   the collector leaves behind.
-* A hash string is checked before C: printable ASCII, with no U+0000, within the input
-  cap. Its block ends in a 0, since C reads it up to its first NUL (brief §4.1). The
+* A hash string is checked before C: printable ASCII from U+0021 to U+007E, so no space
+  and no U+0000, within the input cap. Its block ends in a 0, since C reads it up to its
+  first NUL (brief §4.1). The
   pre-check and needs-rehash's shape check live in the pure
   `(chez-sodium private password-text)`, and run before any section.
 * A password is hashed as its UTF-8 bytes, exactly as given. The binding never
   normalises it.
-* `password-needs-rehash?` answers `#t` for any hash that is not what `password-hash`
-  would make now, unreadable ones included, and never raises because of the hash
-  (brief §4.2).
+* `password-needs-rehash?` answers `#t` for a hash not made with today's algorithm,
+  parallelism and limits, unreadable ones included, and never raises because of the hash
+  (brief §4.2). It reads no salt or tag size, so it is no check that a hash is whole:
+  only `password-verify`, with the password, finds damage (ADR-0009, amended).
 
 ### Dependencies
 
@@ -163,8 +166,10 @@
   `_memlimit_min`, so the suite stays fast under Valgrind. The exceptions are one cheap
   pair that is neither the minimum nor a preset, and one hash at the default
   (brief §8.2). Row 22's code rows hash at the few cheap limits each code needs. The
-  collect-safe row needs no high limit: it blocks a decoy on a FIFO. Only the no-memory
-  rows hash at `'sensitive`, in gated children under a memory cap (ADR-0011, amended).
+  collect-safe row needs no high limit: it blocks a decoy on a FIFO. The docs' password
+  examples hash at the default, the call a reader copies, and `test-docs` runs them. Only
+  the no-memory rows hash at `'sensitive`, in gated children under a memory cap
+  (ADR-0011, amended).
 * A row that says C was not reached proves it from the decoy's call log. libsodium
   accepts many mistakes, for example sizes of 1 to 15 bytes, so its answer proves
   nothing.
