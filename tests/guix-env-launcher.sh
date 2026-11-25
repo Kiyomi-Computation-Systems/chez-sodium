@@ -137,18 +137,22 @@ reset_profile() {
   : >"$store/scheme"
   : >"$store/gcc"
   : >"$store/libsodium.so.26.4.0"
+  : >"$store/libcmark-gfm.so.0.29.0.gfm.13"
+  : >"$store/libcmark-gfm-extensions.so.0.29.0.gfm.13"
   ln -s "$store/scheme" "$profile/bin/scheme"
   ln -s "$store/gcc" "$profile/bin/gcc"
   ln -s "$store/libsodium.so.26.4.0" "$profile/lib/libsodium.so.26"
+  ln -s "$store/libcmark-gfm.so.0.29.0.gfm.13" "$profile/lib/libcmark-gfm.so"
+  ln -s "$store/libcmark-gfm-extensions.so.0.29.0.gfm.13" "$profile/lib/libcmark-gfm-extensions.so"
 }
 
-# run_enter: prints CHEZ, CC, CHEZ_SODIUM_LIBRARY and LD_LIBRARY_PATH (or
-# "unset") as the command sees them, separated by |.
+# run_enter: prints CHEZ, CC, CHEZ_SODIUM_LIBRARY, LD_LIBRARY_PATH (or
+# "unset") and CHEZ_CMARK_GFM_LIBS as the command sees them, separated by |.
 run_enter() {
   status=999
   ( cd "$enter_cwd" && env -i PATH="$PATH" GUIX_ENVIRONMENT="$profile" \
       sh "$enter" sh -c \
-      'printf "%s|%s|%s|%s\n" "${CHEZ-}" "${CC-}" "${CHEZ_SODIUM_LIBRARY-}" "${LD_LIBRARY_PATH-unset}"' ) \
+      'printf "%s|%s|%s|%s|%s\n" "${CHEZ-}" "${CC-}" "${CHEZ_SODIUM_LIBRARY-}" "${LD_LIBRARY_PATH-unset}" "${CHEZ_CMARK_GFM_LIBS-}"' ) \
     >"$tmp/out" 2>"$tmp/err"
   status=$?
 }
@@ -156,7 +160,8 @@ field() { cut -d '|' -f "$1" "$tmp/out"; }
 
 # T7a: a complete profile. Every export names the profile's own entry,
 # never the store file it resolves to: the self-test requires the library's
-# name to be libsodium.so.26.
+# name to be libsodium.so.26, and the two cmark-gfm libraries' the profile's
+# lib/libcmark-gfm.so and lib/libcmark-gfm-extensions.so.
 reset_profile
 run_enter
 check "T7a complete profile: exit 0" [ "$status" -eq 0 ]
@@ -165,9 +170,11 @@ check "T7a CC is the profile's gcc" [ "$(field 2)" = "$profile/bin/gcc" ]
 check "T7a CHEZ_SODIUM_LIBRARY is the profile's libsodium.so.26" \
   [ "$(field 3)" = "$profile/lib/libsodium.so.26" ]
 check "T7a no LD_LIBRARY_PATH" [ "$(field 4)" = "unset" ]
+check "T7a CHEZ_CMARK_GFM_LIBS is the profile's two cmark-gfm libraries, the core first" \
+  [ "$(field 5)" = "$profile/lib/libcmark-gfm.so:$profile/lib/libcmark-gfm-extensions.so" ]
 check "T7a no state directory" [ ! -e "$enter_cwd/.guix-env" ]
 
-# T7b-e: a profile missing one entry is refused, naming the entry, and the
+# T7b-i: a profile missing one entry is refused, naming the entry, and the
 # command never runs.
 refused() {  # LABEL PATH
   check "$1: exit 2" [ "$status" -eq 2 ]
@@ -193,6 +200,26 @@ reset_profile
 rm "$profile/bin/gcc"
 run_enter
 refused "T7e no gcc" "$profile/bin/gcc"
+
+reset_profile
+rm "$profile/lib/libcmark-gfm.so"
+run_enter
+refused "T7f no libcmark-gfm.so" "$profile/lib/libcmark-gfm.so"
+
+reset_profile
+rm "$profile/lib/libcmark-gfm-extensions.so"
+run_enter
+refused "T7g no libcmark-gfm-extensions.so" "$profile/lib/libcmark-gfm-extensions.so"
+
+reset_profile
+rm "$store/libcmark-gfm.so.0.29.0.gfm.13"
+run_enter
+refused "T7h dangling libcmark-gfm.so" "$profile/lib/libcmark-gfm.so"
+
+reset_profile
+rm "$store/libcmark-gfm-extensions.so.0.29.0.gfm.13"
+run_enter
+refused "T7i dangling libcmark-gfm-extensions.so" "$profile/lib/libcmark-gfm-extensions.so"
 
 # T8: the command's arguments pass through verbatim.
 reset_profile

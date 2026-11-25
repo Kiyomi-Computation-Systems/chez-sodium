@@ -11,9 +11,12 @@
 ;;;   - it has no scripts clause: Akku's script mechanism prompts on every
 ;;;     install, and nothing here builds (see Akku.manifest);
 ;;;   - its depends/dev is exactly chez-srfi, in the range that names the
-;;;     pinned version;
-;;;   - Akku.lock holds one project, chez-srfi, its url holding the version
-;;;     Akku.manifest asks for, and carrying a sha256;
+;;;     pinned version, and chez-cmark-gfm, which renders the docs site
+;;;     alone (ADR-0011);
+;;;   - Akku.lock holds two projects, chez-cmark-gfm then chez-srfi, each
+;;;     url holding the version Akku.manifest asks for, and each carrying a
+;;;     sha256: chez-cmark-gfm's the archive `make site-deps` fetches and
+;;;     checks;
 ;;;   - the package's version is CHANGELOG.md's latest release, or 0.0.0
 ;;;     while there is none, so a release that bumps one alone fails;
 ;;;   - CHANGELOG.md's latest release has an entry that says something, and
@@ -478,13 +481,13 @@
   '()
   (answer (lambda () (package-clauses 'scripts))))
 
-(test-equal "Akku.manifest's depends/dev is exactly chez-srfi, in the range that names the pinned version"
-  '((depends/dev ("chez-srfi" "^0.0.0-akku.181.7879b52")))
+(test-equal "Akku.manifest's depends/dev is exactly chez-srfi, in the range that names the pinned version, and chez-cmark-gfm at ^2.0.0"
+  '((depends/dev ("chez-srfi" "^0.0.0-akku.181.7879b52") ("chez-cmark-gfm" "^2.0.0")))
   (answer (lambda () (package-clauses 'depends/dev))))
 
 ;; Whole projects, in the order akku lock writes them, by name.
-(test-equal "Akku.lock holds exactly one project, chez-srfi"
-  '(((name "chez-srfi")))
+(test-equal "Akku.lock holds exactly two projects, chez-cmark-gfm then chez-srfi"
+  '(((name "chez-cmark-gfm")) ((name "chez-srfi")))
   (answer (lambda () (map (lambda (project) (list (assq 'name project))) (lock-projects)))))
 
 ;; One url each, and it holds the version. The expected value is the version
@@ -497,8 +500,31 @@
             (list (contains? url (dev-version "chez-srfi")) (contains? url "akku.181.7879b52")))
           (lock-urls "chez-srfi")))))
 
+;; One url each, and it holds the version.
+(test-equal "Akku.lock's chez-cmark-gfm url holds the version Akku.manifest asks for, and the pinned one"
+  '((#t #t))
+  (answer
+   (lambda ()
+     (map (lambda (url)
+            (list (contains? url (string-append "_" (dev-version "chez-cmark-gfm") "_"))
+                  (contains? url "chez-cmark-gfm_2.0.0_repack")))
+          (lock-urls "chez-cmark-gfm")))))
+
+;; The project whole: the archive make site-deps downloads, and the sha256 it
+;; checks that archive against.
+(test-equal "Akku.lock's chez-cmark-gfm project is the archive make site-deps fetches, and its sha256"
+  '(((name "chez-cmark-gfm")
+     (location
+      (url "https://archive.akkuscm.org/archive/pkg/c/chez-cmark-gfm_2.0.0_repack.tar.xz"))
+     (content
+      (sha256 "bb647e07c03f103600ceb29d5545787bf0ba54563b1bbd98f3be7ac778305159"))))
+  (answer
+   (lambda ()
+     (filter (lambda (project) (equal? (assq 'name project) '(name "chez-cmark-gfm")))
+             (lock-projects)))))
+
 (test-equal "Akku.lock's every project carries a sha256 of 64 hex digits"
-  '(#t)
+  '(#t #t)
   (answer
    (lambda ()
      (map (lambda (project)

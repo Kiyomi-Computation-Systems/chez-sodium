@@ -14,6 +14,12 @@
    "chez-scheme" "libsodium" "gcc-toolchain"
    ;; The memory gate (ADR-0011).
    "valgrind"
+   ;; `make site` renders docs/ through chez-cmark-gfm, which loads this C
+   ;; library by the absolute paths scripts/guix-env-enter exports (ADR-0011).
+   "cmark-gfm"
    ;; What the Makefile and scripts shell out to. bash also gives the
-   ;; self-test its network probe, /dev/tcp. The container has nothing else.
-   "bash" "coreutils" "make" "grep" "sed" "gawk" "findutils" "diffutils"))
+   ;; self-test its network probe, /dev/tcp. tar and xz unpack the archive
+   ;; scripts/fetch-akku-lock holds chez-cmark-gfm's tree to, and build the
+   ;; ones tests/fetch-akku-lock.sh makes. The container has nothing else.
+   "bash" "coreutils" "make" "grep" "sed" "gawk" "findutils" "diffutils"
+   "tar" "xz"))
