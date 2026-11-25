@@ -1,0 +1,9 @@
+chez-sodium v0.1.0 — the first release
+
+Password hashing for Chez Scheme, through a small part of libsodium's C
+library: argon2id hashing, checking and rehashing, random bytes, BLAKE2b
+for storing API keys, and a constant-time compare. libsodium is loaded
+when your program runs, so there is nothing to build. It needs Chez
+Scheme 10.4.0 or later, built with threads, and libsodium 1.0.18 or
+later. Its suites have run on Linux x86_64. The API may change in any
+release before 1.0.

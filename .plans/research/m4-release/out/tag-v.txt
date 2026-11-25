@@ -1,0 +1,4 @@
+gpg:                using EDDSA key CC2923E50902E936049B696B9EBA259B8EAC5130
+gpg: Good signature from "Kiyomi Computation Systems LLC (software releases) <releases@kiyomicomputation.systems>" [ultimate]
+b8c5acb97f507b0131ffc5f7df43c89a9b55fa11	refs/tags/v0.1.0
+981ba2e9e6a41b305d645db8ded4bd49c2c5b341	refs/tags/v0.1.0^{}
