@@ -1,7 +1,7 @@
 #!r6rs
 ;; PURE. Imports no library that loads a shared object.
 (library (site links)
-  (export rewrite-links repo-blob valid-ref? release-tag-version)
+  (export rewrite-links repo-blob valid-ref? release-tag-version release-like-ref?)
   (import (rnrs) (only (site pages) page-file-name))
 
   ;; repo-blob : String
@@ -11,7 +11,7 @@
   (define repo-blob
     "https://github.com/Kiyomi-Computation-Systems/chez-sodium/blob/")
 
-;; valid-ref? : String -> Boolean
+  ;; valid-ref? : String -> Boolean
   ;; Whether REF may go into every repository URL the site writes: one or more
   ;; of A-Z a-z 0-9 . _ / -, and not beginning with -.
   (define (valid-ref? ref)
@@ -37,6 +37,14 @@
                    ((and (char=? (car cs) #\.) (> digits 0) (< dots 2))
                     (loop (cdr cs) 0 (+ dots 1)))
                    (else #f))))))
+
+  ;; release-like-ref? : String -> Boolean
+  ;; Whether REF begins with "v" and a digit, as a release tag does, whether or
+  ;; not it is exactly "v" and three naturals.
+  (define (release-like-ref? ref)
+    (and (> (string-length ref) 1)
+         (char=? (string-ref ref 0) #\v)
+         (char<=? #\0 (string-ref ref 1) #\9)))
 
   (define (prefix? pre s)
     (and (>= (string-length s) (string-length pre))

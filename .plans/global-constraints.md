@@ -134,9 +134,11 @@ record it comes from, and where a rule and its record disagree, the record wins.
   included, and raises no condition for it. The owner confirmed it on 2026-11-24, when Techo
   asked ([ADR-0006], amended).
 - **A password or hash another thread changed during the call is refused after the section,**
-  `changed-during-call`, by `password-hash` and `password-verify`. `password-needs-rehash?`
-  answers `#t` for a hash changed during its call, since it never raises because of the hash
-  ([ADR-0006], [ADR-0009], amended).
+  `changed-during-call`, by `password-hash` and `password-verify`, and `password-needs-rehash?`
+  answers `#t`, since it never raises because of the hash. That covers only a change the writers can see: one that alters a password's length in UTF-8 bytes, or puts
+  a hash string's character out of range. Any other change is hashed or checked as the string
+  stood mid-call, and matches neither the old string nor the new (M4's plan, §3) ([ADR-0006],
+  [ADR-0009], amended).
 - **No secret reaches a condition.** A refusal of a secret parameter names the parameter and its
   kind only, whatever the value's type: irritants `(RULE PARAMETER (kind K))`, through
   `refuse-secret`, in every helper too. Every string and bytevector parameter is secret: a
@@ -310,6 +312,8 @@ record it comes from, and where a rule and its record disagree, the record wins.
   banned words, the export spans, run blocks evaluated, whole programs run through
   `gated-command`, and `finding-libsodium.md`'s tables against discovery's code. No page links
   into `.plans/`, or says `ADR-`, `TODO`, "yet", "unreleased", "slice" or a date ([ADR-0013]).
+- **No page holds a finding id, such as `M3S2-F4`, or says "printable ASCII".** `test-docs` holds
+  both, beside the banned words above ([ADR-0013]).
 - **No page restates a floor:** `check-floors` reads `docs/`, and a page names a floor by a link
   to README.org's Requirements ([ADR-0011], amended).
 - **Installing is a clone, with nothing built.** Every `git clone` line names the manifest's

@@ -240,6 +240,12 @@ Accepted (the owner, 2026-11-25), proposed in [the M4 plan](../2026-11-25-m4-pla
   swap, a `'sensitive` hash and a `'sensitive` verify were each killed, exit 137, at 1.0.18 and
   1.0.22, and nothing was raised. `'interactive` ran to the end (pre-work B, M3-c). The brief
   review had accepted this with no output kept.
+- **`changed-during-call` covers only a change the writers can see** (M4's slice 1 docs review,
+  M4S1D-F1, and its closing review, M4C-F1). The M3 amendment's "a `password` or `hash` another
+  thread changed during the call" read wider. The writers see a change to a password's UTF-8
+  length, or a hash string's character out of range. Any other change is hashed or checked as the
+  string stood mid-call, and matches neither the old string nor the new: 20 of 20 same-width
+  rewrites, reproduced 10 of 10. The documents say never to change a string a verb is reading.
 - **Under short memory a wrong password reads as short memory too.** The fallback's throwaway
   hash fails whichever the password was, so the documents say the fallback can only suggest short
   memory, never prove the password right.

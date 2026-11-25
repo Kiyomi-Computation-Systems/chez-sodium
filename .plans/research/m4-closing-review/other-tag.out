@@ -1,0 +1,12 @@
+== libsodium at /gnu/store/1nqrw55hys6q9wyqrha67b6m09zhmdgf-profile/lib/libsodium.so.26
+(tag-bytes 32 length 93 verify-right #t verify-wrong #f needs-rehash-at-its-limits #f)
+(tag-bytes 16 length 72 verify-right #t verify-wrong #f needs-rehash-at-its-limits #f)
+(tag-bytes 64 length 136 verify-right #t verify-wrong #f needs-rehash-at-its-limits #t)
+(password-hash-makes-length 93)
+== exit 0
+== libsodium at <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+(tag-bytes 32 length 93 verify-right #t verify-wrong #f needs-rehash-at-its-limits #f)
+(tag-bytes 16 length 72 verify-right #t verify-wrong #f needs-rehash-at-its-limits #f)
+(tag-bytes 64 length 136 verify-right #t verify-wrong #f needs-rehash-at-its-limits #t)
+(password-hash-makes-length 93)
+== exit 0

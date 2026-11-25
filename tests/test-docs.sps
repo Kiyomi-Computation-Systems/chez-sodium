@@ -81,8 +81,14 @@
 ;;;   library's refusal reasons, in its order. Each - `REASON`: bullet of a
 ;;;   verb's entry names a reason that verb raises, which a probe of the
 ;;;   verb's own mistakes shows, but for two the probe cannot reach, held to
-;;;   a quoted symbol of password-verbs.sls. The detail entry's bullets are
-;;;   the library's reasons, each once, in any order.
+;;;   a quoted symbol of password-verbs.sls; and names each reason the verb
+;;;   raises. The order the page promises is the probes': an entry's probed
+;;;   reasons, each at its first place, are the probes' reasons in the order
+;;;   the code checks them; a reason no probe reaches is held by presence
+;;;   alone. The detail entry's bullets are the library's reasons, each once,
+;;;   in any order. The glossary's Limits line is the source's Limits line
+;;;   of src/chez-sodium.sls, read as text: the quoted presets in order, then
+;;;   Password-limits.
 ;;;
 ;;; THE RUNNABLE CONVENTION. A Markdown Scheme block whose info string is
 ;;; exactly the one word run, written ```scheme run, is run: the tests
@@ -2341,6 +2347,95 @@
 (test-equal "reference.md: each reason an entry of a verb names is one the verb raises, by verb and reason; no entry of another name has reasons but the detail entry"
   '()
   (entry-problems (entries reference-prose) (map car reason-probes) raised-by))
+
+;; entry-gaps : (Listof Entry) (Listof String) (String -> (Listof String)) (String -> (Listof String))
+;;              -> (Listof (List String Any))
+;; What a verb's entry among VERBS leaves out, beside what entry-problems finds:
+;; each reason RAISED-OF gives that the entry does not name, as (VERB REASON
+;; missing); and, when it leaves none of the PROBED-OF reasons out, those
+;; reasons in an order other than PROBED-OF's, as (VERB order). The entry's
+;; order is its probed reasons, each at its first place; the reasons no probe
+;; reaches are held by presence alone. An entry that has no reasons, and a
+;; verb with no entry, are the rows beside this one.
+(define (entry-gaps entries verbs raised-of probed-of)
+  (apply append
+         (map (lambda (e)
+                (if (and (member (car e) verbs) (pair? (cdr e)))
+                    (let* ((missing (filter (lambda (r) (not (member r (cdr e)))) (raised-of (car e))))
+                           (probed (probed-of (car e)))
+                           (seen (distinct (filter (lambda (r) (member r probed)) (cdr e))))
+                           (probed-missing (filter (lambda (r) (not (member r seen))) probed)))
+                      (append (map (lambda (r) (list (car e) r 'missing)) missing)
+                              (if (and (null? probed-missing) (not (equal? seen probed)))
+                                  (list (list (car e) 'order))
+                                  '())))
+                    '()))
+              entries)))
+
+(test-equal "entry-gaps: a reason a verb raises that its entry leaves out, by verb; probed reasons out of the probes' order, once each, but not when one is left out; an entry with no reasons, one that is no verb's and an extra reason, not"
+  '(("v" "c" missing) ("w" order) ("y" "q" missing))
+  (entry-gaps '(("v" "a" "b") ("w" "b" "a" "b" "c" "x") ("u" "a") ("e") ("z" "a") ("y" "a" "b"))
+              '("v" "w" "e" "y")
+              (lambda (verb) (cond ((string=? verb "y") '("a" "b" "q")) (else '("a" "b" "c"))))
+              (lambda (verb) '("a" "b" "c"))))
+
+(test-equal "entry-gaps: a verb's entry that names each reason it raises, the probed ones in order, repeated or with the unprobed one between, is no gap"
+  '()
+  (entry-gaps '(("v" "a" "a" "q" "b" "c")) '("v")
+              (lambda (verb) '("a" "b" "c" "q")) (lambda (verb) '("a" "b" "c"))))
+
+(test-equal "reference.md: each verb's entry names each reason the verb raises, and its probed ones in the probes' order, which is the order the code checks"
+  '()
+  (entry-gaps (entries reference-prose) (map car reason-probes) raised-by
+              (lambda (verb) (let ((p (assoc verb probed-reasons)))
+                               (if p (distinct (filter string? (cdr p))) '())))))
+
+;; limits-of-line : String -> (Listof String)
+;; The names of the quoted words of a Limits line up to its first ), each
+;; without its ' and its trailing ,, and Password-limits, last, when the line holds it.
+(define (limits-of-line line)
+  (let ((strip (lambda (w)
+                 (let loop ((n (string-length w)))
+                   (if (and (> n 0) (memv (string-ref w (- n 1)) '(#\, #\))))
+                       (loop (- n 1))
+                       (substring w 0 n))))))
+    (append (map (lambda (w) (substring (strip w) 1 (string-length (strip w))))
+                 (filter (lambda (w) (starts? w "'"))
+                         (words (let ((close (search line ")" 0)))
+                                  (if close (substring line 0 close) line)))))
+            (if (search line "Password-limits" 0) '("Password-limits") '()))))
+
+;; limits-line-of : (Listof String) (String -> Boolean) -> (U (Listof String) 'no-limits-line)
+;; limits-of-line of the first line the predicate holds; else no-limits-line.
+(define (limits-line-of lines pred)
+  (let ((l (find pred lines)))
+    (if l (limits-of-line l) 'no-limits-line)))
+
+(define (glossary-limits-line? l)
+  (and (starts? l "Limits") (> (string-length l) 6) (blank? (string-ref l 6))))
+
+(define (source-limits-line? l) (starts? (trim l) ";;   Limits = "))
+
+(test-equal "limits-of-line and limits-line-of: the presets of a Limits line, in order, with Password-limits last; the first line the predicate holds, else none"
+  '(("interactive" "moderate" "sensitive" "Password-limits") ("interactive" "moderate" "Password-limits")
+    ("interactive") no-limits-line)
+  (list (limits-of-line "Limits   'interactive, 'moderate, 'sensitive or a Password-limits")
+        (limits-of-line ";;   Limits = (U 'interactive 'moderate Password-limits), by default 'interactive")
+        (limits-line-of '("Natural x" "Limits 'interactive" "Limits 'z") glossary-limits-line?)
+        (limits-line-of '("Limitsx 'a" "Limits") glossary-limits-line?)))
+
+(test-equal "limits rows: the glossary's Limits line and the source's hold the same presets, in order, as text; a line with one preset less is no match"
+  '(#t #f)
+  (let ((g (limits-of-line "Limits  'interactive, 'moderate, 'sensitive or a Password-limits")))
+    (list (equal? g (limits-of-line ";;   Limits = (U 'interactive 'moderate 'sensitive Password-limits), by default 'interactive"))
+          (equal? g (limits-of-line ";;   Limits = (U 'interactive 'moderate Password-limits), by default 'interactive")))))
+
+(define source-lines (guard (e (#t '())) (text-lines (slurp "src/chez-sodium.sls"))))
+
+(test-equal "reference.md: its glossary's Limits line is the source's Limits line, in text: the presets in order, then Password-limits"
+  (limits-line-of source-lines source-limits-line?)
+  (limits-line-of (apply append (map block-lines (filter (lambda (b) (string=? (block-language b) "text")) reference-blocks)))
+                  glossary-limits-line?))
 
 (test-equal "reference.md: each verb has an entry that names a reason: the verbs without"
   '()

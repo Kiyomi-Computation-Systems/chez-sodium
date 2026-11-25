@@ -285,7 +285,8 @@ Accepted (the owner, 2026-11-25), proposed in [the M4 plan](../2026-11-25-m4-pla
     `gated-command` for a whole program.
   - Measured under the gate (pre-work A, §4.2): about 0.7 s a hash or a verify in process, and
     about 4.9 s for each gated whole program before it does anything.
-  - No docs example hashes above the default.
+  - No docs example that runs hashes above the default. A fragment, read but never run, may
+    show a preset, as the passwords page's `'moderate` does (M4's closing review, M4C-F14).
 - **`check-floors` reads `docs/`:** no line of a page holds either floor's dotted text, so a page
   names a floor by a link to README.org's Requirements. Decision 4's dotted form is the one form
   refused, as everywhere `check-floors` reads.

@@ -96,6 +96,9 @@ The right password logs in, and its hash is redone at `my-limits`.
 - **Wrap the rehash.** It can raise a condition that `sodium-failed?` holds,
   when libsodium can't get the memory. Then keep the old hash, and log the
   user in all the same: the password was right.
+- **Store it only if the hash is unchanged.** Write the new hash only if
+  the account still holds the hash you just verified. Otherwise a login
+  that races a password reset can put the old password back.
 - **What needs-rehash checks.** `password-needs-rehash?` answers `#t` when
   the hash was not made with today's algorithm, parallelism and the limits
   you give it, or when libsodium can't read it. It is no check that the
@@ -121,7 +124,8 @@ an unknown name is checked against.
 
 So check that the password is a string of at most 16384 characters first,
 or catch `assertion-violation?`. A character takes at most 4 bytes as
-UTF-8, so such a string always fits.
+UTF-8, so such a string always fits. `password-hash` refuses the same two,
+so check a new password at sign-up the same way.
 
 The stored hash is never refused for its length or its characters: any
 string that is no hash, however long, answers `#f`.
@@ -143,8 +147,14 @@ older limits, so her first login replaces it.
 ;; The limits new hashes use.
 (define limits 'interactive)
 
-;; One real hash, checked for a name that has no account.
-(define no-account (password-hash "no one's password" limits))
+;; A password nobody knows, never shown: 16 random bytes, in hex.
+(define no-one
+  (number->string
+   (bytevector-uint-ref (random-bytes 16) 0 (endianness big) 16)
+   16))
+
+;; One real hash, of that password, checked for a name that has no account.
+(define no-account (password-hash no-one limits))
 
 (define (sign-up! name password)
   (hashtable-set! accounts name (password-hash password limits)))
@@ -173,7 +183,7 @@ older limits, so her first login replaces it.
 (show (password-needs-rehash? (hashtable-ref accounts "ada" #f) limits))
 (show (log-in! "ada" "wrong horse"))
 (show (log-in! "bea" "battery staple"))
-(show (log-in! "cal" "correct horse"))
+(show (log-in! "cal" no-one))
 (show (log-in! "ada" #f))
 ```
 
@@ -189,8 +199,10 @@ refused
 refused
 ```
 
-Ada logs in, and her new hash verifies and is current. A wrong password, a
-name with no account and a missing password are each refused.
+Ada logs in, and her new hash verifies and is current. A wrong password and
+a missing password are refused. Cal has no account, and a name with none is
+refused whatever the password, even the dummy's own. Make the dummy from a
+password nobody knows, as here.
 
 ## Store the hash exactly
 
@@ -245,6 +257,10 @@ Each hash and each verify takes its limits' memory while it runs.
   nothing is raised. Size a container for every hash that can run at once:
   64 MiB each at `'interactive`, 256 MiB at `'moderate` and 1 GiB at
   `'sensitive`, plus the program's own memory.
+
+So bound how many hashes run at once, with a fixed number of worker threads
+or a queue, and limit how often logins may fail. Without a bound, a flood of
+logins takes all the memory.
 
 ## Where hashes live
 

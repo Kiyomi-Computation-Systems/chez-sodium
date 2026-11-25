@@ -104,6 +104,44 @@
   (list (list 'exit (list 'site-exit-status 'runner)) #f)
   (list site-exit-form (equal? site-exit-form suite-exit-form)))
 
+;; --- the Makefile keeps SITE_REF out of every recipe's text ------------------
+
+;; contains? : String String -> Boolean
+(define (contains? s sub)
+  (let ((n (string-length s)) (m (string-length sub)))
+    (let loop ((i 0))
+      (cond ((> (+ i m) n) #f)
+            ((string=? sub (substring s i (+ i m))) #t)
+            (else (loop (+ i 1)))))))
+
+;; hostile-ref : String
+;; A tag name holding shell code, as data: a backtick command and a dollar
+;; command. A recipe that expanded it into its text would print the marker.
+(define hostile-ref "v1`echo INJECTEDTICK`$(echo INJECTEDDOLLAR)")
+
+;; dry-run : String -> (List Integer Boolean Boolean)
+;; make -n GOAL with the hostile ref in the child's environment: its exit
+;; status, whether its printed recipes (stdout and stderr) hold either marker
+;; or the whole ref, and whether they hold the generator's command. make -n
+;; prints each recipe line and runs none, so nothing here is executed.
+(define (dry-run goal needle)
+  (let* ((r (capture-command
+             (list "env" "-u" "MAKEFLAGS" "-u" "MFLAGS" "-u" "MAKELEVEL"
+                   (string-append "SITE_REF=" hostile-ref)
+                   "make" "--no-print-directory" "-n" goal)))
+         (text (string-append (cadr r) (caddr r))))
+    (list (car r)
+          (or (contains? text "INJECTED") (contains? text "`") (contains? text "$(echo"))
+          (contains? text needle))))
+
+(test-equal "make -n site prints the generator's command and no part of SITE_REF"
+  '(0 #f #t)
+  (dry-run "site" "build-site.sps"))
+
+(test-equal "make -n check-site prints the checker's command and no part of SITE_REF"
+  '(0 #f #t)
+  (dry-run "check-site" "tests/check-site.sps"))
+
 (test-end "site-testing")
 
 ;; This suite tests a verdict, so its exit cannot rest on that verdict: it

@@ -32,11 +32,18 @@
 #   script       writes the libsodium floor    and no suite runs
 #   floors-      SECURITY.md writes the       check-floors names the line,
 #   house        Chez floor                   and no suite runs
+#   floors-      CONTRIBUTING.md and the bug  check-floors names each line,
+#   contrib      report template write a      and no suite runs
+#                floor
 #   floors-      a page of docs/ writes the   check-floors names the line,
 #   docs         libsodium floor              and no suite runs
 #   ci         job memory given a            check-ci names the key, and
 #                continue-on-error key         no suite runs
 #   no-suites    every suite deleted           make test refuses to pass
+#
+# Every contributor file gets its own plant: SECURITY.md and a page already
+# have one, and a file dropped from check-floors' line in the Makefile is
+# read by nothing else, so only a plant in it can show the drop.
 #
 # The copy holds no real suite, so no slow one can run into the 5 s
 # TEST_TIMEOUT. The plant is tests/test-0-plant.sps, or, in the two site
@@ -50,8 +57,9 @@
 # "check-suites: " or "test: " as a whole: check-suites' verdict, the plant's
 # outcome, the after-suite's pass line, and the count. The leaks case also
 # compares the lines starting "suite-exit-status: ", whole, the seam case those
-# starting "check-seam: ", the floors, floors-script, floors-house and floors-docs cases those starting
-# "check-floors: ", and the ci case those starting "check-ci: ".
+# starting "check-seam: ", the floors, floors-script, floors-house,
+# floors-contrib and floors-docs cases those starting "check-floors: ", and
+# the ci case those starting "check-ci: ".
 #
 # The copy is the working tree without .git, build/ and .claude/ (Claude
 # Code's local state, which can hold whole worktrees), and with the
@@ -463,6 +471,26 @@ run_case "floors-house: check-floors names SECURITY.md when it writes the Chez f
      echo 'check-floors: FAILED (problems: 1)')" \
   '^(check-suites|check-floors|test): '
 cp "$root/SECURITY.md" "$copy/SECURITY.md"
+
+# The floors-contrib case: CONTRIBUTING.md writes the libsodium floor and the
+# bug-report template the Chez floor, each read from the copy's floors file.
+# Without either path on the Makefile's check-floors line, no check sees its
+# plant and make test passes: the case fails then.
+cp "$root/CONTRIBUTING.md" "$copy/CONTRIBUTING.md"
+printf 'It needs libsodium %s or later.\n' "$sodium_floor" >>"$copy/CONTRIBUTING.md"
+contrib_line=$(grep -c '' "$copy/CONTRIBUTING.md")
+tmpl=.github/ISSUE_TEMPLATE/bug_report.md
+cp "$root/$tmpl" "$copy/$tmpl"
+printf 'Chez version (%s or later),\n' "$chez_floor" >>"$copy/$tmpl"
+tmpl_line=$(grep -c '' "$copy/$tmpl")
+run_case "floors-contrib: check-floors names CONTRIBUTING.md and an issue template that write a floor, and no suite runs" \
+  "$(checked 1
+     echo "check-floors: CONTRIBUTING.md: line $contrib_line contains the libsodium floor $sodium_floor, which no page may write: a page links to README.org's Requirements, which state it from packaging/floors.sexp"
+     echo "check-floors: $tmpl: line $tmpl_line contains the Chez floor $chez_floor, which no page may write: a page links to README.org's Requirements, which state it from packaging/floors.sexp"
+     echo 'check-floors: FAILED (problems: 2)')" \
+  '^(check-suites|check-floors|test): '
+cp "$root/CONTRIBUTING.md" "$copy/CONTRIBUTING.md"
+cp "$root/$tmpl" "$copy/$tmpl"
 
 cp "$root/docs/tokens.md" "$copy/docs/tokens.md"
 printf 'It needs libsodium %s or later.\n' "$sodium_floor" >>"$copy/docs/tokens.md"

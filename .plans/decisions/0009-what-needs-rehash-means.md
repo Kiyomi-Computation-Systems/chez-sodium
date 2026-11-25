@@ -178,6 +178,9 @@ Accepted (the owner, 2026-11-25: "go with A"), proposed in [the M4 plan](../2026
   answers `#t`, and a damaged hash verifies `#f`.
 - **The documents say it:** needs-rehash tells whether a hash was made with today's algorithm,
   parallelism and limits; it is no check that the hash is intact.
+- **The M3 amendment's "a hash another thread changed during the call answers `#t`"** holds only
+  for a change the writer sees: a character out of range, or a change to the string's length. Any
+  other change is read as the string stood mid-call ([ADR-0006], amended 2026-11-25).
 - **The M3 amendment's "a tag of 42" is corrected.** libsodium answers -1 for a salt of 21
   characters, since a lone trailing character never decodes. A tag of 42 characters answers -1
   only when its last character's spare bits are not zero: ending in `g`, `w`, `A` or `Q` it

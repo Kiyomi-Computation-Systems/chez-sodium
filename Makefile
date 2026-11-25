@@ -274,17 +274,17 @@ check-seam: ## Fail unless every library under src/ keeps to the seam: the famil
 	@$(CHEZ) --program tests/check-seam.sps src
 
 # Holds README.org, every file under .github/workflows, scripts/ci and docs,
-# and CONTRIBUTING.md and SECURITY.md, to packaging/floors.sexp, the one file
-# that writes the floors (ADR-0011, tests/check-floors.sps): the list lines of
+# and CONTRIBUTING.md, SECURITY.md and the issue and pull request templates,
+# to packaging/floors.sexp, the one file that writes the floors (ADR-0011, tests/check-floors.sps): the list lines of
 # README.org's Requirements section must state them, and no other line of
 # README.org may; no workflow line or CI script line may write either floor's
 # version, since CI reads them through scripts/ci/floor.sh; and no page and no
 # contributor's file may, since each names the floors by a link to README.org.
 # It needs no deps: (floors) imports only (rnrs) and a few of Chez's own
 # bindings.
-check-floors: ## Fail unless README.org's Requirements state the floors in packaging/floors.sexp, and nothing else in README.org, no workflow, no CI script, no page of docs/, CONTRIBUTING.md or SECURITY.md does
+check-floors: ## Fail unless README.org's Requirements state the floors in packaging/floors.sexp, and nothing else in README.org, no workflow, no CI script, no page of docs/, contributor's file or template does
 	@scripts/require-tools "$(GOAL)" $(CHEZ)
-	@$(CHEZ) --libdirs tests --program tests/check-floors.sps packaging/floors.sexp README.org .github/workflows scripts/ci docs CONTRIBUTING.md SECURITY.md
+	@$(CHEZ) --libdirs tests --program tests/check-floors.sps packaging/floors.sexp README.org .github/workflows scripts/ci docs CONTRIBUTING.md SECURITY.md .github/ISSUE_TEMPLATE .github/PULL_REQUEST_TEMPLATE.md
 
 # Holds .github/workflows/ci.yml to the one shape tests/check-ci.sh reads
 # (ADR-0011): its triggers, its six jobs and every key in them, each check
@@ -657,8 +657,9 @@ check-memory-gate: ## Plant a heap overrun and a leak; make test-memory must fai
 # docs/*.md rendered to build/site/ through chez-cmark-gfm. Akku.lock pins
 # chez-cmark-gfm for the site alone: nothing under src/, nor any
 # tests/test-*.sps, imports it, so make test needs none of this (ADR-0011).
-# The site needs the system cmark-gfm library (`cmark-gfm` from apt). In the container, scripts/guix-env-enter hands chez-cmark-gfm the
-# profile's by absolute path (CHEZ_CMARK_GFM_LIBS, ADR-0011).
+# The site needs the system cmark-gfm library (`cmark-gfm` from apt). In the
+# container, scripts/guix-env-enter hands chez-cmark-gfm the profile's by
+# absolute path (CHEZ_CMARK_GFM_LIBS, ADR-0011).
 #
 # chez-cmark-gfm comes from the archive Akku.lock pins, downloaded and checked
 # against the lock's sha256 by scripts/fetch-akku-lock, and unpacked under

@@ -221,6 +221,23 @@ chez-sodium, M1's merges of #3 to #7.
 - **The rule:** to merge a stack by squash, bring `main` into each head this way before its merge,
   and check `origin/main^{tree}` against the tested head's tree after it. Budget one CI run a PR.
 
+### libsodium 1.0.18 reads a salt byte of 0xC3 as `/`
+
+chez-sodium, M4's closing PR, from PR #19's CI run 45624451416.
+
+- **What happened.** `test-native-codes`' row "a byte of 0xC3 as the salt's first character … verify
+  of it is -1 at both" failed once on `main`'s 1.0.18: verify answered 0, not -1.
+- **Why.** The row edited a fresh hash, whose salt is random. 1.0.18's argon2 base64 decoder reads
+  the byte 0xC3 as `/`, value 63, so a salt that already began with `/` was unchanged by the
+  edit, and the hash still verified. 1.0.22 refuses the byte.
+- **Reproduced:** 1,280 fresh hashes at the minimum limits, each salt's first byte set to 0xC3. At
+  1.0.18, 23 verified, every one a salt that began with `/`; at 1.0.22, none. About 1 in 64, so
+  each CI run, three of whose jobs load 1.0.18, failed about once in 20.
+- **The rule:** a row that edits a random hash chooses the hash it edits, by a bounded retry, so
+  its answer does not depend on the salt. The row now picks a salt that does not begin with `/`,
+  and a second row holds the alias itself at 1.0.18. The binding's pre-check refuses every
+  non-ASCII hash string before C, so no caller meets the alias.
+
 ## Editing the records
 
 None yet.

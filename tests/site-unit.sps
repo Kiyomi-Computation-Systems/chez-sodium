@@ -323,6 +323,10 @@
   '("0.1.0" "10.20.300" #f #f #f #f #f #f #f)
   (map release-tag-version
        '("v0.1.0" "v10.20.300" "main" "v0.1" "v0.1.0.1" "v0.1.x" "v" "0.1.0" "v0..1")))
+(test-equal "release-like-ref? is a ref beginning v and a digit, tag or not"
+  '(#t #t #t #t #f #f #f #f #f)
+  (map release-like-ref?
+       '("v0.1.0" "v0.1.0-rc.1" "v0.2" "v1" "main" "v" "v-1" "vx1" "0.1.0")))
 
 ;; --- template --------------------------------------------------------
 (test-eq "every page's description says what the library is"

@@ -1,5 +1,6 @@
 #!r6rs
-;;; (chez-sodium): libsodium for Chez Scheme. The public library.
+;;; (chez-sodium): password hashing for Chez Scheme, through a small part of
+;;; libsodium. The public library.
 ;;;
 ;;; It defines nothing: every name is re-exported from the private library
 ;;; that defines it (ADR-0012). So a reference runs that library alone, and a

@@ -21,7 +21,7 @@
 ;; The version is CHANGELOG.md's latest release, or 0.0.0 while there is
 ;; none; test-manifest holds the two.
 (akku-package ("chez-sodium" "0.0.0")
-  (synopsis "libsodium bindings for Chez Scheme")
+  (synopsis "Password hashing for Chez Scheme, through libsodium")
   (authors "Kiyomi Computation Systems LLC")
   (homepage "https://github.com/Kiyomi-Computation-Systems/chez-sodium")
   (license "BSD-3-Clause")
