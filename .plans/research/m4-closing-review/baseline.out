@@ -1,0 +1,10 @@
+tests/test-reference.sps rc=0 0s # of expected passes      23 
+tests/test-docs.sps rc=0 3s # of expected passes      152 
+tests/test-manifest.sps rc=0 0s # of expected passes      107 
+tests/test-check-floors.sps rc=0 6s # of expected passes      442 
+tests/test-site-testing.sps rc=0 0s # of expected passes      7 
+tests/test-check-ci.sps rc=0 41s # of expected passes      882 
+make check-floors rc=0 0s: check-floors: README.org, .github/workflows (ci.yml, pages.yml), scripts/ci (build-chez.sh, build-sodium.sh, check-action-pins.sh, check-chez.sh, check-sodium.sh, floor.sh, report-sodium.sh), docs (finding-libsodium.md, passwords.md, quickstart.md, reference.md, tokens.md), CONTRIBUTING.md and SECURITY.md hold the floors in packaging/floors.sexp (chez 10.4.0, sodium 1.0.18)
+make check-ci rc=0 0s: check-ci: .github/workflows/ci.yml has the one shape check-ci reads
+make check-suites rc=0 1s: check-suites: every suite ends with (exit (suite-exit-status runner)), and every site suite with (exit (site-exit-status runner)) (46 checked)
+make check-site rc=0 1s: check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label, a release tag its manifest's version -- all green

@@ -126,6 +126,12 @@ hashes and tags.
 fails a call that passed these checks, which no release does. The
 [reference](reference.md#blake2b) lists each refusal.
 
+## Threads
+
+Never change a bytevector while a verb reads it. If another thread does,
+`blake2b` and `constant-time-bytevector=?` answer for whatever bytes they
+read, which may be neither the old bytes nor the new.
+
 ## When the system has no randomness
 
 libsodium reads randomness from the kernel, through `getrandom` or

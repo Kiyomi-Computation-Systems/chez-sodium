@@ -371,7 +371,9 @@ Smaller than chez-sqlite3's tree, with the same shape and helpers.
   - a password outside libsodium's length range;
   - an empty key;
   - a password, or `password-verify`'s hash, that another thread changed during the call,
-    refused after the section (ADR-0006, amended).
+    refused after the section, when the writers can see the change: a password's UTF-8
+    length, or a hash character out of range. Any other change is hashed or checked as it
+    stood (ADR-0006, amended 2026-11-25).
 - **No secret ever reaches a condition** (L-F9, P-F8).
   - **Every string and bytevector parameter is secret:**
     - a password and a hash string;

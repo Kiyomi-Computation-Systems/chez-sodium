@@ -62,9 +62,11 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
   - **Techo's question,** whether verify can tell short memory from a wrong password, is
     answered: no change in M3, and Techo's session was told.
 - **M4 is under way:** `docs/`, `docs/reference.md` with `test-reference`, the site, `CHANGELOG.md`
-  and release 0.1.0 (brief §9; [the M4 plan](2026-11-25-m4-plan.md); ADR-0013). Slice 0, the plan
-  and the records, is on `m4-slice-0`. The owner allowed stacked PRs for M4 on 2026-11-25, as for
-  M3.
+  and release 0.1.0 (brief §9; [the M4 plan](2026-11-25-m4-plan.md); ADR-0013). The owner allowed
+  stacked PRs for M4 on 2026-11-25, as for M3.
+  - **Merged:** slice 0, the plan and the records (#18, `6edcb7f`), and slice 1, the docs and the
+    site (#19, `6687b63`).
+  - **Next:** M4's closing review's fixes, then the release (the plan's §4.9 to §4.11).
 
 ## Answered for M1
 
@@ -194,7 +196,8 @@ password, and the fallback's reach.
   - a hash's own limits set what verifying it costs, so hashes come from trusted storage;
   - a container's memory limit kills the process, exit 137, with nothing raised (measured);
   - the login pattern: `password-needs-rehash?` only after `password-verify` answers `#t`;
-  - a password changed by another thread during the call is refused;
+  - a password changed by another thread during the call is refused when the change alters its
+    UTF-8 length; any other change is hashed as it stood, so never change a string a verb reads;
   - a password over the cap, or one that is no string, is refused by `password-verify`, not
     answered `#f`, so a login form checks for a string of at most 16384 characters first, or
     catches the refusal;
@@ -214,6 +217,83 @@ password, and the fallback's reach.
   and moved to the tag by the release (the M4 plan, §4.4).
 
 ## Close-outs
+
+### 2026-11-25 — M4 slice 1: the docs and the site (PR #19)
+
+- **Built** on `m4-slice-1`, in one tree, as the slice 0 review's fixes chose:
+  - **the base first, alone** (Sonnet): cmark-gfm, `tar` and `xz` in the container,
+    `CHEZ_CMARK_GFM_LIBS`, chez-cmark-gfm locked, `fetch-akku-lock`, and the Makefile's site
+    section;
+  - **then eight builders at once,** on disjoint files:
+    - the reference and `test-reference` (Sonnet);
+    - README.org and four pages (Opus);
+    - `test-docs` (Sonnet);
+    - `check-floors`' docs inputs and the clone check (Sonnet);
+    - the comment pass (Sonnet);
+    - the generator and its suites (Sonnet);
+    - the `site` job, `pages.yml` and `check-ci` (Sonnet);
+    - the contributor files (Sonnet).
+
+  The caller joined them, and planted a mutant per check, each failing its row
+  ([its mutation log](m4-slice-1-mutation-log.md)).
+- **The owner's requests during the slice:**
+  - README.org and the quick start say what chez-sodium is not;
+  - `CONTRIBUTING.md`, `SECURITY.md` and their templates;
+  - the CI badge.
+- **The walk as a reader:**
+  - in `ubuntu:24.04`, the quick start verbatim but for its branch, `make test` 44 of 44;
+  - on the development workstation, a Guix Chez on another distribution answered `not-found` by
+    discovery, as the finding page says, and loaded with the override.
+
+  The site job's steps and `pages.yml`'s build ran on Ubuntu's Chez 9.5.8.
+- **Reviewed:** two Opus reviews at once.
+  - The docs review found no blocker, 4 majors and 14 minors
+    ([research/m4-slice-1-docs-review/](research/m4-slice-1-docs-review/README.md)). The majors:
+    - a password changed mid-call is refused only when its UTF-8 length changes. The pages had
+      promised more, and the caller reproduced it 10 of 10;
+    - the login fragments were never run;
+    - SECURITY.md pointed at a reporting form that was off;
+    - two banned forms had no check.
+  - The site review found 1 major and 8 minors
+    ([research/m4-slice-1-site-review/](research/m4-slice-1-site-review/README.md)). The major: a tag
+    name reached `make site`'s shell as code, reproduced.
+  - Four fix agents fixed every finding, on disjoint files.
+- **The owner's answers:** the caller turned private vulnerability reporting on (read back
+  `{"enabled":true}`), and Conventional Commits binds outside contributors only.
+- **Two agents reran a probe from a file** after Claude Code's removal guard refused it, which
+  they should not have. Nothing was deleted, and every later brief says a refused or blocked
+  command is reported, never rerun another way.
+- **In the container:** `make test` 44 of 44, `check-test-fails` 17 cases, `check-site` all green,
+  `make site` with `SITE_REF=v0.1.0`, `make build`, `check-dev`, `check-clean`. On the host,
+  `make check-guix` and `make check-pins`.
+- **CI:** run 45620300156 on `b34b7ee` passed all six jobs, `site` in 40 s. Under the gate,
+  `test-check-ci` took 193 s, 7 s from the plan's split line, and `test-docs` 86 s. The memory job
+  took 37 minutes of 120.
+- **Merged** after #18, by a merge commit, `8f47efc`, that keeps the slice's tree. Its run,
+  45624451416, failed once on `main`: `test-native-codes`' 0xC3 row, an M3 row that edits a random
+  hash, meets 1.0.18's reading of 0xC3 as `/` about once in 64 (`traps.md`). The failed job, rerun,
+  passed, and the closing PR makes the row choose its hash. Squash-merged as `6687b63`, its tree
+  equal to the tested head's.
+
+### 2026-11-25 — M4 slice 0: the plan and the records (PR #18)
+
+- **Pre-work:** two Opus agents at once ([research/m4-plan/](research/m4-plan/)):
+  - set A mapped chez-sqlite3's M5 onto chez-sodium;
+  - set B checked every fact the pages would state, at the floor and at 1.0.22. The caller reran
+    the finding the owner's first question rested on, and corrected set B's "differs by release"
+    to randomness.
+- **The owner's answers** (the plan's §2.1):
+  - needs-rehash restated, not tightened;
+  - five pages;
+  - the docs' password examples run at the default;
+  - the release's six items accepted.
+- **Records:** the plan; ADR-0013, new; ADR-0006, 0009, 0010, 0011 and 0012 amended; the brief,
+  the constraints, AGENTS.md, the traps and the ledger.
+- **Reviewed:** one Opus review found no blocker, 8 majors and 13 minors
+  ([research/m4-slice-0-review/](research/m4-slice-0-review/README.md)). The caller reproduced
+  each major. The largest fix moved the site into slice 1, built in one tree.
+- **CI:** run 45606843402 passed all five jobs. Squash-merged as `6edcb7f`, its tree equal to the
+  tested head's.
 
 ### 2026-11-24 — M3's closing review and its fixes (PR #17)
 

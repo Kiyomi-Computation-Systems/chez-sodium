@@ -1,0 +1,88 @@
+=== clean: the unmutated copy
+check 0 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+check 1 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-reference.sps
+check 2 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-manifest.sps
+check 3 exit 0: $CHEZ --libdirs tests --program tests/check-floors.sps packaging/floors.sexp README.org .github/workflows scripts/ci docs CONTRIBUTING.md SECURITY.md
+=== clean-make: the unmutated copy, through make
+check 0 exit 0: make -s check-floors
+check 1 exit 0: make -s check-site
+check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label, a release tag its manifest's version -- all green
+=== all-together-no-dummy-refusal: the login program's refusal of the dummy hash removed: a verify #t against it would log in
+check 0 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+=== all-together-dummy-row: the fix: a row that tries the dummy's own password on a name with no account, refused
+check 0 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+=== all-together-dummy-row-mutant: the fix holds the line: with the row, the dummy's refusal removed fails
+check 0 exit 1: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+FAIL docs/passwords.md:137: the whole program, run as written, prints the text block after it, line for line
+# of unexpected failures  1
+=== all-together-no-bound: the login program's bound removed: (log-in! ada #f) raises
+check 0 exit 1: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+FAIL docs/passwords.md:137: the whole program, run as written, exits 0 with nothing on stderr
+FAIL docs/passwords.md:137: the whole program, run as written, prints the text block after it, line for line
+# of unexpected failures  2
+=== all-together-swapped: the login program's verify given its arguments swapped
+check 0 exit 1: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+FAIL docs/passwords.md:137: the whole program, run as written, prints the text block after it, line for line
+# of unexpected failures  1
+=== all-together-output: the login program's stated output changed
+check 0 exit 1: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+FAIL docs/passwords.md:137: the whole program, run as written, prints the text block after it, line for line
+# of unexpected failures  1
+=== login-run-no-guard: the run block's rehash left unwrapped, as the bullet below it says not to
+check 0 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+=== tokens-no-length-check: the token lookup's length check, which its bullet explains, removed
+check 0 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+=== ref-bullet-dropped: a refusal blake2b raises dropped from its entry
+check 0 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+check 1 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-reference.sps
+=== ref-order-swapped: two of blake2b's refusals swapped, under in this order
+check 0 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+check 1 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-reference.sps
+=== ref-reason-wrong-verb: control: a reason password-hash never raises, listed under it
+check 0 exit 1: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+FAIL reference.md: each reason an entry of a verb names is one the verb raises, by verb and reason; no entry of another name has reasons but the detail entry
+# of unexpected failures  1
+=== ref-glossary-limits: the glossary's Limits without 'sensitive
+check 0 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+check 1 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-reference.sps
+=== src-limits-comment: the source's Limits definition without 'sensitive
+check 0 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+check 1 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-reference.sps
+=== ref-needs-rehash-first-wording: the reference says needs-rehash finds a damaged hash
+check 0 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+check 1 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-reference.sps
+=== floor-issue-template: a floor in the bug-report template
+check 0 exit 0: $CHEZ --libdirs tests --program tests/check-floors.sps packaging/floors.sexp README.org .github/workflows scripts/ci docs CONTRIBUTING.md SECURITY.md
+check 1 exit 0: make -s check-floors
+=== floor-contributing-unwired: CONTRIBUTING.md dropped from the Makefile's check-floors line, and a floor planted in it
+check 0 exit 0: make -s check-floors
+check 1 exit 0: make -s check-test-fails
+check-test-fails: ok fails: a failing suite is named FAIL, and the suites after it run
+check-test-fails: ok no-tests: a suite that runs no test is named FAIL, and the suites after it run
+check-test-fails: ok hangs: a suite that never ends is named HUNG, and the suites after it run
+check-test-fails: ok exit-line: check-suites names a suite without the shared exit form, and no suite runs
+check-test-fails: ok early-exit: check-suites names a suite that exits before its verdict, and no suite runs
+check-test-fails: ok nested-exit: check-suites names an exit inside a form before the verdict, and no suite runs
+check-test-fails: ok empty: check-suites names a suite with no datum, and no suite runs
+check-test-fails: ok leaks: a suite whose tests pass, but which counts a block up and never down, is named FAIL through the counters' line, and the suites after it run
+=== release: the release's edits: the manifest at 0.1.0, a [0.1.0] entry, both clone lines at v0.1.0
+check 0 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-manifest.sps
+check 1 exit 0: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-docs.sps
+check 2 exit 0: $CHEZ --libdirs tests --program tests/check-floors.sps packaging/floors.sexp README.org .github/workflows scripts/ci docs CONTRIBUTING.md SECURITY.md
+check 3 exit 0: make -s check-site
+check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label, a release tag its manifest's version -- all green
+check 4 exit 0: SITE_REF=v0.1.0 make -s check-site
+check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label, a release tag its manifest's version -- all green
+check 5 exit 0: SITE_REF=v0.1.0 make -s site && grep -c blob/v0.1.0/ build/site/index.html
+=== release-rc-tag: a v* tag that is no X.Y.Z, at the manifest's 0.0.0: check-site holds nothing
+check 0 exit 0: SITE_REF=v0.1.0-rc.1 make -s check-site
+check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label, a release tag its manifest's version -- all green
+check 1 exit 0: SITE_REF=v0.2 make -s check-site
+check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label, a release tag its manifest's version -- all green
+=== release-manifest-alone: control: the manifest bumped alone
+check 0 exit 1: $CHEZ --libdirs src:tests:scheme-libs --program tests/test-manifest.sps
+FAIL Akku.manifest's version is CHANGELOG.md's latest release, or 0.0.0 with none
+FAIL README.org and docs/ hold the clone lines Akku.manifest's version calls for, one in README.org, one in the quick start
+# of unexpected failures  2
+check 1 exit 0: SITE_REF=v0.1.0 make -s check-site
+check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label, a release tag its manifest's version -- all green

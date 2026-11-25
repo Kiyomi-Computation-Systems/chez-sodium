@@ -36,6 +36,10 @@ SodiumLibraryUnavailable  a condition that sodium-library-unavailable? holds
   hash string counts characters. `random-bytes` is capped the same way.
 - **Wiping.** chez-sodium wipes the C memory it uses, and nothing else:
   [What is wiped](passwords.md#what-is-wiped) says what that leaves.
+- **Threads.** Never change an argument while a verb reads it. `blake2b` and
+  `constant-time-bytevector=?` answer for whatever bytes they read, which
+  may be neither the old bytes nor the new. The password verbs refuse only
+  some changes, as their entries say.
 
 ## How the library loads
 
@@ -233,14 +237,17 @@ It never raises `&sodium-failed`.
 password-needs-rehash? : String [Limits] -> Boolean
 ```
 
-Answers `#f` only when the hash reads as one `password-hash` makes at the
-limits, which default to `'interactive`. Everything else is `#t`: a hash made
-at other limits, a hash libsodium cannot read, `"garbage"` and `""`. It never
-raises because of the hash.
+Answers `#f` only when the hash was made with the algorithm and parallelism
+`password-hash` uses, at the limits, which default to `'interactive`, and
+libsodium can read it. Everything else is `#t`: a hash made at other limits,
+a hash libsodium cannot read, `"garbage"` and `""`. It never raises because
+of the hash.
 
-It may answer `#f` for a hash that was damaged but still reads, so it is no
-check that a hash is intact. Call it only after `password-verify` answers
-`#t`: see [Logging in](passwords.md#logging-in).
+It never checks the salt's or the tag's size, or whether the hash is whole.
+So it may answer `#f` for a hash that was damaged but still reads, or for one
+of a shape `password-hash` never makes: it is no check that a hash is intact.
+Call it only after `password-verify` answers `#t`: see
+[Logging in](passwords.md#logging-in).
 
 Refuses, the hash first, then the limits, before it looks at the hash:
 

@@ -143,9 +143,10 @@
   ;; for LIMITS. Libsodium answering anything but 0, or answering 0 with no
   ;; string that passes the pre-check, an empty one included, raises a
   ;; &sodium-failed after the section, its function "crypto_pwhash_str" and
-  ;; its code the answer, 0 for no string. A PASSWORD
+  ;; its code the answer, 0 for no string. A PASSWORD whose UTF-8 length
   ;; another thread changed during the call is refused after the section,
-  ;; (changed-during-call password (kind string)).
+  ;; (changed-during-call password (kind string)); any other change is hashed
+  ;; as the string stood.
   (define password-hash
     (case-lambda
       ((password) (password-hash password 'interactive))
@@ -182,8 +183,10 @@
   ;; comes before the pre-check, from password-verify, assertion violations:
   ;; not-a-string for HASH, then not-a-string, over-the-cap and
   ;; length-out-of-range for PASSWORD, irritants (RULE PARAMETER (kind K)). A
-  ;; HASH or a PASSWORD another thread changed during the call is refused after
-  ;; the section, (changed-during-call PARAMETER (kind string)).
+  ;; PASSWORD whose UTF-8 length, or a HASH whose length or a character's range,
+  ;; another thread changed during the call is refused after the section,
+  ;; (changed-during-call PARAMETER (kind string)); any other change is checked
+  ;; as the string stood.
   (define (password-verify hash password)
     (unless (string? hash)
       (refuse-secret 'password-verify 'not-a-string 'hash hash))
@@ -213,8 +216,9 @@
   ;; read, one that fails the pre-check, a prefix other than the loaded
   ;; library's, or parameters that do not read p=1; #f otherwise. The last
   ;; three are answered without a section and without C. It never raises
-  ;; because of HASH, a HASH another thread changed during the call included,
-  ;; which answers #t. Refused from
+  ;; because of HASH: a HASH whose length or a character's range another thread
+  ;; changed during the call answers #t, any other change is read as the
+  ;; string stood. Refused from
   ;; password-needs-rehash?, assertion violations: not-a-string for HASH,
   ;; irritants (not-a-string hash (kind K)), then not-password-limits for LIMITS.
   (define password-needs-rehash?

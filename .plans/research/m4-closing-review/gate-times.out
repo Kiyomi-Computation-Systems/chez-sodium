@@ -1,0 +1,14 @@
+deps: vendor/chez-srfi linked into build/scheme-libs/srfi
+=== tests/test-check-ci.sps
+test-memory: pass tests/test-check-ci.sps
+  time: 147s under the gate, within 450s, three quarters of MEMORY_TIMEOUT's 600s
+=== tests/test-docs.sps
+test-memory: pass tests/test-docs.sps
+  time: 59s under the gate, within 450s, three quarters of MEMORY_TIMEOUT's 600s
+=== tests/test-reference.sps
+test-memory: pass tests/test-reference.sps
+  time: 8s under the gate, within 450s, three quarters of MEMORY_TIMEOUT's 600s
+=== tests/test-manifest.sps
+test-memory: pass tests/test-manifest.sps
+  time: 7s under the gate, within 450s, three quarters of MEMORY_TIMEOUT's 600s
+test-memory: ran 4, passed 4, failed 0, hung 0, slow 0

@@ -1,0 +1,20 @@
+--- <repo>/build/m4-closing-review/mut/release
+check-site-deps exit 0
+fetch-akku-lock: chez-cmark-gfm is up to date (build/akku/chez-cmark-gfm)
+site-deps exit 0
+check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label, a release tag its manifest's version -- all green
+check-site main exit 0
+check-site v0.1.0 exit 0: check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label, a release tag its manifest's version -- all green
+site: build/site ready (open build/site/index.html)
+site v0.1.0 exit 0
+git clone --branch v0.1.0 https://github.com/Kiyomi-Computation-Systems/chez-sodium.git
+--- <repo>/build/m4-closing-review/mut/clean-make
+check-site-deps exit 0
+fetch-akku-lock: chez-cmark-gfm is up to date (build/akku/chez-cmark-gfm)
+site-deps exit 0
+check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label, a release tag its manifest's version -- all green
+check-site main exit 0
+check-site v0.1.0 exit 2: make: *** [Makefile:709: check-site] Error 1
+site: build/site ready (open build/site/index.html)
+site v0.1.0 exit 0
+git clone https://github.com/Kiyomi-Computation-Systems/chez-sodium.git

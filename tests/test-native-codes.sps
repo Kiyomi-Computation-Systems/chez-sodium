@@ -550,11 +550,30 @@
 (define (with-salt-byte bytes byte)
   (append (take bytes salt-first-index) (list byte) (list-tail bytes (+ salt-first-index 1))))
 
-(test-equal "crypto_pwhash_str_needs_rehash: a byte of 0xC3 as the salt's first character is 0 at 1.0.18 and -1 at 1.0.22, by the version this suite loaded; verify of it is -1 at both (the two calls' codes)"
+;; salted-hash : (Natural -> Boolean) -> (U (Listof Natural) #f)
+;; A fresh hash of "pw" at the minimum limits whose salt's first byte
+;; satisfies OK?, or #f after 4096 tries. libsodium 1.0.18 reads a salt byte
+;; of 0xC3 as the base64 character /, so a salt that begins with / is
+;; unchanged by the edit below and still verifies; a hash's salt is random,
+;; and begins with / about once in 64.
+(define (salted-hash ok?)
+  (let loop ((tries 0))
+    (and (< tries 4096)
+         (let ((h (hash-string pw ops-min mem-min)))
+           (if (ok? (list-ref h salt-first-index)) h (loop (+ tries 1)))))))
+
+(define slash (char->integer #\/))
+
+(test-equal "crypto_pwhash_str_needs_rehash: a byte of 0xC3 as the salt's first character, in place of one that is not /, is 0 at 1.0.18 and -1 at 1.0.22, by the version this suite loaded; verify of it is -1 at both (the two calls' codes)"
   (list (cond ((equal? version "1.0.18") 0) (else -1)) -1)
   (guarded (lambda ()
-             (let ((edited (with-salt-byte pw-hash #xC3)))
+             (let ((edited (with-salt-byte (salted-hash (lambda (b) (not (= b slash)))) #xC3)))
                (list (rehash edited ops-min mem-min) (verify edited pw))))))
+
+(test-equal "crypto_pwhash_str_verify: a byte of 0xC3 in place of a salt's first character / verifies at 1.0.18, which reads 0xC3 as /, and is -1 at 1.0.22, by the version this suite loaded"
+  (cond ((equal? version "1.0.18") 0) (else -1))
+  (guarded (lambda ()
+             (verify (with-salt-byte (salted-hash (lambda (b) (= b slash))) #xC3) pw))))
 
 ;; A tripwire, not a property of the library: it fails on any release whose
 ;; byte-0x80 answer nobody has measured, so that release's answer is measured

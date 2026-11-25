@@ -1,0 +1,68 @@
+files read: 391
+category | lines | files | in tests/fixtures/: lines | files
+milestone | 3 | 1 | 0 | 0
+slice | 4 | 4 | 0 | 0
+finding id | 2 | 1 | 0 | 0
+research path | 4 | 3 | 0 | 0
+date | 0 | 0 | 0 | 0
+the maintainer | 0 | 0 | 0 | 0
+the owner | 0 | 0 | 0 | 0
+amended | 0 | 0 | 0 | 0
+decision N | 0 | 0 | 0 | 0
+traps.md or AGENTS.md | 1 | 1 | 0 | 0
+review | 12 | 7 | 0 | 0
+brief or plan section | 0 | 0 | 0 | 0
+row N | 0 | 0 | 0 | 0
+banned, any category, outside fixtures: 12 lines in 7 files
+
+## milestone
+tests/guix-env-launcher.sh:301: # M1: `make check-guix` without guix stops at require-tools, naming the
+tests/guix-env-launcher.sh:314: # M2: `make test` with no Chez stops at its prerequisite check-suites, whose
+tests/guix-env-launcher.sh:341: # runs, and the default is one. Each refusal runs in M2's copy.
+
+## slice
+src/chez-sodium/private/password-verbs.sls:24: ;;; encodes, slices or lists a string. A test reads this file as data to hold
+tests/test-decoy-source.sps:255: ;; slice : (Vectorof String) Natural Natural -> (Listof String)
+tests/test-docs.sps:24: ;;;   "slice", "printable ASCII", a path in .plans, or a date written
+tests/test-public.sps:187: ;; THUNK run in an engine of FUEL ticks a slice, resumed each time it expires
+
+## finding id
+tests/test-docs.sps:26: ;;;   capitals and digits, then -F and digits, as in M3S2-F4 or L-F7;
+tests/test-docs.sps:664: ;; digits, then -F and one or more digits, as M3S2-F4, M4S0-F7 and L-F7.
+
+## research path
+tests/test-conventions.sps:310: ;; The records a row cites exist: ADR-NNNN is a file under .plans/decisions.
+tests/test-docs.sps:14: ;;;   fail: nothing here could check them. No link points into .plans/, and
+tests/test-docs.sps:24: ;;;   "slice", "printable ASCII", a path in .plans, or a date written
+tests/test-manifest.sps:26: ;;;     /.plans export-ignore and /AGENTS.md export-ignore, in that order, so
+
+## date
+
+## the maintainer
+
+## the owner (other words)
+
+## amended (other words)
+
+## decision N (other words)
+
+## traps.md or AGENTS.md (other words)
+tests/test-manifest.sps:26: ;;;     /.plans export-ignore and /AGENTS.md export-ignore, in that order, so
+
+## review (other words)
+scripts/ci/build-chez.sh:22: # Changing the floor is a reviewed change: fetch the release tarball, compare
+scripts/ci/build-sodium.sh:43: # current_version, is a reviewed change of that role's pin: the SHA-256 of
+scripts/ci/build-sodium.sh:50: # reviewed copies in tests/test-ci-sodium.sps. Until the pin moves, the new
+scripts/ci/check-action-pins.sh:24: # A tag or a branch can be moved to other code after it was reviewed; a
+scripts/ci/check-sodium.sh:54: # floor value in tests/test-check-ci.sps, and the reviewed copies in
+tests/check-seam.sps:70: ;;;       macro-defining macro, is not read: such a library is held by review.
+tests/check-seam.sps:92: ;;; so a route nobody thought of is closed until a reviewer opens it.
+tests/check-seam.sps:159: ;; time, load a file. Adding a name is a reviewed change to the seam
+tests/check-seam.sps:199: ;; Adding a name or a library is a reviewed change to the seam (ADR-0012).
+tests/test-ci-sodium.sps:35: ;;;     order, besides the output. The pins are literals here, a reviewed copy
+tests/test-ci-sodium.sps:227: ;; --- the reviewed copies -----------------------------------------------------------------
+tests/test-never-loads.sps:82: ;; to a library's imports changes its list here, in review.
+
+## brief or plan section (other words)
+
+## row N (other words)

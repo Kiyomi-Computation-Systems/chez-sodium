@@ -38,7 +38,8 @@
 2. **The docs are five pages and README.org:**
    - `docs/` holds a quick start, which is the site's home, passwords, tokens, finding libsodium,
      and the reference, in that order. `site/pages.sls` writes the order once, and README.org's
-     Documentation list holds it;
+     Documentation list holds it. README.org links the site once it is deployed: the release
+     puts the link in (M4's closing review);
    - **README.org and the quick start say what chez-sodium is, and what it is not:** a small,
      deliberate part of libsodium, for password hashing first, and no encryption, signatures, key
      exchange, AEAD, streams, password-based key derivation, guarded memory or encoding helpers
@@ -147,8 +148,8 @@
 - **The pages cannot drift from the code silently.** A change to an export's signature fails
   `test-reference`; a change to discovery or the refusal reasons fails `test-docs`; a floor's move
   fails `check-floors` on any page that restates it.
-- **`test-docs` is estimated at about a minute under the gate,** most of it gated whole programs
-  (pre-work A, §4.2); slice 1's join measures it.
+- **`test-docs` takes 86 s under the gate on CI,** most of it gated whole programs (PR #19's run;
+  pre-work A, §4.2, estimated about a minute).
 - **Each later release** dates its entry, bumps the manifest and the clone lines together, signs
   its tag, and makes its Release by the same recipe.
 - **Publishing on Akku stays a later decision,** after Techo has battle-tested the library

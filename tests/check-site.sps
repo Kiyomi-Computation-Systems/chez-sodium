@@ -33,13 +33,14 @@
 ;;;   8. every page's first line is "# " and its nav label, so a label and
 ;;;      its page's H1 cannot drift apart.
 ;;;   9. when SITE_REF is a release tag, "v" and three naturals, its version
-;;;      is Akku.manifest's, which is read as data. Any other ref is not held.
+;;;      is Akku.manifest's, which is read as data. A ref beginning "v" and a
+;;;      digit that is no such tag is refused. Any other ref is not held.
 ;;;
 ;;; Each invariant `die`s with its own name on failure and exits 1, so a
 ;;; caller reading this program's stderr learns which invariant broke.
 (import (rnrs) (only (chezscheme) getenv directory-list)
         (site io) (site render) (site pages) (site serializer)
-        (only (site links) repo-blob valid-ref? release-tag-version))
+        (only (site links) repo-blob valid-ref? release-tag-version release-like-ref?))
 
 (define (die . parts)
   (for-each (lambda (x) (display x (current-error-port))) parts)
@@ -336,6 +337,8 @@
                (cadr (cadr d)))
               (else (loop (read p))))))))
 
+(when (and (release-like-ref? ref) (not (release-tag-version ref)))
+  (die "check-site: SITE_REF " ref " begins with v and a digit, but is not v and three naturals"))
 (let ((tag-version (release-tag-version ref)))
   (when tag-version
     (let ((manifest (manifest-version "Akku.manifest")))

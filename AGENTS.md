@@ -43,7 +43,9 @@
 * No verb holds state between calls: no handles. That is why streaming SHA-256 is out
   and `hmac-sha256` is one call (brief §3.2).
 * **DO NOT** setup macos CI runners: linux only!
-* Exported functions should have a comment with a Typed Racket style type signature
+* Exported functions should have a comment with a Typed Racket style type signature,
+  `;; NAME : TYPE` and nothing more; a note goes on a comment line of its own. Each is
+  held to `docs/reference.md` by `test-reference` (ADR-0012, amended).
 * The public library is `(chez-sodium)`. Internals live under
   `(chez-sodium private …)` and never escape it.
 
@@ -67,8 +69,9 @@
   - Native's `call-with-utf8` writes it from `char->integer`, never through
     `string->utf8`, each character's bytes only if they fit the block counted before the
     section. `call-with-c-string` writes a hash string and its 0 the same way.
-  - A change another thread makes mid-write is seen when it changes a character's width,
-    or puts a hash character out of range. It is answered as data. After the section,
+  - A change another thread makes mid-write is seen when it changes the password's length
+    in UTF-8 bytes, or puts a hash character out of range; any other change is hashed or
+    checked as the string stood. It is answered as data. After the section,
     `password-hash` and `password-verify` refuse it as `changed-during-call`, and
     `password-needs-rehash?` answers `#t`. The documents say what
   wiping cannot reach: the caller's copies, the bytevectors a verb returns, and copies
@@ -128,7 +131,8 @@
   holds the decision records' hard rules and binds every task brief. Read both
   before starting slice work.
 * Add entries to `CHANGELOG.md` for each release
-* A comment in `src/`, `tests/`, the Makefile, `scripts/` or `packaging/` is
+* A comment in `src/`, `tests/`, `site/`, `build-site.sps`, the Makefile, `scripts/` or
+  `packaging/` is
   for a developer reading the code: no milestone, slice, research path, date
   or "the maintainer". A bare `ADR-NNNN` may point to why.
 * `/docs` is for user facing documentation only.
