@@ -1,0 +1,13 @@
+s10-js-link: check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label -- all green
+s11-dir-link: check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label -- all green
+s12-plans-link: check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label -- all green
+s13-readme-second-list-line: check-site: the nav is not README.org's list of the pages. listed=((quickstart.md . Quick start) (passwords.md . Passwords) (tokens.md . Tokens) (finding-libsodium.md . Finding libsodium) (reference.md . Reference) (toke
+s1-label-pages-only: check-site: the nav is not README.org's list of the pages. listed=((quickstart.md . Quick start) (passwords.md . Passwords) (tokens.md . Tokens) (finding-libsodium.md . Finding libsodium) (reference.md . Reference)) nav=
+s2-label-readme-only: check-site: the nav is not README.org's list of the pages. listed=((quickstart.md . Quick start) (passwords.md . Passwords) (tokens.md . Token) (finding-libsodium.md . Finding libsodium) (reference.md . Reference)) nav=(
+s3-h1-only: check-site: a page's H1 is not its nav label, in docs/passwords.md: wanted "# Passwords" as its first line, found "# Password"
+s4-extra-page: check-site: nav completeness FAILED. missing-from-site/pages.sls=(extra.md) extra-in-site/pages.sls=()
+s5-drop-reference-nav-and-readme: check-site: nav completeness FAILED. missing-from-site/pages.sls=(reference.md) extra-in-site/pages.sls=()
+s6-repo-link-missing: check-site: a link out to the repository names no file in it, in tokens.md: (https://github.com/Kiyomi-Computation-Systems/chez-sodium/blob/main/NOTES.org)
+s7-repo-link-bad-fragment: check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label -- all green
+s8-page-anchor-dangling: check-site: anchor resolution FAILED. danglers=((tokens.md . passwords.md#no-such))
+s9-swap-pages-and-readme: check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label -- all green

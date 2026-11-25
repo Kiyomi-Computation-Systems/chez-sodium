@@ -10,7 +10,7 @@
 
 - [ ] `make test` passes locally
 - [ ] A behaviour change comes with a test I watched fail without it
-- [ ] The title is a Conventional Commit (`feat:`, `fix:`, `docs:`, …)
+- [ ] The title is a Conventional Commit (`feat:`, `fix:`, `docs:`, …), unless this is a milestone PR
 - [ ] `README.org` and `docs/` match, if what users see changed (`make check-site`)
 - [ ] `CHANGELOG.md` has an entry under `[Unreleased]`, if users can see the change
 - [ ] A moved pin is with `Akku.manifest` and `Akku.lock` (`make check-pins`)

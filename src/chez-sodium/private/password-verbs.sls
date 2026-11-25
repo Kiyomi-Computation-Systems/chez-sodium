@@ -212,8 +212,9 @@
   ;; or that libsodium cannot read: other limits, a string libsodium cannot
   ;; read, one that fails the pre-check, a prefix other than the loaded
   ;; library's, or parameters that do not read p=1; #f otherwise. The last
-  ;; three are answered without a section and without C. It never raises because of HASH, a HASH another thread changed
-  ;; during the call included, which answers #t. Refused from
+  ;; three are answered without a section and without C. It never raises
+  ;; because of HASH, a HASH another thread changed during the call included,
+  ;; which answers #t. Refused from
   ;; password-needs-rehash?, assertion violations: not-a-string for HASH,
   ;; irritants (not-a-string hash (kind K)), then not-password-limits for LIMITS.
   (define password-needs-rehash?

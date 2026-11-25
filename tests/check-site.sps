@@ -14,7 +14,7 @@
 ;;;     scheme --program tests/check-site.sps
 ;;; or simply `make check-site`.
 ;;;
-;;; Asserts eight invariants, on render-site's return value and the files
+;;; Asserts nine invariants, on render-site's return value and the files
 ;;; it reads -- no filesystem write, no `build/site/` dependency:
 ;;;   1. nav completeness -- (site pages) names exactly docs/*.md on disk,
 ;;;      the home page, its first, included.
@@ -32,12 +32,14 @@
 ;;;      is that list's first.
 ;;;   8. every page's first line is "# " and its nav label, so a label and
 ;;;      its page's H1 cannot drift apart.
+;;;   9. when SITE_REF is a release tag, "v" and three naturals, its version
+;;;      is Akku.manifest's, which is read as data. Any other ref is not held.
 ;;;
 ;;; Each invariant `die`s with its own name on failure and exits 1, so a
 ;;; caller reading this program's stderr learns which invariant broke.
 (import (rnrs) (only (chezscheme) getenv directory-list)
         (site io) (site render) (site pages) (site serializer)
-        (only (site links) repo-blob))
+        (only (site links) repo-blob valid-ref? release-tag-version))
 
 (define (die . parts)
   (for-each (lambda (x) (display x (current-error-port))) parts)
@@ -101,6 +103,8 @@
 
 ;; --- render the real site once, for checks (2) and (3) --------------------
 (define ref (or (getenv "SITE_REF") "main"))
+(unless (valid-ref? ref)
+  (die "check-site: SITE_REF is not one or more of A-Z a-z 0-9 . _ / - not beginning with -"))
 (define result (render-site (read-site-inputs) ref))
 
 ;; --- (2) anchor resolution -------------------------------------------------
@@ -316,5 +320,28 @@
              (if (pair? lines) (string-append "\"" (car lines) "\"") "an empty page")))))
   pages)
 
-(display "check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label -- all green\n")
+;; --- (9) a release tag is Akku.manifest's version -------------------------------
+;; The manifest is read as data, never imported: its (akku-package (NAME
+;; VERSION) ...) form holds the version. A tag on a tree whose manifest says
+;; another version would deploy pages whose quick start clones that other
+;; release. A ref that is no release tag, main among them, is not held.
+(define (manifest-version path)
+  (call-with-input-file path
+    (lambda (p)
+      (let loop ((d (read p)))
+        (cond ((eof-object? d) #f)
+              ((and (pair? d) (eq? (car d) 'akku-package)
+                    (pair? (cdr d)) (pair? (cadr d)) (pair? (cdr (cadr d)))
+                    (string? (cadr (cadr d))))
+               (cadr (cadr d)))
+              (else (loop (read p))))))))
+
+(let ((tag-version (release-tag-version ref)))
+  (when tag-version
+    (let ((manifest (manifest-version "Akku.manifest")))
+      (unless (equal? tag-version manifest)
+        (die "check-site: SITE_REF " ref " is a release tag, but Akku.manifest's version is "
+             (or manifest "not found") ", not " tag-version)))))
+
+(display "check-site: nav, anchors, no .md leak, every link written, repository links exist, nav is README.org's list, no <pre> reflow, each page's H1 its label, a release tag its manifest's version -- all green\n")
 (exit 0)

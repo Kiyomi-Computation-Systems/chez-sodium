@@ -1,7 +1,7 @@
 #!r6rs
 ;; PURE. Imports no library that loads a shared object.
 (library (site links)
-  (export rewrite-links repo-blob)
+  (export rewrite-links repo-blob valid-ref? release-tag-version)
   (import (rnrs) (only (site pages) page-file-name))
 
   ;; repo-blob : String
@@ -10,6 +10,33 @@
   ;; exists in the checkout.
   (define repo-blob
     "https://github.com/Kiyomi-Computation-Systems/chez-sodium/blob/")
+
+;; valid-ref? : String -> Boolean
+  ;; Whether REF may go into every repository URL the site writes: one or more
+  ;; of A-Z a-z 0-9 . _ / -, and not beginning with -.
+  (define (valid-ref? ref)
+    (and (> (string-length ref) 0)
+         (not (char=? (string-ref ref 0) #\-))
+         (let loop ((cs (string->list ref)))
+           (or (null? cs)
+               (let ((c (car cs)))
+                 (and (or (char<=? #\a c #\z) (char<=? #\A c #\Z)
+                          (char<=? #\0 c #\9) (memv c '(#\. #\_ #\/ #\-)))
+                      (loop (cdr cs))))))))
+
+  ;; release-tag-version : String -> (U String #f)
+  ;; For a release tag, "v" and three naturals joined by dots, its version
+  ;; without the "v"; #f for any other ref.
+  (define (release-tag-version ref)
+    (and (> (string-length ref) 1)
+         (char=? (string-ref ref 0) #\v)
+         (let ((v (substring ref 1 (string-length ref))))
+           (let loop ((cs (string->list v)) (digits 0) (dots 0))
+             (cond ((null? cs) (and (= dots 2) (> digits 0) v))
+                   ((char<=? #\0 (car cs) #\9) (loop (cdr cs) (+ digits 1) dots))
+                   ((and (char=? (car cs) #\.) (> digits 0) (< dots 2))
+                    (loop (cdr cs) 0 (+ dots 1)))
+                   (else #f))))))
 
   (define (prefix? pre s)
     (and (>= (string-length s) (string-length pre))

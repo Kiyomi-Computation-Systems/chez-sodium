@@ -312,7 +312,32 @@
     (file-names-by-rule (map car pages)))
   (map page-file-name (map car pages)))
 
+;; --- the ref ----------------------------------------------------------
+(test-equal "valid-ref? takes main, a release tag, a path of a ref and a prerelease"
+  '(#t #t #t #t)
+  (map valid-ref? '("main" "v0.1.0" "release/v1_2" "v1.0.0-rc.1")))
+(test-equal "valid-ref? refuses the empty ref, a leading -, a backtick, $, a space, a quote, a semicolon, a newline and non-ASCII"
+  '(#f #f #f #f #f #f #f #f #f)
+  (map valid-ref? (list "" "-v1" "v0.1.0`id`" "v0.1.0$x" "a b" "a\"b" "a;b" "a\nb" "v\x3bb;")))
+(test-equal "release-tag-version is v and three naturals, without the v"
+  '("0.1.0" "10.20.300" #f #f #f #f #f #f #f)
+  (map release-tag-version
+       '("v0.1.0" "v10.20.300" "main" "v0.1" "v0.1.0.1" "v0.1.x" "v" "0.1.0" "v0..1")))
+
 ;; --- template --------------------------------------------------------
+(test-eq "every page's description says what the library is"
+  'present
+  (if (string-contains-sub?
+       doc-html "<meta name=\"description\" content=\"Password hashing for Chez Scheme, through libsodium, with random bytes, BLAKE2b and a constant-time compare\">")
+      'present 'missing))
+(test-eq "no page's keywords name hmac or crypto, which 0.1.0 does not bind"
+  'absent
+  (let ((i (index-of doc-html "name=\"keywords\" content=\"" 0)))
+    (if (and i
+             (let ((kw (substring doc-html i (index-of doc-html "\">" i))))
+               (or (string-contains-sub? kw "hmac")
+                   (string-contains-sub? kw "crypto"))))
+        'present 'absent)))
 (test-eq "the document is rooted at html" 'html
   (and (pair? doc-out) (eq? (car doc-out) '*TOP*) (car (cadr doc-out))))
 (test-eq "the stylesheet is linked in head" 'linked

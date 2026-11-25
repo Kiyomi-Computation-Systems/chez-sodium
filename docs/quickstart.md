@@ -16,6 +16,12 @@ This page goes from a clone to a first program.
 A program needs nothing else: no C compiler, no headers and no build step.
 chez-sodium is Scheme source, and it loads libsodium when your program runs.
 
+On a Chez built without threads, importing chez-sodium is refused:
+"chez-sodium needs a threaded Chez Scheme, and (threaded?) is #f in this
+one. Chez builds threaded unless configured with --nothreads". On a Chez
+older than Requirements names, it is refused too, and the message names
+the version it needs.
+
 ## On Ubuntu 24.04
 
 Ubuntu's `chezscheme` package is too old, so build Chez from its release

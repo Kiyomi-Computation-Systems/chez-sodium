@@ -5,7 +5,8 @@ test that shows it, needs only the checks below. **Bigger work** starts as an
 issue, so the design is agreed before the code is written.
 
 **A new binding is a design decision.** chez-sodium binds only what Techo has a
-named use for: the subset rule. Adding one takes a row in the brief's subset, a
+named use for: the subset rule. Techo is the application chez-sodium is built
+for; its needs decide what is bound. Adding one takes a row in the brief's subset, a
 row in the convention table, and a test on every supported libsodium.
 Encryption, signatures and the rest are out on purpose (brief §3.3, in
 `.plans/2026-11-22-chez-sodium-project-brief.md`).
@@ -47,8 +48,9 @@ CI runs these on every pull request, on Linux x86_64. Keep them green:
 - **The Makefile:** give each new target a `## ` description, so `make help`
   lists it.
 - **`docs/`:** it is for people using the library. Keep it short and plain.
-  A new page goes in `docs/` and in `site/pages.sls`; `make check-site` fails
-  until both name it.
+  A new page goes in `docs/`, in `site/pages.sls`, and in README.org's
+  Documentation list, in the same order. `make check-site` fails until all
+  three agree.
 - **The container files** (`channels.scm`, `manifest.scm`, `scripts/guix-env*`):
   run `make check-guix` on the host.
 - **A binding:** follow the subset rule above, with its rows and its test.
@@ -70,9 +72,9 @@ CI runs these on every pull request, on Linux x86_64. Keep them green:
   - No Scheme copy of a secret: it goes straight into its block.
 - **One critical section per verb**, covering its blocks, the C call and the
   wipe. Nothing raises inside it: answer data there, and raise after.
-- Comments say what the code does and why, in the present tense. They don't
-  cite plans, dates or issue numbers; that history belongs in commits and
-  CHANGELOG.md.
+- Comments say what the code does and why, in the present tense. They name no
+  milestone, plan, date or issue number; that history belongs in commits and
+  CHANGELOG.md. A bare `ADR-NNNN` may point to why.
 
 ## Tests
 
@@ -86,9 +88,10 @@ CI runs these on every pull request, on Linux x86_64. Keep them green:
 
 ## Pull requests
 
-- Commit messages and PR titles follow
+- An outside contributor's PR title follows
   [Conventional Commits](https://www.conventionalcommits.org): `feat:`,
-  `fix:`, `docs:`, `test:`, `refactor:`, `chore:`.
+  `fix:`, `docs:`, `test:`, `refactor:`, `chore:`. The project's own milestone
+  PRs use their own titles.
 - Pull requests are squash-merged, so the PR title becomes the commit's.
 - A change users can see gets an entry under `## [Unreleased]` in
   [CHANGELOG.md](CHANGELOG.md).

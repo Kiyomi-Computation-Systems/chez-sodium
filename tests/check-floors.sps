@@ -12,10 +12,11 @@
 ;;; odd number of double quotes, a double-quoted string left open at the line's
 ;;; end: CI states no floor, and scripts/ci/floor.sh reads them from the file;
 ;;; and no line of any file in the scripts directory, of any document given as
-;;; a file or under one given as a directory, contains either floor's version text: a page names the floors by a link to
-;;; README.org's Requirements. The two rules about double quotes are YAML's,
-;;; and a script is shell, a page prose, so they do not apply there. The rules
-;;; are in (floors); this program reads the files, prints, and exits.
+;;; a file or under one given as a directory, contains either floor's version
+;;; text: a page names the floors by a link to README.org's Requirements. The
+;;; two rules about double quotes are YAML's, and a script is shell, a page
+;;; prose, so they do not apply there. The rules are in (floors); this program
+;;; reads the files, prints, and exits.
 ;;; tests/test-check-floors.sps holds each rule on texts and runs this program
 ;;; on fixture directories.
 ;;;

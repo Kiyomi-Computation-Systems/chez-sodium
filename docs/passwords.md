@@ -64,9 +64,15 @@ OWASP's minimum for argon2id is 2 passes over 19 MiB, which is 19456 KiB:
 
 At each login: verify the password, and only after a `#t` ask whether its
 hash needs redoing. If it does, hash the password again at today's limits,
-and store the new hash.
+and store the new hash. Here one account, its hash made at older limits,
+stands in for your store:
 
-```scheme
+```scheme run
+(define my-limits 'interactive)
+(define stored (password-hash "correct horse" (make-password-limits 2 19456)))
+(define (stored-hash account) stored)
+(define (store-hash! account hash) (set! stored hash))
+
 (define (log-in! account password)
   (let ((hash (stored-hash account)))
     (cond ((password-verify hash password)
@@ -75,7 +81,14 @@ and store the new hash.
                (store-hash! account (password-hash password my-limits))))
            'logged-in)
           (else 'refused))))
+
+(let* ((wrong (log-in! "ada" "wrong horse"))
+       (right (log-in! "ada" "correct horse")))
+  (list wrong right (password-needs-rehash? stored my-limits)))
+;; => (refused logged-in #f)
 ```
+
+The right password logs in, and its hash is redone at `my-limits`.
 
 - **Verify first.** `password-needs-rehash?` answers `#t` for `"garbage"`
   and for `""`. A program that rehashes on that `#t` without verifying
@@ -94,7 +107,9 @@ For a name with no account, still verify the password: against one real
 hash, made at your current limits, and refuse whatever it answers. Any
 string that is not a real hash, such as `""` or `"*"`, answers in
 microseconds instead of about 50 ms, and that time would tell an attacker
-which names have accounts.
+which names have accounts. An account whose hash was made at older limits
+answers in another time than that real hash does, until its next login
+rehashes it.
 
 ## Before you verify
 
@@ -184,6 +199,9 @@ spaces. Any change, even one trailing space or newline, makes it verify `#f`
 for ever. `password-needs-rehash?` may not notice, since it reads a hash's
 limits, not whether the hash is whole.
 
+So keep it in a text column of no fixed width, never a `CHAR(n)`, which
+pads it with spaces. Its length grows with its limits.
+
 ## What `#f` means
 
 `password-verify` answers `#f` for a wrong password, for a hash libsodium
@@ -193,7 +211,10 @@ tells the three apart.
 To guess at memory: after a `#f`, hash a throwaway string at your current
 limits. If that raises a condition `sodium-failed?` holds, memory is short.
 
-```scheme
+```scheme run
+(define my-limits 'interactive)
+(define stored (password-hash "correct horse" my-limits))
+
 (define (check hash password)
   (cond ((password-verify hash password) 'right)
         ((guard (e ((sodium-failed? e) #t))
@@ -201,8 +222,13 @@ limits. If that raises a condition `sodium-failed?` holds, memory is short.
            #f)
          'out-of-memory)
         (else 'wrong)))
+
+(list (check stored "correct horse") (check stored "wrong horse"))
+;; => (right wrong)
 ```
 
+- It doubles what a wrong password costs: a verify, then a hash. Guess
+  only where you use the answer, such as in a log line.
 - Under short memory, a wrong password reads as short memory too.
 - It sees only a failure libsodium is told of, as under `ulimit -v`. A
   container's memory limit kills the process instead.
@@ -222,20 +248,25 @@ Each hash and each verify takes its limits' memory while it runs.
 
 ## Where hashes live
 
-A hash's own limits set what verifying it costs, whatever limits you pass.
-An `'interactive` hash edited to ask for 1 GiB and 4 passes took about
-1.8 s here to answer `#f`. So keep hashes where only you can write them.
+A hash's own limits set what verifying it costs, whatever limits you hash
+new passwords at. An `'interactive` hash edited to ask for 1 GiB and 4
+passes took about 1.8 s here to answer `#f`. So keep hashes where only you
+can write them.
 
 ## Threads and Ctrl-C
 
 While a hash or a verify runs, its thread takes no interrupts. Ctrl-C,
-timers and engine expiries on that thread wait until it ends: about 50 ms
-at `'interactive`, and about 2 s at `'sensitive`, here. Other threads run
-on, so hash on a worker thread to keep a program responsive.
+timers and an engine's running out of time, on that thread, wait until it
+ends: about 50 ms at `'interactive`, and about 2 s at `'sensitive`, here.
+Other threads run on, so hash on a worker thread to keep a program
+responsive.
 
-Don't change a password string while a verb reads it. If another thread
-does, the call is refused, as `changed-during-call`, and never answered
-wrongly.
+Never change a string while a verb reads it. Another thread's change is
+seen only when it alters the password's length as UTF-8, or puts a space,
+control or non-ASCII character in a hash. Then `password-hash` and
+`password-verify` refuse the call, as `changed-during-call`. Any other
+change goes unseen: the verb hashes or checks the string as it stood
+mid-change, which may be neither the old string nor the new.
 
 A program that first reaches chez-sodium through `eval` or the REPL should
 do it on one thread, before engines or other threads can:

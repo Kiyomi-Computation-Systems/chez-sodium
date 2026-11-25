@@ -1,0 +1,14 @@
+== app.sps
+(#t #f 32)
+== which.sps
+"1.0.18"
+== which.sps, a missing override
+(refused load-failed "/no/such/libsodium.so.23")
+== make build
+chez-sodium: libsodium loaded and accepted
+  path:       /usr/lib/x86_64-linux-gnu/libsodium.so.23 (system)
+  version:    1.0.18 (library 10.3)
+  counts:     ((block . 0))
+test: ran 44, passed 44, failed 0, hung 0
+WALK DONE
+exit 0

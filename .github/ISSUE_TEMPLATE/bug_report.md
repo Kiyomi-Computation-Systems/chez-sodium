@@ -10,7 +10,7 @@ report it privately. -->
 **Environment**
 
 - OS and architecture (chez-sodium is Linux only; e.g. Ubuntu 24.04 x86_64):
-- Chez Scheme version (`chez --version`):
+- Chez Scheme version (`scheme --version`):
 - libsodium version (`sodium-version`), and how it was found (the
   `CHEZ_SODIUM_LIBRARY` override, or discovery):
 - chez-sodium version or commit:

@@ -657,18 +657,21 @@ check-memory-gate: ## Plant a heap overrun and a leak; make test-memory must fai
 # docs/*.md rendered to build/site/ through chez-cmark-gfm. Akku.lock pins
 # chez-cmark-gfm for the site alone: nothing under src/, nor any
 # tests/test-*.sps, imports it, so make test needs none of this (ADR-0011).
-# The site needs the system cmark-gfm library (`cmark-gfm` from Homebrew or
-# apt). In the container, scripts/guix-env-enter hands chez-cmark-gfm the
+# The site needs the system cmark-gfm library (`cmark-gfm` from apt). In the container, scripts/guix-env-enter hands chez-cmark-gfm the
 # profile's by absolute path (CHEZ_CMARK_GFM_LIBS, ADR-0011).
 #
 # chez-cmark-gfm comes from the archive Akku.lock pins, downloaded and checked
 # against the lock's sha256 by scripts/fetch-akku-lock, and unpacked under
-# build/akku. Run make site-deps once on the host, where the network is.
-# After that it needs none, and the container finds the tree under build/,
-# held to the archive it keeps there.
+# build/akku. Run make site-deps on the host, where the network is: once, and
+# again after make clean, which removes the archive with build/. In between it
+# needs none, and the container finds the tree under build/, held to the
+# archive it keeps there.
 SITE_CMARK   := build/akku/chez-cmark-gfm/src
 SITE_LIBDIRS := .:$(SITE_CMARK)
 SITE_REF     ?= main
+# Exported, so the generator reads the ref from its environment. It stays out
+# of every recipe's text: there a tag name's backtick would run as shell code.
+export SITE_REF
 
 # The generator's suites, every tests/site-*.sps: SRFI-64 under
 # (site-testing), each ending with its site-exit-form (check-suites), and each
@@ -682,6 +685,8 @@ SITE_SUITES := $(sort $(wildcard tests/site-*.sps))
 site-deps: ## (host, once) Get chez-cmark-gfm as Akku.lock pins it, from its locked archive, into build/akku
 	@AKKU_DEST=build/akku sh scripts/fetch-akku-lock chez-cmark-gfm
 
+# Overwrites the pages it writes and never removes one: a page renamed or
+# dropped since the last render stays in build/site until make clean.
 # Renders with no suite's libraries on its path: the generator imports
 # (rnrs), a few of Chez's own bindings, (site ...) and (cmark gfm), so any
 # Chez runs it, CI's site job and the Pages workflow on Ubuntu's, which is
@@ -689,7 +694,7 @@ site-deps: ## (host, once) Get chez-cmark-gfm as Akku.lock pins it, from its loc
 site: site-deps ## Render docs/ into build/site/ (open build/site/index.html); SITE_REF=<tag> pins links to repository files
 	@scripts/require-tools "$(GOAL)" $(CHEZ)
 	@mkdir -p build/site
-	@SITE_REF="$(SITE_REF)" SITE_OUT=build/site \
+	@SITE_OUT=build/site \
 	  $(CHEZ) --libdirs $(SITE_LIBDIRS) --program build-site.sps
 	@cp site/style.css build/site/style.css
 	@echo "site: build/site ready (open build/site/index.html)"
@@ -708,7 +713,7 @@ check-site: site-deps deps ## Test the site generator, then render docs/ in memo
 	  esac; \
 	  $(CHEZ) --libdirs "$$libs" --program $$t || exit 1; \
 	done
-	@SITE_REF="$(SITE_REF)" $(CHEZ) --libdirs $(SITE_LIBDIRS) --program tests/check-site.sps
+	@$(CHEZ) --libdirs $(SITE_LIBDIRS) --program tests/check-site.sps
 
 check-site-deps: ## Test scripts/fetch-akku-lock offline, against a local archive and lock of its own
 	@sh tests/fetch-akku-lock.sh

@@ -70,6 +70,9 @@
    - chez-cmark-gfm, a second `depends/dev`, and cmark-gfm in the container ([ADR-0011], amended);
    - a sixth CI job, `site`, and a second workflow, `pages.yml`, which deploys on a `v*` tag's
      push. `check-ci` holds both;
+   - `SITE_REF` reaches the generator by the environment, and the generator refuses a ref outside
+     `A-Z a-z 0-9 . _ / -`; `check-site` holds a release tag's version to `Akku.manifest`'s (slice 1's
+     site review);
    - Pages is built from GitHub Actions. Its `github-pages` environment takes the tag rule `v*`
      alone, set before the tag, so the tag's push deploys the first site, its links naming
      `blob/v0.1.0/`.

@@ -9,7 +9,7 @@ foreign interface, and loads it when your program runs: there is nothing to
 compile. Password hashing is its main job. It does four things:
 
 - hash a password with argon2id, check it, and tell when a hash needs
-  redoing because its limits were raised;
+  redoing because its limits changed;
 - make random bytes from the system, for keys and tokens;
 - hash bytes fast with BLAKE2b, for storing an API key without storing the
   key;
@@ -39,7 +39,7 @@ Every verb is built. chez-sodium's suites run on Linux on x86_64:
 - in CI, on Chez built from its source at the oldest version Requirements
   names: with Ubuntu 24.04's libsodium, which chez-sodium finds by itself,
   and with libsodium built from its own source, at the oldest release
-  Requirements names and at 1.0.22;
+  Requirements names and at the current release;
 - in the development container, on Guix's Chez and Guix's libsodium.
 
 Linux on arm64 has not run them. Linux is the only system supported.
@@ -89,8 +89,6 @@ The [[file:docs/quickstart.md][quick start]] shows the whole program, and how to
 - [[file:docs/tokens.md][Tokens]]: make API keys, store them, and compare secrets.
 - [[file:docs/finding-libsodium.md][Finding libsodium]]: which library is loaded, and how to name another.
 - [[file:docs/reference.md][Reference]]: every name the library exports.
-
-The same pages are on the [[https://kiyomi-computation-systems.github.io/chez-sodium/][docs site]].
 
 ** Contributing
 

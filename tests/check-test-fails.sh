@@ -30,6 +30,10 @@
 #                10.3.0, not the floor         and no suite runs
 #   floors-      a script under scripts/ci     check-floors names the line,
 #   script       writes the libsodium floor    and no suite runs
+#   floors-      SECURITY.md writes the       check-floors names the line,
+#   house        Chez floor                   and no suite runs
+#   floors-      a page of docs/ writes the   check-floors names the line,
+#   docs         libsodium floor              and no suite runs
 #   ci         job memory given a            check-ci names the key, and
 #                continue-on-error key         no suite runs
 #   no-suites    every suite deleted           make test refuses to pass
@@ -46,7 +50,7 @@
 # "check-suites: " or "test: " as a whole: check-suites' verdict, the plant's
 # outcome, the after-suite's pass line, and the count. The leaks case also
 # compares the lines starting "suite-exit-status: ", whole, the seam case those
-# starting "check-seam: ", the floors and floors-script cases those starting
+# starting "check-seam: ", the floors, floors-script, floors-house and floors-docs cases those starting
 # "check-floors: ", and the ci case those starting "check-ci: ".
 #
 # The copy is the working tree without .git, build/ and .claude/ (Claude
@@ -442,6 +446,33 @@ run_case "floors-script: check-floors names a script under scripts/ci that write
      echo 'check-floors: FAILED (problems: 1)')" \
   '^(check-suites|check-floors|test): '
 rm -f "${copy:?}/scripts/ci/plant.sh"
+
+# The floors-house and floors-docs cases: SECURITY.md writes the Chez floor,
+# and a page of docs/ writes the libsodium floor, each read from the copy's
+# floors file. check-floors reads the contributor files and every page under
+# docs/, so it names the line. Without CONTRIBUTING.md and SECURITY.md, or
+# docs, among the paths the Makefile runs check-floors on, no check sees the
+# plant and make test passes: the case fails then. check-floors passes before
+# and after: the plant is removed.
+cp "$root/SECURITY.md" "$copy/SECURITY.md"
+printf 'Chez version (%s or later),\n' "$chez_floor" >>"$copy/SECURITY.md"
+house_line=$(grep -c '' "$copy/SECURITY.md")
+run_case "floors-house: check-floors names SECURITY.md when it writes the Chez floor, and no suite runs" \
+  "$(checked 1
+     echo "check-floors: SECURITY.md: line $house_line contains the Chez floor $chez_floor, which no page may write: a page links to README.org's Requirements, which state it from packaging/floors.sexp"
+     echo 'check-floors: FAILED (problems: 1)')" \
+  '^(check-suites|check-floors|test): '
+cp "$root/SECURITY.md" "$copy/SECURITY.md"
+
+cp "$root/docs/tokens.md" "$copy/docs/tokens.md"
+printf 'It needs libsodium %s or later.\n' "$sodium_floor" >>"$copy/docs/tokens.md"
+docs_line=$(grep -c '' "$copy/docs/tokens.md")
+run_case "floors-docs: check-floors names a page of docs/ that writes the libsodium floor, and no suite runs" \
+  "$(checked 1
+     echo "check-floors: docs/tokens.md: line $docs_line contains the libsodium floor $sodium_floor, which no page may write: a page links to README.org's Requirements, which state it from packaging/floors.sexp"
+     echo 'check-floors: FAILED (problems: 1)')" \
+  '^(check-suites|check-floors|test): '
+cp "$root/docs/tokens.md" "$copy/docs/tokens.md"
 
 # The ci case: the copy's workflow gives job memory, the Valgrind gate, a
 # job-level continue-on-error key, which would let the gate fail and the run

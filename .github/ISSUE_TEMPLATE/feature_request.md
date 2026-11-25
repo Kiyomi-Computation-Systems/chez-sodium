@@ -15,8 +15,8 @@ answer?
 
 **A new binding?**
 
-chez-sodium binds only what Techo has a named use for, and adding one is a
-design decision; see the subset rule in CONTRIBUTING.md. Name:
+chez-sodium binds only what Techo, the application it is built for, has a
+named use for, and adding one is a design decision; see the subset rule in CONTRIBUTING.md. Name:
 
 - the libsodium function:
 - the use:

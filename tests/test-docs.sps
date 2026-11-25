@@ -21,11 +21,16 @@
 ;;;   fails, by its #+begin_src line; so does a README with no Scheme block,
 ;;;   and one with a block inside another, which the Org reader would not see;
 ;;; - no page says ADR- or TODO, "not yet" or any other "yet", "unreleased",
-;;;   "slice", a path in .plans, or a date written YYYY-MM-DD, in any case;
+;;;   "slice", "printable ASCII", a path in .plans, or a date written
+;;;   YYYY-MM-DD, in any case; nor holds a finding id: a capital letter, then
+;;;   capitals and digits, then -F and digits, as in M3S2-F4 or L-F7;
 ;;; - every code span of a page's prose that is one name, its chars a to z,
 ;;;   digits, -, !, ? and =, beginning sodium-, chez-sodium-, password-,
 ;;;   make-password-, random-, blake2b or constant-time-, is an export of
-;;;   (chez-sodium). A page writes BLAKE2b-512 and the like outside code;
+;;;   (chez-sodium). So is every such name in README.org's Org verbatim
+;;;   =x= or code ~x~ span, as Org's rule reads one within a line, and every
+;;;   such symbol, at any depth and quoted too, in the data of a Markdown
+;;;   Scheme fragment. A page writes BLAKE2b-512 and the like outside code;
 ;;; - every Markdown Scheme fragment whose first datum, as Chez's read reads
 ;;;   the block's text, is a list headed import is a whole program: read
 ;;;   skips a #!r6rs and comments before it. It runs as written, a program of
@@ -39,8 +44,9 @@
 ;;;   (sodium-library-unavailable? V), V the guard's variable. It prints
 ;;;   (sodium-version) as the suite reads it, as write writes it, and a
 ;;;   newline, and runs again with CHEZ_SODIUM_LIBRARY naming a file that is
-;;;   not there, exits 0 with nothing on stderr, and prints one datum, as
-;;;   write writes it, and a newline: a list whose first element is refused.
+;;;   not there, exits 0 with nothing on stderr, and prints exactly
+;;;   (refused load-failed "PATH"), PATH that file, as write writes it, and a
+;;;   newline.
 ;;;   It has no text block before the next Scheme block of its page, since
 ;;;   the version it prints differs by lane;
 ;;; - no whole program names a (chez-sodium private ...) library: no list
@@ -68,7 +74,15 @@
 ;;;   gives it a value, up to a blank, that begins with /. One after any
 ;;;   other char, as Org's verbatim =CHEZ_SODIUM_LIBRARY= is, sets nothing;
 ;;; - every page of docs/ has one level-1 heading, and it is the page's
-;;;   first line.
+;;;   first line;
+;;; - docs/reference.md's reasons are the code's. Its glossary's Reason line,
+;;;   the quoted words of the text block line that begins Reason and of the
+;;;   indented lines after it, and its reasons table's first column, are the
+;;;   library's refusal reasons, in its order. Each - `REASON`: bullet of a
+;;;   verb's entry names a reason that verb raises, which a probe of the
+;;;   verb's own mistakes shows, but for two the probe cannot reach, held to
+;;;   a quoted symbol of password-verbs.sls. The detail entry's bullets are
+;;;   the library's reasons, each once, in any order.
 ;;;
 ;;; THE RUNNABLE CONVENTION. A Markdown Scheme block whose info string is
 ;;; exactly the one word run, written ```scheme run, is run: the tests
@@ -642,14 +656,35 @@
                       (for-all digit? (string->list (substring w 8 10)))))
                (loop (+ i 1)))))))
 
+;; upper? : Char -> Boolean
+(define (upper? c) (and (char<=? #\A c) (char<=? c #\Z)))
+
+;; finding-id? : String -> Boolean
+;; Whether the text holds a finding id: a capital letter, then capitals and
+;; digits, then -F and one or more digits, as M3S2-F4, M4S0-F7 and L-F7.
+(define (finding-id? s)
+  (let ((n (string-length s)))
+    (let loop ((i 1))
+      (and (< (+ i 2) n)
+           (or (and (char=? (string-ref s i) #\-)
+                    (char=? (string-ref s (+ i 1)) #\F)
+                    (digit? (string-ref s (+ i 2)))
+                    (let back ((j (- i 1)) (capital #f))
+                      (if (and (>= j 0) (or (upper? (string-ref s j)) (digit? (string-ref s j))))
+                          (back (- j 1) (or capital (upper? (string-ref s j))))
+                          capital)))
+               (loop (+ i 1)))))))
+
 ;; forbidden : String -> (Listof String)
 ;; Which of the banned phrases the text says, in any case, a line's end
-;; between two words read as a space.
+;; between two words read as a space; and whether it holds a finding id, which
+;; is read as written.
 (define (forbidden text)
   (let ((flat (ascii-downcase (list->string (map (lambda (c) (if (char=? c #\newline) #\space c))
                                                  (string->list text))))))
     (append (filter (lambda (p) (search flat p 0))
-                    '("adr-" "todo" "not yet" " yet" "unreleased" "slice" ".plans"))
+                    '("adr-" "todo" "not yet" " yet" "unreleased" "slice" ".plans" "printable ascii"))
+            (if (finding-id? text) '("a finding id") '())
             (if (dated? flat) '("a date") '()))))
 
 ;; name-prefixes : (Listof String)
@@ -674,6 +709,47 @@
           ((and (name-like? (car rest)) (not (member (car rest) exports)) (not (member (car rest) out)))
            (loop (cdr rest) (cons (car rest) out)))
           (else (loop (cdr rest) out)))))
+
+;; org-post : (Listof Char)
+;; What may follow a closing = or ~ of an Org span, besides a blank or a line's end.
+(define org-post '(#\- #\. #\, #\; #\: #\! #\? #\' #\) #\} #\[ #\" #\\))
+
+;; org-spans : String -> (Listof String)
+;; The text of each verbatim =x= and code ~x~ span of one line of Org text,
+;; as Org's rule reads one: its marker begins the line or follows a blank or
+;; one of -({'" and is followed by a char that is no blank; it closes at the
+;; next marker of its own kind that follows a char that is no blank and is
+;; followed by the line's end, a blank or a char of org-post. A span never
+;; crosses a line.
+(define (org-spans line)
+  (let ((n (string-length line)))
+    (let loop ((i 0) (out '()))
+      (cond ((>= i n) (reverse out))
+            ((and (memv (string-ref line i) '(#\= #\~))
+                  (or (= i 0)
+                      (blank? (string-ref line (- i 1)))
+                      (memv (string-ref line (- i 1)) '(#\- #\( #\{ #\' #\")))
+                  (< (+ i 1) n)
+                  (not (blank? (string-ref line (+ i 1)))))
+             (let close ((j (+ i 2)))
+               (cond ((>= j n) (loop (+ i 1) out))
+                     ((and (char=? (string-ref line j) (string-ref line i))
+                           (not (blank? (string-ref line (- j 1))))
+                           (or (= (+ j 1) n)
+                               (blank? (string-ref line (+ j 1)))
+                               (memv (string-ref line (+ j 1)) org-post)))
+                      (loop (+ j 1) (cons (substring line (+ i 1) j) out)))
+                     (else (close (+ j 1))))))
+            (else (loop (+ i 1) out))))))
+
+;; datum-symbols : Any -> (Listof String)
+;; The name of each symbol among the datum's elements, at any depth, a
+;; vector's, a quoted datum's and a dotted tail's among them, in order.
+(define (datum-symbols x)
+  (cond ((symbol? x) (list (symbol->string x)))
+        ((pair? x) (append (datum-symbols (car x)) (datum-symbols (cdr x))))
+        ((vector? x) (apply append (map datum-symbols (vector->list x))))
+        (else '())))
 
 ;; --- the readers, on texts of the suite's own --------------------------------------------------
 
@@ -825,11 +901,23 @@
           (go '(";; => 3"))
           (go '("(define x 1)" "(list x x)" "" ";; => (1 1)" "")))))
 
-(test-equal "forbidden: each banned phrase, in any case across a line's end, and a date; a yet without its not"
-  '(("adr-" "todo" "not yet" " yet" "slice" ".plans" "a date") () (" yet"))
-  (list (forbidden "see ADR-0001, TODO: Not\nyet, a Slice of .plans/x on 2026-11-14")
+(test-equal "forbidden: each banned phrase, in any case across a line's end, a finding id and a date; a yet without its not"
+  '(("adr-" "todo" "not yet" " yet" "slice" ".plans" "printable ascii" "a finding id" "a date") ()
+    (" yet") ("unreleased") ("printable ascii") ("printable ascii") () ("a finding id"))
+  (list (forbidden "see ADR-0001, TODO: Not\nyet, a Slice of .plans/x on 2026-11-14, printable ASCII, M4S0-F7")
         (forbidden "Nothing to see: 2026-1-14 or 20261114.")
-        (forbidden "The rest is not here\nYet.")))
+        (forbidden "The rest is not here\nYet.")
+        (forbidden "Unreleased")
+        (forbidden "A Printable\nASCII hash")
+        (forbidden "printable ascii")
+        (forbidden "Printable text, and ASCII.")
+        (forbidden "L-F7")))
+
+(test-equal "finding-id?: a capital, then capitals and digits, then -F and digits, as M3S2-F4, M4S0-F7 and L-F7, at the text's start, middle and end, with more digits, or in a longer word; not F4, -F4, a lowercase id, no digit, a digit-only start, a space, or another letter after -"
+  '(yes yes yes yes yes yes yes yes yes no no no no no no no no no no)
+  (map (lambda (s) (if (finding-id? s) 'yes 'no))
+       '("M3S2-F4" "M4S0-F7" "L-F7" "A-F1" "see (L-F7)." "x M3S2-F10 y" "XM3-F1" "end A-F1" "1a B2-F3"
+         "F4" "-F4" "m3s2-f4" "M3S2-F" "M3S2-FX" "12-F3" "M3S2 F4" "M3S2- F4" "A-G4" "")))
 
 (test-equal "unknown-names: only the name-like spans that are no export, sorted, each once"
   '("chez-sodium-nope" "sodium-nope")
@@ -859,6 +947,40 @@
        '("sodium-az" "sodium-09" "sodium--" "sodium-!" "sodium-?" "sodium-=" "sodium-"
          "sodium-A" "sodium- x" "sodium-a.b" "sodium-a_b" "(sodium-a)" "sodium-a/b"
          "blake2" "Sodium-a" "ransom-a" "constant-tim")))
+
+(test-equal "org-spans: =x= and ~y~, at the line's start, after a blank, a ( and a quote, closed before a blank, a line's end and each char of org-post; a ~ span may hold ="
+  '(("x" "y") ("a" "b" "c") ("a") ("p") ("q") ("r") ("s") ("t") ("u") ("v") ("w") ("x") ("constant-time-bytevector=?") ("y"))
+  (map org-spans
+       '("a =x= b ~y~ c" "=a= start, (=b=), ~c~." "-=a=" "(=p=" "'=q='" "=r=-" "=s=;" "=t=:" "=u=!" "=v=?" "=w=)" "=x=\\"
+         "~constant-time-bytevector=?~" "CHEZ_SODIUM_LIBRARY=/x and =y=")))
+
+(test-equal "org-spans: none from a marker inside a word, one followed or preceded by a blank, an unclosed one, a closer after a blank or before a letter, the other marker, or an empty span; two kinds on a line are each read"
+  '(() () () () () () () () ("a" "b") ("p"))
+  (map org-spans
+       '("x=a=b" "a = b = c" "=a =" "=a" "~a" "=a~ b~" "=a=b" "==" "=a= ~b~ ~" "~a= =p=")))
+
+(test-equal "org-spans, held to the exports: an Org span that is a typo of an export, under each prefix, is named; each export, and a span of no prefix, is not"
+  '("blake2bb" "chez-sodium-eror?" "constant-time-bytevector?" "make-password-limit" "password-hashes"
+    "random-byte" "sodium-versio")
+  (unknown-names (apply append
+                        (map org-spans
+                             '("=sodium-versio= and ~chez-sodium-eror?~" "see =password-hashes=, ~make-password-limit~."
+                               "(=random-byte=) ~blake2bb~ =constant-time-bytevector?= =x-y=" "=sodium-version= ~password-hash~"
+                               "~constant-time-bytevector=?~ and =random-bytes= =blake2b=")))
+                 sample-exports))
+
+(test-equal "datum-symbols: each symbol of the data at any depth, a vector's, a quoted one's, a dotted tail's, in order; no string, comment or number"
+  '("define" "f" "password-verfy" "x" "quote" "password-hashes" "vector" "random-byte" "a" "sodium-nope" "b" "y")
+  (datum-symbols (datums "(define (f) (password-verfy x '(password-hashes))) #(vector random-byte) (a . sodium-nope) ;; z-nope\n\"s-nope\" 12 (b y)")))
+
+(test-equal "unknown-names, on the symbols of a fragment's data: a typo of an export, bare, quoted, in a vector or a dotted tail, is named; an export, a name of no prefix, a string and a comment are not"
+  '("blake2bb" "chez-sodium-x" "password-hashh" "password-verfy" "random-byte" "sodium-nope")
+  (unknown-names
+   (datum-symbols
+    (datums (string-append "#!r6rs (define (log-in! h p) (cond ((password-verfy h p) (when x 'password-hashh))))\n"
+                           "#(random-byte) (a . sodium-nope) \"password-nope\" ;; sodium-comment\n"
+                           "'chez-sodium-x '(blake2bb) (password-hash p) (sodium-version) 'not-found")))
+   sample-exports))
 
 (test-equal "name-like?: BLAKE2b-512 and the like, written outside a code span, are no span; a span of one is no name"
   '(no no)
@@ -1042,15 +1164,12 @@
         ((vector? x) (guards-unavailable? (vector->list x)))
         (else #f)))
 
-;; refusal-shape : String -> (U 'one-refusal String)
-;; one-refusal when TEXT is one datum, as write writes it, and a newline,
-;; that datum a list whose first element is refused; else TEXT itself.
-(define (refusal-shape text)
-  (let ((d (datums text)))
-    (if (and (= (length d) 1) (list? (car d)) (pair? (car d)) (eq? (caar d) 'refused)
-             (string=? text (string-append (shown (car d)) "\n")))
-        'one-refusal
-        text)))
+;; refusal-text : String -> String
+;; What a guarded program prints when CHEZ_SODIUM_LIBRARY names the file PATH
+;; and it is not there: the datum (refused load-failed PATH), as write writes
+;; it, and a newline.
+(define (refusal-text path)
+  (string-append "(refused load-failed " (shown path) ")\n"))
 
 (test-equal "whole-program?: a Markdown fragment whose first datum, as read reads it, is a list headed import: past blanks, a #!r6rs, a line comment, a block comment and a datum comment, in brackets, with a datum after; not one whose import comes later, a quoted import, an imports, unreadable text, a runnable block, an Org block, another language, or an empty block"
   '(#t #t #t #t #t #t #t #t no no no no no no no no no no)
@@ -1103,12 +1222,9 @@
          "(guard (e ((sodium-failed? e) 'no)) 1)"
          "(list sodium-library-unavailable? (sodium-library-unavailable? e))")))
 
-(test-equal "refusal-shape: one written datum and a newline, a list whose first element is refused; no newline, a line before, two data, another first element, a bare symbol, another spacing, or unreadable text is its own text"
-  '(one-refusal one-refusal "(refused x)" "start\n(refused x)\n" "(refused x)\n(refused y)\n"
-    "(denied x)\n" "refused\n" "(refused \"a\"  b)\n" "(refused x\n")
-  (map refusal-shape
-       '("(refused x)\n" "(refused load-failed \"/a b\")\n" "(refused x)" "start\n(refused x)\n"
-         "(refused x)\n(refused y)\n" "(denied x)\n" "refused\n" "(refused \"a\"  b)\n" "(refused x\n")))
+(test-equal "refusal-text: the datum as write writes it, its path a string with its quotes and backslashes escaped, and a newline"
+  '("(refused load-failed \"/a b\")\n" "(refused load-failed \"/a\\\"b\\\\c\")\n")
+  (list (refusal-text "/a b") (refusal-text "/a\"b\\c")))
 
 ;; --- the private libraries a whole program names ----------------------------------------------
 
@@ -1754,13 +1870,33 @@
                  read)))
       (map symbol->string (cdr (find (lambda (c) (and (pair? c) (eq? (car c) 'export))) (cddr data)))))))
 
-(test-equal "every code span of the prose that is one name of a prefix of the library is an export of (chez-sodium), by page"
+;; prose-spans : String -> (Listof String)
+;; The code spans of a page's prose: Org's =x= and ~x~ for an Org page, Markdown's
+;; `x` for any other.
+(define (prose-spans p)
+  (if (org-page? p)
+      (apply append (map org-spans (prose-of p)))
+      (code-spans (joined (prose-of p)))))
+
+(test-equal "every code span of the prose that is one name of a prefix of the library is an export of (chez-sodium), by page: README.org's Org spans =x= and ~x~ too"
   '()
   (apply append
          (map (lambda (p)
-                (let ((bad (unknown-names (code-spans (joined (prose-of p)))
-                                          export-strings)))
+                (let ((bad (unknown-names (prose-spans p) export-strings)))
                   (map (lambda (n) (list p n)) bad)))
+              pages)))
+
+(test-equal "every symbol of a Markdown Scheme fragment's data, quoted ones too, that is one name of a prefix of the library is an export of (chez-sodium), by page, line and name"
+  '()
+  (apply append
+         (map (lambda (p)
+                (apply append
+                       (map (lambda (b)
+                              (map (lambda (n) (list p (block-line b) n))
+                                   (unknown-names (datum-symbols (datums (joined (block-lines b))))
+                                                  export-strings)))
+                            (filter (lambda (b) (eq? (scheme-mark b #f) 'fragment))
+                                    (if (org-page? p) '() (scheme-blocks p))))))
               pages)))
 
 ;; --- the variable's name, and its value, on the pages ----------------------------------------------
@@ -1808,11 +1944,11 @@
 
 (define finding-tables (tables finding-prose))
 
-;; table-headed : String -> (U (List Natural (Listof String) (Listof (Listof String))) (List 'tables Natural))
-;; The one table of the page whose header's first cell is HEAD; else how
-;; many there are.
-(define (table-headed head)
-  (let ((found (filter (lambda (t) (and (pair? (cadr t)) (string=? (car (cadr t)) head))) finding-tables)))
+;; table-headed : (Listof Table) String -> (U (List Natural (Listof String) (Listof (Listof String))) (List 'tables Natural))
+;; The one table of TABLES whose header's first cell is HEAD; else how many
+;; there are.
+(define (table-headed tables head)
+  (let ((found (filter (lambda (t) (and (pair? (cadr t)) (string=? (car (cadr t)) head))) tables)))
     (if (= (length found) 1) (car found) (list 'tables (length found)))))
 
 ;; rows-of : (U Table (List 'tables Natural)) -> (U (Listof (Listof String)) (List 'tables Natural))
@@ -1826,12 +1962,29 @@
   (guard (e (#t (list 'raised (describe e))))
     (map symbol->string sodium-library-unavailable-reasons)))
 
-(test-equal "finding-libsodium.md: the reasons table's first column is the library's refusal reasons, in its order, each cell one code span"
-  library-reasons
-  (let ((rows (rows-of (table-headed "Reason"))))
+;; reasons-column : (Listof Table) -> (U (Listof (U String Any)) (List 'tables Natural))
+;; The first column of the one table headed Reason, each cell one code span's
+;; text; else why not.
+(define (reasons-column tables)
+  (let ((rows (rows-of (table-headed tables "Reason"))))
     (if (no-table? rows)
         rows
         (map (lambda (row) (if (pair? row) (cell-span (car row)) (list 'no-cell row))) rows))))
+
+(test-equal "reasons-column: the first column of the one table headed Reason, each cell's code span; a cell that is no one span, a second table headed Reason and none are named"
+  '(("a" "b") ("a" (not-one-code-span "b `c`")) (tables 2) (tables 0))
+  (let ((table (lambda (head . cells)
+                 (append (list "Prose." (string-append "| " head " | Meaning |") "|---|---|")
+                         (map (lambda (c) (string-append "| " c " | x |")) cells)
+                         (list "")))))
+    (list (reasons-column (tables (table "Reason" "`a`" "`b`")))
+          (reasons-column (tables (table "Reason" "`a`" "b `c`")))
+          (reasons-column (tables (append (table "Reason" "`a`") (table "Reason" "`b`"))))
+          (reasons-column (tables (table "System" "`a`"))))))
+
+(test-equal "finding-libsodium.md: the reasons table's first column is the library's refusal reasons, in its order, each cell one code span"
+  library-reasons
+  (reasons-column finding-tables))
 
 ;; discovery-worlds : (Listof (List String (U 'guix 'fhs #f) (Listof (Pair Symbol String))
 ;;                                   (List (U 'holds 'begins) String)))
@@ -1929,7 +2082,7 @@
                      'fhs)
         (row-agrees? linux-row 'fhs)))
 
-(define discovery-rows (rows-of (table-headed "System")))
+(define discovery-rows (rows-of (table-headed finding-tables "System")))
 
 (test-equal "finding-libsodium.md: the discovery table has a row for each of discovery's worlds, and no other"
   (length discovery-worlds)
@@ -1987,6 +2140,217 @@
                                             discovery-rows)))
                      prose-override-sources)))
 
+
+;; --- reference.md's reasons, held to the code -------------------------------------------------------
+
+(define reference-page "docs/reference.md")
+
+;; Empty when the page is not among the pages read, so each row below fails
+;; by its name.
+(define reference-prose (guard (e (#t '())) (prose-of reference-page)))
+(define reference-blocks (guard (e (#t '())) (blocks-of reference-page)))
+
+;; glossary-reasons : (Listof Block) -> (U (Listof String) 'no-reason-line)
+;; The words that begin with ' on the line of a text block that begins
+;; Reason and a blank, and on the lines after it that begin with a blank,
+;; their ' dropped; no-reason-line when no text block has one.
+(define (glossary-reasons blocks)
+  (let ((lines (apply append (map block-lines (filter (lambda (b) (string=? (block-language b) "text")) blocks)))))
+    (let find ((ls lines))
+      (cond ((null? ls) 'no-reason-line)
+            ((and (starts? (car ls) "Reason") (> (string-length (car ls)) 6) (blank? (string-ref (car ls) 6)))
+             (let take ((rest (cdr ls)) (taken (list (car ls))))
+               (if (and (pair? rest) (> (string-length (car rest)) 0) (blank? (string-ref (car rest) 0)))
+                   (take (cdr rest) (cons (car rest) taken))
+                   (apply append
+                          (map (lambda (l)
+                                 (map (lambda (w) (substring w 1 (string-length w)))
+                                      (filter (lambda (w) (starts? w "'")) (words l))))
+                               (reverse taken))))))
+            (else (find (cdr ls)))))))
+
+(test-equal "glossary-reasons: the quoted words of the Reason line and the indented lines after it; not a line after a flush or a blank one, nor a word without its quote, nor Reasons, an indented Reason or a Reason alone"
+  '(("a" "b" "c" "d") ("a") no-reason-line no-reason-line no-reason-line no-reason-line)
+  (let ((go (lambda lines (glossary-reasons (list (make-block 1 "text" '() lines #t))))))
+    (list (go "Natural   x" "Reason    one of 'a 'b" "          'c" "          'd" "Other     'z")
+          (go "Reason    one of 'a b" "" "  'z")
+          (go "Reasons   one of 'a")
+          (go "  Reason  one of 'a")
+          (go "Reason")
+          (glossary-reasons (list (make-block 1 "sh" '() '("Reason  one of 'a") #t))))))
+
+(test-equal "reference.md: its glossary's Reason line is the library's refusal reasons, in its order"
+  library-reasons
+  (glossary-reasons reference-blocks))
+
+(test-equal "reference.md: its reasons table's first column is the library's refusal reasons, in its order, each cell one code span"
+  library-reasons
+  (reasons-column (tables reference-prose)))
+
+;; entries : (Listof String) -> (Listof (Pair String (Listof String)))
+;; Each ### `NAME` entry of a Markdown page's prose, as NAME and the REASON of
+;; each of its lines that begins - `REASON`: with REASON of a to z, digits
+;; and -, in order. An entry ends at the next heading of level 3 or less.
+(define (entries prose)
+  (let loop ((ls prose) (current #f) (out '()))
+    (define (close) (if current (cons (cons (car current) (reverse (cdr current))) out) out))
+    (if (null? ls)
+        (reverse (close))
+        (let ((h (heading-of (car ls))))
+          (cond ((and h (<= (car h) 3))
+                 (loop (cdr ls)
+                       (and (= (car h) 3)
+                            (starts? (cdr h) "`") (ends? (cdr h) "`")
+                            (list (substring (cdr h) 1 (- (string-length (cdr h)) 1))))
+                       (close)))
+                ((and current (bullet-reason (car ls)))
+                 => (lambda (r) (loop (cdr ls) (cons (car current) (cons r (cdr current))) out)))
+                (else (loop (cdr ls) current out)))))))
+
+;; bullet-reason : String -> (U String #f)
+;; REASON, for a line that begins - `REASON`: with REASON of a to z, digits and -.
+(define (bullet-reason line)
+  (and (starts? line "- `")
+       (let ((close (search line "`:" 3)))
+         (and close (> close 3)
+              (let ((r (substring line 3 close)))
+                (and (for-all (lambda (c) (or (and (char<=? #\a c) (char<=? c #\z)) (digit? c) (char=? c #\-)))
+                              (string->list r))
+                     r))))))
+
+;; The reasons each verb of the reference raises: those a probe of its own
+;; mistakes gives, and these two, which no probe reaches: a password that
+;; cannot be too long once the cap holds, and a change another thread makes
+;; mid-call. They are held to a symbol the library quotes.
+(define unprobed-reasons
+  '(("password-hash" "length-out-of-range" "changed-during-call")
+    ("password-verify" "length-out-of-range" "changed-during-call")))
+
+;; Each verb's mistakes, as expressions the probe evaluates in run-env. Each
+;; is refused before any hash is made or any call reaches libsodium.
+(define reason-probes
+  '(("random-bytes" "(random-bytes \"32\")" "(random-bytes 65537)")
+    ("blake2b" "(blake2b \"x\")" "(blake2b (make-bytevector 65537 0))" "(blake2b (make-bytevector 1 0) #f)"
+     "(blake2b (make-bytevector 1 0) 15)" "(blake2b (make-bytevector 1 0) 32 #f)"
+     "(blake2b (make-bytevector 1 0) 32 (make-bytevector 0 0))"
+     "(blake2b (make-bytevector 1 0) 32 (make-bytevector 15 1))")
+    ("constant-time-bytevector=?" "(constant-time-bytevector=? 1 2)"
+     "(constant-time-bytevector=? (make-bytevector 65537 0) (make-bytevector 1 0))")
+    ("password-hash" "(password-hash 1)" "(password-hash (make-string 65537 #\\a))" "(password-hash \"pw\" 'fast)")
+    ("password-verify" "(password-verify 1 \"x\")" "(password-verify \"x\" #f)"
+     "(password-verify \"x\" (make-string 65537 #\\a))")
+    ("password-needs-rehash?" "(password-needs-rehash? 1)" "(password-needs-rehash? \"x\" 'bogus)")
+    ("make-password-limits" "(make-password-limits 1.0 8)" "(make-password-limits 0 8)"
+     "(make-password-limits 1 64.0)" "(make-password-limits 1 7)")))
+
+;; reason-of : String -> (U String (List 'other String))
+;; The reason, the first irritant, of the refusal the expression raises in
+;; run-env; else what happened.
+(define (reason-of expression)
+  (guard (e ((and (assertion-violation? e) (irritants-condition? e)
+                  (pair? (condition-irritants e)) (symbol? (car (condition-irritants e))))
+             (symbol->string (car (condition-irritants e))))
+            (#t (list 'other (describe e))))
+    (eval (car (datums expression)) run-env)
+    (list 'other "nothing raised")))
+
+(define probed-reasons
+  (map (lambda (entry) (cons (car entry) (map reason-of (cdr entry)))) reason-probes))
+
+;; raised-by : String -> (Listof String)
+;; The reasons the verb raises: its probed ones, each once, and its unprobed ones.
+(define (raised-by verb)
+  (let ((probed (assoc verb probed-reasons)) (extra (assoc verb unprobed-reasons)))
+    (distinct (append (if probed (filter string? (cdr probed)) '()) (if extra (cdr extra) '())))))
+
+;; quoted-symbols : Any -> (Listof String)
+;; The name of each symbol of each quoted datum of the data, at any depth.
+(define (quoted-symbols x)
+  (cond ((and (pair? x) (eq? (car x) 'quote) (pair? (cdr x))) (datum-symbols (cadr x)))
+        ((pair? x) (append (quoted-symbols (car x)) (quoted-symbols (cdr x))))
+        ((vector? x) (apply append (map quoted-symbols (vector->list x))))
+        (else '())))
+
+(define library-quoted
+  (guard (e (#t '()))
+    (quoted-symbols
+     (call-with-port
+      (open-file-input-port "src/chez-sodium/private/password-verbs.sls" (file-options) (buffer-mode block)
+                            (make-transcoder (utf-8-codec)))
+      read))))
+
+;; entry-problems : (Listof Entry) (Listof String) (String -> (Listof String)) -> (Listof (List String Any))
+;; Each reason an entry of a verb among VERBS names that RAISED-OF does not
+;; give for the verb, as (VERB REASON); an entry that has reasons and is no
+;; verb's, the detail entry apart, as (NAME no-such-verb).
+(define (entry-problems entries verbs raised-of)
+  (apply append
+         (map (lambda (e)
+                (cond ((member (car e) verbs)
+                       (map (lambda (r) (list (car e) r))
+                            (filter (lambda (r) (not (member r (raised-of (car e))))) (cdr e))))
+                      ((or (null? (cdr e)) (string=? (car e) "sodium-library-unavailable-detail")) '())
+                      (else (list (list (car e) 'no-such-verb)))))
+              entries)))
+
+(define sample-reference
+  (list "# R" "### `v`" "Refuses:" "" "- `a`: x." "- `b`: y." "  - `zz`: nested." "- Not `c`: text." "- `d e`: no."
+        "### `w`" "- `a`: x." "## Other" "- `a`: after the level 2." "### `x`" "- `q`: x." "#### `y`" "- `r`: deeper."
+        "### no code" "- `s`: x." "### `empty`"))
+
+(test-equal "entries: each ### `NAME` entry's bullets of the form - `REASON`:, in order, to the next heading of level 3 or less; not a nested bullet, a bullet that begins with other text or a REASON with a blank in it, one under a heading of another level or without a name in code; an entry with none is an empty one"
+  '(("v" "a" "b") ("w" "a") ("x" "q" "r") ("empty"))
+  (entries sample-reference))
+
+(test-equal "entry-problems: a reason a verb does not raise, named by verb; an entry that is no verb's, named; the detail entry and an entry with no reasons, not"
+  '(("v" "b") ("x" no-such-verb))
+  (entry-problems (entries sample-reference) '("v" "w")
+                  (lambda (verb) (if (string=? verb "v") '("a") '("a" "b")))))
+
+(test-equal "entry-problems: a verb's entry that names each reason it raises, in any order and more than once, is no problem"
+  '()
+  (entry-problems '(("v" "b" "a" "b")) '("v") (lambda (verb) '("a" "b" "c"))))
+
+(test-equal "quoted-symbols: the symbols of each quoted datum, at any depth, a vector's among them; no unquoted one, string or comment"
+  '("a" "b" "c" "d")
+  (quoted-symbols (datums "(f 'a x \"y\") (g '(b (c))) #(h 'd) ;; 'z\n(i j)")))
+
+(test-equal "the probes of each verb's mistakes each raise a refusal, whose reason is a string: those that do not, by verb"
+  '()
+  (apply append
+         (map (lambda (entry)
+                (let ((bad (filter (lambda (r) (not (string? r))) (cdr entry))))
+                  (if (null? bad) '() (list (cons (car entry) bad)))))
+              probed-reasons)))
+
+(test-equal "a probe reaches each reason the verb has that the reference's entry names, but for the unprobed ones: each verb's reasons the probes give, in order, once each"
+  '(("random-bytes" "not-a-natural" "over-the-cap")
+    ("blake2b" "not-a-bytevector" "over-the-cap" "not-a-natural" "size-out-of-range" "empty-key" "key-length-out-of-range")
+    ("constant-time-bytevector=?" "not-a-bytevector" "over-the-cap")
+    ("password-hash" "not-a-string" "over-the-cap" "not-password-limits")
+    ("password-verify" "not-a-string" "over-the-cap")
+    ("password-needs-rehash?" "not-a-string" "not-password-limits")
+    ("make-password-limits" "not-a-natural" "ops-out-of-range" "memory-out-of-range"))
+  (map (lambda (entry) (cons (car entry) (distinct (filter string? (cdr entry))))) probed-reasons))
+
+(test-equal "the reasons no probe reaches are symbols password-verbs.sls quotes"
+  '()
+  (filter (lambda (r) (not (member r library-quoted)))
+          (distinct (apply append (map cdr unprobed-reasons)))))
+
+(test-equal "reference.md: each reason an entry of a verb names is one the verb raises, by verb and reason; no entry of another name has reasons but the detail entry"
+  '()
+  (entry-problems (entries reference-prose) (map car reason-probes) raised-by))
+
+(test-equal "reference.md: each verb has an entry that names a reason: the verbs without"
+  '()
+  (let ((named (map car (filter (lambda (e) (pair? (cdr e))) (entries reference-prose)))))
+    (filter (lambda (v) (not (member v named))) (map car reason-probes))))
+
+(test-equal "reference.md: the detail entry's bullets are the library's refusal reasons, each once, in any order"
+  (guard (e (#t (list 'raised (describe e)))) (list-sort string<? library-reasons))
+  (let ((e (assoc "sodium-library-unavailable-detail" (entries reference-prose))))
+    (if e (list-sort string<? (cdr e)) 'no-detail-entry)))
 
 ;; --- whole programs, and the guarded one -----------------------------------------------------------
 
@@ -2211,12 +2575,11 @@
                   (if (null? names) '() (list (list (car w) (block-line (cadr w)) names)))))
               whole-programs)))
 
-;; status-and-stderr, stdout-of, refusal-of : Run -> ...
+;; status-and-stderr, stdout-of : Run -> ...
 ;; What a row asserts of a run's answer, or the answer when the run raised.
 (define (ran? r) (integer? (car r)))
 (define (status-and-stderr r) (if (ran? r) (list (car r) (caddr r)) r))
 (define (stdout-of r) (if (ran? r) (cadr r) r))
-(define (refusal-of r) (if (ran? r) (list (car r) (refusal-shape (cadr r)) (caddr r)) r))
 
 ;; loaded-line : (U String (List 'raised String))
 ;; What the suite reads itself of the library it loaded, as a guarded program
@@ -2254,9 +2617,9 @@
        (test-equal (string-append name "with the library there, prints the version the suite reads itself, written, and a newline")
          loaded-line
          (stdout-of (list-ref r 3)))
-       (test-equal (string-append name "with CHEZ_SODIUM_LIBRARY naming a missing file, exits 0 with nothing on stderr and prints one datum, a list whose first element is refused")
-         '(0 one-refusal "")
-         (refusal-of (list-ref r 4))))))
+       (test-equal (string-append name "with CHEZ_SODIUM_LIBRARY naming a missing file, exits 0 with nothing on stderr and prints exactly (refused load-failed PATH), as write writes it, and a newline")
+         (list 0 (refusal-text missing-library) "")
+         (list-ref r 4)))))
  program-runs)
 
 (test-end "docs")

@@ -75,8 +75,8 @@
        (head
         (meta (^ (charset "utf-8")))
         (meta (^ (name "viewport") (content "width=device-width, initial-scale=1")))
-        (meta (^ (name "description") (content "libsodium for Chez Scheme")))
-        (meta (^ (name "keywords") (content "libsodium sodium crypto password hash blake2b hmac scheme chez r6rs")))
+        (meta (^ (name "description") (content "Password hashing for Chez Scheme, through libsodium, with random bytes, BLAKE2b and a constant-time compare")))
+        (meta (^ (name "keywords") (content "libsodium sodium password hash blake2b random constant-time scheme chez r6rs")))
         (title ,title)
         (link (^ (rel "stylesheet") (href "style.css"))))
        (body

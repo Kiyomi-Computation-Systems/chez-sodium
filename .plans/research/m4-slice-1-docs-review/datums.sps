@@ -1,0 +1,20 @@
+;; Each pair BEFORE AFTER on the command line: same when Chez's read reads
+;; the same datums from both, else DIFF and the first datum that differs.
+(import (rnrs) (only (chezscheme) read))
+(define (all path)
+  (call-with-input-file path
+    (lambda (p) (let loop ((out '()))
+                  (let ((d (read p))) (if (eof-object? d) (reverse out) (loop (cons d out))))))))
+(define (first-diff a b k)
+  (cond ((and (null? a) (null? b)) #f)
+        ((or (null? a) (null? b)) (list 'length-at k))
+        ((equal? (car a) (car b)) (first-diff (cdr a) (cdr b) (+ k 1)))
+        (else (list 'datum k))))
+(let loop ((args (cdr (command-line))) (bad 0))
+  (if (null? args)
+      (exit (if (= bad 0) 0 1))
+      (let* ((b (car args)) (a (cadr args))
+             (d (guard (e (#t (list 'raised (if (message-condition? e) (condition-message e) e))))
+                  (first-diff (all b) (all a) 0))))
+        (display (if d "DIFF " "same ")) (display a) (when d (display " ") (write d)) (newline)
+        (loop (cddr args) (if d (+ bad 1) bad)))))

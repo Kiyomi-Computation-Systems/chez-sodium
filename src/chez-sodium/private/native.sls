@@ -40,10 +40,10 @@
 ;;;
 ;;; Steps 1 to 7 are the let* of one definition, load-answers, run inside one
 ;;; call-in-section: dlopen, every bind, sodium_init and the size calls happen
-;;; in one critical section, which answers data (ADR-0007). Our
-;;; own pure code refuses inside it, and the guard of call-in-section raises the refusal
-;;; again once the section has ended, where load-step, outside it, makes the
-;;; raise serious, records it and raises it. So no caller's handler runs
+;;; in one critical section, which answers data (ADR-0007). Our own pure code
+;;; refuses inside it, and the guard of call-in-section raises the refusal again
+;;; once the section has ended, where load-step, outside it, makes the raise
+;;; serious, records it and raises it. So no caller's handler runs
 ;;; inside the section. An engine spends no ticks inside a section, so the
 ;;; load is never abandoned half-done by an expiry; one abandoned before the
 ;;; section starts leaves the library wedged, which no code closes, and every

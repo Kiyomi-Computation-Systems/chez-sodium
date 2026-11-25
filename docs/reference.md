@@ -24,17 +24,18 @@ SodiumLibraryUnavailable  a condition that sodium-library-unavailable? holds
 ## What every call shares
 
 - **Mistakes are refused.** A wrong kind or size of argument raises an
-  assertion violation, checked left to right before anything else runs. Its
-  irritants are `(REASON PARAMETER VALUE)`: the rule broken, the parameter's
-  name, and its value. A string or bytevector is a secret, so it shows only
-  its kind. Each entry lists its reasons. A mistake is never a
-  `chez-sodium-error?`.
+  assertion violation, checked left to right before anything else runs.
+  `condition-irritants` gives its details, `(REASON PARAMETER VALUE)`: the
+  rule broken, the parameter's name, and the value. A secret parameter, a
+  password, a hash, an input, a key or an operand, shows only its kind,
+  such as `(kind boolean)`, whatever was passed. Any other value shows as
+  itself when it is a number, symbol, boolean or character, and by its kind
+  otherwise. An accessor's refusal names no parameter: `(REASON (kind K))`.
+  Each entry lists its reasons. A mistake is never a `chez-sodium-error?`.
 - **Every input is at most 64 KiB.** A password counts its UTF-8 bytes. A
   hash string counts characters. `random-bytes` is capped the same way.
-- **Wiping.** chez-sodium wipes the C memory it uses. It cannot wipe your own
-  string or bytevector, the bytevectors it gives back, or copies the
-  collector leaves behind. `string-fill!` and `bytevector-fill!` clear your
-  copy only.
+- **Wiping.** chez-sodium wipes the C memory it uses, and nothing else:
+  [What is wiped](passwords.md#what-is-wiped) says what that leaves.
 
 ## How the library loads
 
@@ -44,14 +45,14 @@ SodiumLibraryUnavailable  a condition that sodium-library-unavailable? holds
 - If it cannot load, that reference raises `&sodium-library-unavailable`. Each
   later reference raises it again. See [finding libsodium](finding-libsodium.md)
   for where it looks and how to point it at a file.
-- Reference it once, on one thread, before you start engines or threads that
-  reach it. A first reference on two threads at once raises Chez's own
-  "cyclic dependency" condition, not ours; a later reference answers. A first
+- A first reference on two threads at once raises Chez's own "cyclic
+  dependency" condition, not ours; a later reference answers. A first
   reference inside an engine that is then dropped leaves it stuck for the
-  rest of the process.
-- A program that names a chez-sodium procedure loads the library before its
-  first line. So a `guard` in a program cannot catch a failure of the load.
-  Use `eval` inside the guard:
+  rest of the process. [It loads once](finding-libsodium.md#it-loads-once)
+  says how to avoid both.
+- A program that names a procedure which reaches libsodium loads it before
+  its first line. So a `guard` in a program cannot catch a failure of the
+  load. Use `eval` inside the guard:
 
 ```scheme
 (guard (e ((sodium-library-unavailable? e)
@@ -128,8 +129,7 @@ Refuses, in this order, the first mistake only:
 - `key-length-out-of-range`: the key is not 16 to 64 bytes.
 
 It raises `&sodium-failed` only if libsodium fails a call whose arguments
-passed these checks. No release does. Catch it, if at all, beside
-`password-hash`'s.
+passed these checks. No release does.
 
 ### `constant-time-bytevector=?`
 
@@ -140,7 +140,8 @@ constant-time-bytevector=? : Bytevector Bytevector -> Boolean
 Answers `#t` when both bytevectors hold the same bytes, and two empty ones do.
 Equal-length operands take the same time wherever they differ. Operands of
 different lengths answer `#f` at once, so the time shows whether the lengths
-match. Compare values of a fixed length, such as hashes.
+match. [Tokens](tokens.md#compare-a-secret-in-constant-time) says when to use
+it.
 
 ```scheme run
 (constant-time-bytevector=? (u8-list->bytevector '(1 2 3))
@@ -158,11 +159,10 @@ Both operands are checked before their lengths are compared. It never raises
 
 ## The password verbs
 
-A hash is a string. Keep it exactly as `password-hash` gave it: any change, a
-space or a newline included, makes it verify `#f` for ever. A password is
-hashed as its UTF-8 bytes, exactly as given, so the same text in two Unicode
-forms verifies only against its own hash. See [passwords](passwords.md)
-for how to use them.
+A hash is a string, and any change to it makes it verify `#f`. A password is
+hashed as its UTF-8 bytes, exactly as given, never normalised.
+[Passwords](passwords.md) says how to use these verbs: logging in, what to
+check before a verify, memory, and threads.
 
 ### `password-hash`
 
@@ -173,8 +173,7 @@ password-hash : String [Limits] -> String
 Gives a fresh hash string of the password at the limits. The limits default to
 `'interactive`. The salt is fresh each call, so two hashes of one password
 differ. Each preset costs more than the one before it, in time and memory.
-Hash on a worker thread: the calling thread's interrupts wait while a hash
-runs, about 50 ms here at `'interactive` and about 2 s at `'sensitive`.
+The calling thread takes no interrupts while a hash runs.
 
 Refuses, in this order, the first mistake only:
 
@@ -183,13 +182,14 @@ Refuses, in this order, the first mistake only:
 - `length-out-of-range`: its UTF-8 is outside libsodium's own range. No
   release's range excludes anything the cap allows.
 - `not-password-limits`: the limits are no preset and no Password-limits.
-- `changed-during-call`: another thread changed the password while it ran.
+- `changed-during-call`: another thread changed the password's length as
+  UTF-8 while it ran. Any other change is not seen, and the hash is of the
+  string as it stood mid-change.
 
 It raises `&sodium-failed` when libsodium cannot do the hash, as when it cannot
 get the memory. The function is `"crypto_pwhash_str"`, and the code is what
-libsodium answered. A container's memory limit does not raise: it kills the
-process, so size a container for each hash that can run at once, 64 MiB at
-`'interactive` and more at the higher presets.
+libsodium answered. Under a container's memory limit the process is killed
+instead: see [Memory](passwords.md#memory).
 
 ### `password-verify`
 
@@ -204,15 +204,12 @@ comes first, then the password. Anything else is `#f`:
 - a hash libsodium cannot read, such as `"garbage"` or one over the cap;
 - memory libsodium could not get.
 
-Nothing tells the three apart. To guess at the last one, hash a throwaway
-string at your current limits after a `#f`: a `&sodium-failed` there means
-memory is short. Under short memory a wrong password reads as short memory
-too, and the guess fits only hashes made at your current limits.
+Nothing tells the three apart: see [What `#f` means](passwords.md#what-f-means).
 
-A hash is read only when it has 1 to 65536 characters, none a space, newline,
-U+0000 or non-ASCII character. Any other hash answers `#f` without running
-libsodium. A hash's own limits set what verifying it costs, so hashes should
-come from storage only you can write.
+A hash is read only when it has 1 to 65536 characters, each from `!` to `~`,
+U+0021 to U+007E: no space, tab, newline, DEL, other control character or
+non-ASCII character. Any other hash answers `#f` without running libsodium. A
+hash's own limits set what verifying it costs.
 
 Every refusal comes before that check, so a bad password is refused even
 against a bad hash. It refuses, the hash first, then the password:
@@ -220,14 +217,15 @@ against a bad hash. It refuses, the hash first, then the password:
 - `not-a-string`: the hash is not a string.
 - `not-a-string`: the password is not a string. `#f` from a missing form
   field is refused.
-- `over-the-cap`: the password's UTF-8 is more than 65536 bytes. This holds
-  even against an unknown account's dummy hash.
+- `over-the-cap`: the password's UTF-8 is more than 65536 bytes.
 - `length-out-of-range`: as for `password-hash`.
-- `changed-during-call`: another thread changed the hash or the password
-  while it ran.
+- `changed-during-call`: another thread put a character outside `!` to `~` in
+  the hash, or changed the password's length as UTF-8, while it ran. Any
+  other change is not seen, and the answer is for the strings as they stood
+  mid-change.
 
-Check a login form's password is a string of at most 16384 characters first,
-or catch `assertion-violation?`. It never raises `&sodium-failed`.
+It never raises `&sodium-failed`.
+[Before you verify](passwords.md#before-you-verify) says what to check first.
 
 ### `password-needs-rehash?`
 
@@ -240,17 +238,16 @@ limits, which default to `'interactive`. Everything else is `#t`: a hash made
 at other limits, a hash libsodium cannot read, `"garbage"` and `""`. It never
 raises because of the hash.
 
-So call it only after `password-verify` answers `#t`. It may answer `#f` for a
-hash that was damaged but still reads. Give it the same custom limits you
-give `password-hash`.
+It may answer `#f` for a hash that was damaged but still reads, so it is no
+check that a hash is intact. Call it only after `password-verify` answers
+`#t`: see [Logging in](passwords.md#logging-in).
 
 Refuses, the hash first, then the limits, before it looks at the hash:
 
 - `not-a-string`: the hash is not a string.
 - `not-password-limits`: the limits are no preset and no Password-limits.
 
-It never raises `&sodium-failed` itself. The new hash you then make can: wrap
-that call, and if it fails, keep the old hash and log the user in.
+It never raises `&sodium-failed`.
 
 ### `make-password-limits`
 
@@ -353,8 +350,8 @@ Gives the file the load refused, or `#f` when none was chosen.
 sodium-library-unavailable-source : SodiumLibraryUnavailable -> (U Symbol #f)
 ```
 
-Gives where that path came from, such as `override`, or `#f` when none was
-chosen. [Finding libsodium](finding-libsodium.md) lists them.
+Gives where that path came from, such as `override`, or `#f` for `not-found`.
+[Finding libsodium](finding-libsodium.md) lists them.
 
 ### `sodium-library-unavailable-detail`
 
@@ -395,7 +392,7 @@ sodium-failed-function : SodiumFailed -> String
 ```
 
 Gives the name of the C function that failed, such as `"crypto_pwhash_str"`.
-The verb that raised it is the condition's who.
+`condition-who` gives the verb that raised it.
 
 ### `sodium-failed-code`
 
