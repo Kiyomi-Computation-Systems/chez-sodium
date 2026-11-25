@@ -1,0 +1,118 @@
+guile: warning: failed to install locale
+guile: warning: failed to install locale
+guile: warning: failed to install locale
+-- override: the container's 1.0.22
+((loaded "1.0.22") again (loaded "1.0.22"))
+-- override: the floor's 1.0.18
+((loaded "1.0.18") again (loaded "1.0.18"))
+-- override: a bare soname
+(refused reason invalid-override path #f source override detail "libsodium.so.23" candidates ())
+(who chez-sodium chez-sodium-error? #t serious? #t)
+(message "CHEZ_SODIUM_LIBRARY must be an absolute path to libsodium, which chez-sodium loads with no search of its own; set one, or unset it to use discovery")
+(irritants ("libsodium.so.23"))
+(second-raise-is-the-same-condition #t)
+   uncaught:
+   | Exception in chez-sodium: CHEZ_SODIUM_LIBRARY must be an absolute path to libsodium, which chez-sodium loads with no search of its own; set one, or unset it to use discovery with irritant "libsodium.so.23"
+   | exit status of the uncaught program: 255
+-- override: set to the empty string
+(refused reason invalid-override path #f source override detail "" candidates ())
+(who chez-sodium chez-sodium-error? #t serious? #t)
+(message "CHEZ_SODIUM_LIBRARY must be an absolute path to libsodium, which chez-sodium loads with no search of its own; set one, or unset it to use discovery")
+(irritants (""))
+(second-raise-is-the-same-condition #t)
+   uncaught:
+   | Exception in chez-sodium: CHEZ_SODIUM_LIBRARY must be an absolute path to libsodium, which chez-sodium loads with no search of its own; set one, or unset it to use discovery with irritant ""
+   | exit status of the uncaught program: 255
+-- override: a relative path
+(refused reason invalid-override path #f source override detail "lib/libsodium.so.23" candidates ())
+(who chez-sodium chez-sodium-error? #t serious? #t)
+(message "CHEZ_SODIUM_LIBRARY must be an absolute path to libsodium, which chez-sodium loads with no search of its own; set one, or unset it to use discovery")
+(irritants ("lib/libsodium.so.23"))
+(second-raise-is-the-same-condition #t)
+-- override: no such file
+(refused reason load-failed path "/no/such/libsodium.so.23" source override detail "(while loading /no/such/libsodium.so.23) /no/such/libsodium.so.23: cannot open shared object file: No such file or directory" candidates ())
+(who chez-sodium chez-sodium-error? #t serious? #t)
+(message "the loader refused this libsodium; name one this Chez can load with CHEZ_SODIUM_LIBRARY, an absolute path")
+(irritants ("/no/such/libsodium.so.23"))
+(second-raise-is-the-same-condition #t)
+   uncaught:
+   | Exception in chez-sodium: the loader refused this libsodium; name one this Chez can load with CHEZ_SODIUM_LIBRARY, an absolute path with irritant "/no/such/libsodium.so.23"
+   | exit status of the uncaught program: 255
+-- override: a text file
+(refused reason load-failed path "<repo>/README.org" source override detail "(while loading <repo>/README.org) <repo>/README.org: invalid ELF header" candidates ())
+(who chez-sodium chez-sodium-error? #t serious? #t)
+(message "the loader refused this libsodium; name one this Chez can load with CHEZ_SODIUM_LIBRARY, an absolute path")
+(irritants ("<repo>/README.org"))
+(second-raise-is-the-same-condition #t)
+-- decoy at 1.0.17
+(refused reason below-floor path "<repo>/build/m4-plan/b/load/control/libsodium.so.23" source override detail "1.0.17" candidates ())
+(who chez-sodium chez-sodium-error? #t serious? #t)
+(message "libsodium 1.0.17 is older than chez-sodium's floor, 1.0.18; name a newer one with CHEZ_SODIUM_LIBRARY")
+(irritants ("<repo>/build/m4-plan/b/load/control/libsodium.so.23"))
+(second-raise-is-the-same-condition #t)
+   uncaught:
+   | Exception in chez-sodium: libsodium 1.0.17 is older than chez-sodium's floor, 1.0.18; name a newer one with CHEZ_SODIUM_LIBRARY with irritant "<repo>/build/m4-plan/b/load/control/libsodium.so.23"
+   | exit status of the uncaught program: 255
+-- decoy whose version string is NULL
+(refused reason below-floor path "<repo>/build/m4-plan/b/load/control/libsodium.so.23" source override detail #f candidates ())
+(who chez-sodium chez-sodium-error? #t serious? #t)
+(message "libsodium's version string is NULL, and chez-sodium's floor is 1.0.18; name a newer one with CHEZ_SODIUM_LIBRARY")
+(irritants ("<repo>/build/m4-plan/b/load/control/libsodium.so.23"))
+(second-raise-is-the-same-condition #t)
+-- decoy whose version reads 1.0.18-stable
+(refused reason below-floor path "<repo>/build/m4-plan/b/load/control/libsodium.so.23" source override detail "1.0.18-stable" candidates ())
+(who chez-sodium chez-sodium-error? #t serious? #t)
+(message "libsodium 1.0.18-stable is older than chez-sodium's floor, 1.0.18; name a newer one with CHEZ_SODIUM_LIBRARY")
+(irritants ("<repo>/build/m4-plan/b/load/control/libsodium.so.23"))
+(second-raise-is-the-same-condition #t)
+-- decoy whose sodium_init answers -1
+(refused reason init-failed path "<repo>/build/m4-plan/b/load/control/libsodium.so.23" source override detail -1 candidates ())
+(who chez-sodium chez-sodium-error? #t serious? #t)
+(message "sodium_init failed; name another libsodium with CHEZ_SODIUM_LIBRARY")
+(irritants ("<repo>/build/m4-plan/b/load/control/libsodium.so.23"))
+(second-raise-is-the-same-condition #t)
+   uncaught:
+   | Exception in chez-sodium: sodium_init failed; name another libsodium with CHEZ_SODIUM_LIBRARY with irritant "<repo>/build/m4-plan/b/load/control/libsodium.so.23"
+   | exit status of the uncaught program: 255
+-- decoy whose sodium_init answers 1
+((loaded "1.0.18") again (loaded "1.0.18"))
+-- decoy without crypto_pwhash_str
+(refused reason missing-api path "<repo>/build/m4-plan/b/load/lacks-pwhash-str/libsodium.so.23" source override detail "crypto_pwhash_str" candidates ())
+(who chez-sodium chez-sodium-error? #t serious? #t)
+(message "the library has no crypto_pwhash_str, so it is not a libsodium chez-sodium can use; name another with CHEZ_SODIUM_LIBRARY")
+(irritants ("<repo>/build/m4-plan/b/load/lacks-pwhash-str/libsodium.so.23"))
+(second-raise-is-the-same-condition #t)
+   uncaught:
+   | Exception in chez-sodium: the library has no crypto_pwhash_str, so it is not a libsodium chez-sodium can use; name another with CHEZ_SODIUM_LIBRARY with irritant "<repo>/build/m4-plan/b/load/lacks-pwhash-str/libsodium.so.23"
+   | exit status of the uncaught program: 255
+-- a shared object with no libsodium function
+(refused reason missing-api path "<repo>/build/m4-plan/b/load/not-sodium/libsodium.so.23" source override detail "sodium_version_string" candidates ())
+(who chez-sodium chez-sodium-error? #t serious? #t)
+(message "the library has no sodium_version_string, so it is not a libsodium chez-sodium can use; name another with CHEZ_SODIUM_LIBRARY")
+(irritants ("<repo>/build/m4-plan/b/load/not-sodium/libsodium.so.23"))
+(second-raise-is-the-same-condition #t)
+-- unset: discovery in the container
+((loaded "1.0.22") again (loaded "1.0.22"))
+-- unset: empty profiles
+(refused reason not-found path #f source #f detail #f candidates ("<repo>/build/m4-plan/b/load/empty/lib/libsodium.so.26" "<repo>/build/m4-plan/b/load/empty/lib/libsodium.so.23" "<repo>/build/m4-plan/b/load/home/.guix-home/profile/lib/libsodium.so.26" "<repo>/build/m4-plan/b/load/home/.guix-home/profile/lib/libsodium.so.23" "<repo>/build/m4-plan/b/load/home/.guix-profile/lib/libsodium.so.26" "<repo>/build/m4-plan/b/load/home/.guix-profile/lib/libsodium.so.23" "/run/current-system/profile/lib/libsodium.so.26" "/run/current-system/profile/lib/libsodium.so.23"))
+(who chez-sodium chez-sodium-error? #t serious? #t)
+(message "no libsodium found among the candidates; name one with CHEZ_SODIUM_LIBRARY, an absolute path")
+(irritants (("<repo>/build/m4-plan/b/load/empty/lib/libsodium.so.26" "<repo>/build/m4-plan/b/load/empty/lib/libsodium.so.23" "<repo>/build/m4-plan/b/load/home/.guix-home/profile/lib/libsodium.so.26" "<repo>/build/m4-plan/b/load/home/.guix-home/profile/lib/libsodium.so.23" "<repo>/build/m4-plan/b/load/home/.guix-profile/lib/libsodium.so.26" "<repo>/build/m4-plan/b/load/home/.guix-profile/lib/libsodium.so.23" "/run/current-system/profile/lib/libsodium.so.26" "/run/current-system/profile/lib/libsodium.so.23")))
+(second-raise-is-the-same-condition #t)
+   uncaught:
+   | Exception in chez-sodium: no libsodium found among the candidates; name one with CHEZ_SODIUM_LIBRARY, an absolute path with irritant ("<repo>/build/m4-plan/b/load/empty/lib/libsodium.so.26" "<repo>/build/m4-plan/b/load/empty/lib/libsodium.so.23" "<repo>/build/m4-plan/b/load/home/.guix-home/profile/lib/libsodium.so.26" "<repo>/build/m4-plan/b/load/home/.guix-home/profile/lib/libsodium.so.23" "<repo>/build/m4-plan/b/load/home/.guix-profile/lib/libsodium.so.26" "<repo>/build/m4-plan/b/load/home/.guix-profile/lib/libsodium.so.23" ...)
+   | exit status of the uncaught program: 255
+-- unset: a profile holding libsodium.so.23 alone
+((loaded "1.0.18") again (loaded "1.0.18"))
+-- unset: a profile holding both sonames
+((loaded "1.0.22") again (loaded "1.0.22"))
+-- unset: GUIX_ENVIRONMENT empty, GUIX_PROFILE holding both
+((loaded "1.0.22") again (loaded "1.0.22"))
+-- discovery's candidate lists, from the pure procedure
+(sources (override guix-environment guix-profile guix-home guix-user-profile guix-system system))
+(fhs ta6le (("/usr/local/lib/libsodium.so.26" . system) ("/usr/local/lib/libsodium.so.23" . system) ("/usr/lib/x86_64-linux-gnu/libsodium.so.26" . system) ("/usr/lib/x86_64-linux-gnu/libsodium.so.23" . system) ("/usr/lib64/libsodium.so.26" . system) ("/usr/lib64/libsodium.so.23" . system) ("/usr/lib/libsodium.so.26" . system) ("/usr/lib/libsodium.so.23" . system)))
+(guix ta6le (("/@GUIX_ENVIRONMENT/lib/libsodium.so.26" . guix-environment) ("/@GUIX_ENVIRONMENT/lib/libsodium.so.23" . guix-environment) ("/@GUIX_PROFILE/lib/libsodium.so.26" . guix-profile) ("/@GUIX_PROFILE/lib/libsodium.so.23" . guix-profile) ("/@HOME/.guix-home/profile/lib/libsodium.so.26" . guix-home) ("/@HOME/.guix-home/profile/lib/libsodium.so.23" . guix-home) ("/@HOME/.guix-profile/lib/libsodium.so.26" . guix-user-profile) ("/@HOME/.guix-profile/lib/libsodium.so.23" . guix-user-profile) ("/run/current-system/profile/lib/libsodium.so.26" . guix-system) ("/run/current-system/profile/lib/libsodium.so.23" . guix-system)))
+(fhs tarm64le (("/usr/local/lib/libsodium.so.26" . system) ("/usr/local/lib/libsodium.so.23" . system) ("/usr/lib/aarch64-linux-gnu/libsodium.so.26" . system) ("/usr/lib/aarch64-linux-gnu/libsodium.so.23" . system) ("/usr/lib64/libsodium.so.26" . system) ("/usr/lib64/libsodium.so.23" . system) ("/usr/lib/libsodium.so.26" . system) ("/usr/lib/libsodium.so.23" . system)))
+(guix tarm64le (("/@GUIX_ENVIRONMENT/lib/libsodium.so.26" . guix-environment) ("/@GUIX_ENVIRONMENT/lib/libsodium.so.23" . guix-environment) ("/@GUIX_PROFILE/lib/libsodium.so.26" . guix-profile) ("/@GUIX_PROFILE/lib/libsodium.so.23" . guix-profile) ("/@HOME/.guix-home/profile/lib/libsodium.so.26" . guix-home) ("/@HOME/.guix-home/profile/lib/libsodium.so.23" . guix-home) ("/@HOME/.guix-profile/lib/libsodium.so.26" . guix-user-profile) ("/@HOME/.guix-profile/lib/libsodium.so.23" . guix-user-profile) ("/run/current-system/profile/lib/libsodium.so.26" . guix-system) ("/run/current-system/profile/lib/libsodium.so.23" . guix-system)))
+(not-linux ta6osx ())
+(world-of-no-maps fhs)

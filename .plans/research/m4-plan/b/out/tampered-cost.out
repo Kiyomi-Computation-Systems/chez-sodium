@@ -1,0 +1,12 @@
+== libsodium at /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26
+("m=65536,t=2,p=1" verify #t ms 50.7)
+("m=65536,t=20,p=1" verify #f ms 419.3)
+("m=262144,t=3,p=1" verify #f ms 329.3)
+("m=1048576,t=4,p=1" verify #f ms 1765.5)
+== exit 0
+== libsodium at <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+("m=65536,t=2,p=1" verify #t ms 49.2)
+("m=65536,t=20,p=1" verify #f ms 397.0)
+("m=262144,t=3,p=1" verify #f ms 328.2)
+("m=1048576,t=4,p=1" verify #f ms 1760.3)
+== exit 0

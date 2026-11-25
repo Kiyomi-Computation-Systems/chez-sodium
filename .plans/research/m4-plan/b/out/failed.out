@@ -1,0 +1,33 @@
+-- decoy pwhash-str-fails: password-hash
+(sodium-failed function "crypto_pwhash_str" code -1 who password-hash message "libsodium gave no result for a call that passed its checks" irritants? #f chez-sodium-error? #t error? #t assertion? #f)
+   exit 0
+-- decoy pwhash-str-other: password-hash
+(sodium-failed function "crypto_pwhash_str" code 1 who password-hash message "libsodium gave no result for a call that passed its checks" irritants? #f chez-sodium-error? #t error? #t assertion? #f)
+   exit 0
+-- decoy pwhash-str-unreadable: password-hash
+(sodium-failed function "crypto_pwhash_str" code 0 who password-hash message "libsodium gave no result for a call that passed its checks" irritants? #f chez-sodium-error? #t error? #t assertion? #f)
+   exit 0
+-- decoy pwhash-str-empty: password-hash
+(sodium-failed function "crypto_pwhash_str" code 0 who password-hash message "libsodium gave no result for a call that passed its checks" irritants? #f chez-sodium-error? #t error? #t assertion? #f)
+   exit 0
+-- decoy generichash-fails: blake2b
+(sodium-failed function "crypto_generichash" code -1 who blake2b message "libsodium gave no result for a call that passed its checks" irritants? #f chez-sodium-error? #t error? #t assertion? #f)
+   exit 0
+-- decoy generichash-other: blake2b
+(sodium-failed function "crypto_generichash" code 1 who blake2b message "libsodium gave no result for a call that passed its checks" irritants? #f chez-sodium-error? #t error? #t assertion? #f)
+   exit 0
+-- decoy pwhash-str-fails: password-hash, uncaught
+Exception in password-hash: libsodium gave no result for a call that passed its checks
+   exit 255
+-- /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26: password-hash at 'sensitive under ulimit -v 524288
+(sodium-failed function "crypto_pwhash_str" code -1 who password-hash message "libsodium gave no result for a call that passed its checks" irritants? #f chez-sodium-error? #t error? #t assertion? #f)
+   exit 0
+-- the same, uncaught
+Exception in password-hash: libsodium gave no result for a call that passed its checks
+   exit 255
+-- <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23: password-hash at 'sensitive under ulimit -v 524288
+(sodium-failed function "crypto_pwhash_str" code -1 who password-hash message "libsodium gave no result for a call that passed its checks" irritants? #f chez-sodium-error? #t error? #t assertion? #f)
+   exit 0
+-- the same, uncaught
+Exception in password-hash: libsodium gave no result for a call that passed its checks
+   exit 255

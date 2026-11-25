@@ -9,6 +9,8 @@
   Amended 2026-11-24 in M3's plan, and accepted by the owner that day
   ([amendment](#amendment-2026-11-24-m3s-plan)).
   Its last points added after M3's slice reviews and closing review.
+  Amended 2026-11-25 in M4's plan, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-25-a-signature-comment-is-its-type-alone-m4s-plan)).
 - **Date:** 2026-11-23
 - **Scope:** the public library, and what `make check-seam` holds under `src/`
 - **Settles:** the M1 plan §4.2, items 1 and 7
@@ -139,7 +141,21 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
 
   The owner chose this on 2026-11-24.
 
+## Amendment, 2026-11-25: a signature comment is its type alone (M4's plan)
+
+Accepted (the owner, 2026-11-25), proposed in [the M4 plan](../2026-11-25-m4-plan.md), §2.1, Q4
+item 3, and §4.2, with [ADR-0013], decision 3.
+
+- **Each export's signature comment, in `src/chez-sodium.sls`, is `;; NAME : TYPE` and nothing
+  more.** A note on the arguments, such as `input, size, key`, goes on a comment line of its own
+  below, whose second word is not `:`. Four comments carried one at the end: `blake2b`'s,
+  `password-verify`'s, `password-needs-rehash?`'s and `make-password-limits`'.
+- **`test-reference` holds each to `docs/reference.md`,** character for character, and the
+  exports to the reference's entries as whole lists. That is AGENTS.md's one exception to "no test
+  reads a comment": the signature comments are the contract.
+
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0006]: 0006-errors-and-no-secret-shown.md
 [ADR-0007]: 0007-one-critical-section-per-verb.md
 [ADR-0008]: 0008-every-block-wiped-before-free.md
+[ADR-0013]: 0013-the-first-release.md

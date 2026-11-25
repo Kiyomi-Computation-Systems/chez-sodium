@@ -1,0 +1,6 @@
+== libsodium at /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26
+(hash-ms 13.598649999999992 verify-ms 13.607479000000012)
+== exit 0
+== libsodium at <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+(hash-ms 13.705960000000005 verify-ms 13.537478999999962)
+== exit 0

@@ -10,6 +10,8 @@
   choice that day ([amendment](#amendment-2026-11-24-a-secrets-refusal-states-its-bound-as-numbers)).
   Amended 2026-11-24 in M3's plan, and accepted by the owner that day
   ([amendment](#amendment-2026-11-24-m3s-plan)).
+  Amended 2026-11-25 in M4's plan, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-25-the-fallbacks-reach-measured-m4s-plan)).
   Its last points added after M3's slice reviews.
 - **Date:** 2026-11-22
 - **Scope:** every condition chez-sodium raises, and every refusal of a caller's mistake
@@ -226,6 +228,21 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
   password. `password-needs-rehash?` never raises because of the hash ([ADR-0009], decision 3),
   so it answers `#t` for a hash changed during its call (slice 0's review, M3S0-F5).
 - **A hash string that fails the pre-check is answered, not refused** ([ADR-0009]).
+
+## Amendment, 2026-11-25: the fallback's reach, measured (M4's plan)
+
+Accepted (the owner, 2026-11-25), proposed in [the M4 plan](../2026-11-25-m4-plan.md), §3.
+
+- **"Or with no overcommit" is measured nowhere.** It would need `vm.overcommit_memory=2`, which
+  needs root, and no record kept a run of it. The documents name `ulimit -v` alone
+  ([research/m4-plan/b/](../research/m4-plan/b/README.md), D7).
+- **A container's memory limit kills the process, measured.** Under a 512 MiB cgroup with no
+  swap, a `'sensitive` hash and a `'sensitive` verify were each killed, exit 137, at 1.0.18 and
+  1.0.22, and nothing was raised. `'interactive` ran to the end (pre-work B, M3-c). The brief
+  review had accepted this with no output kept.
+- **Under short memory a wrong password reads as short memory too.** The fallback's throwaway
+  hash fails whichever the password was, so the documents say the fallback can only suggest short
+  memory, never prove the password right.
 
 [ADR-0002]: 0002-runtime-discovery-and-the-sonames.md
 [ADR-0007]: 0007-one-critical-section-per-verb.md

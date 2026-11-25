@@ -1,10 +1,13 @@
-# ADR-0009: `password-needs-rehash?` answers `#t` for any hash `password-hash` would not make now
+# ADR-0009: `password-needs-rehash?` answers `#t` for a hash not made with today's algorithm and limits
 
 - **Status:** Accepted (the owner, 2026-11-22), brief §11.1. Decision 4's KiB unit and the
   bound `crypto_pwhash_strprefix` are brief §11.5; the default limits are brief §11.7.
   Amended 2026-11-24 in M3's plan, and accepted by the owner that day
   ([amendment](#amendment-2026-11-24-m3s-plan)).
   Its last points added after M3's slice reviews and closing review.
+  Amended 2026-11-25 in M4's plan, and accepted by the owner that day
+  ([amendment](#amendment-2026-11-25-the-rule-as-built-m4s-plan)): the title, decision 1 and
+  the batch-job consequence restated.
 - **Date:** 2026-11-22
 - **Scope:** `password-needs-rehash?`, the limits, and the hash-string checks it shares with
   `password-verify`
@@ -33,8 +36,10 @@
 
 ## Decision
 
-1. **What `#t` means:** this hash is not what `password-hash` would make now, at these limits.
-   The caller replaces it, using the password it has just verified.
+1. **What `#t` means:** this hash was not made with today's algorithm, parallelism and limits,
+   or libsodium cannot read it (amended 2026-11-25; the first wording was "not what
+   `password-hash` would make now"). The caller replaces it, using the password it has just
+   verified.
 2. **It answers `#t` when any of these holds:**
    1. the limits differ: libsodium answers 1;
    2. libsodium cannot read the hash: it answers -1;
@@ -90,7 +95,8 @@
   release changes the default, every older hash answers `#t` and is migrated at its next login.
 - **A batch job** that checks stored hashes without passwords gets `#t` for stale and
   unreadable hashes alike. Both read as "replace at the next login". If a job ever needs to tell
-  them apart, that is a new verb with three answers, not a raise.
+  them apart, that is a new verb with three answers, not a raise. It cannot find a damaged hash
+  that libsodium still reads (amended 2026-11-25).
 - **A hash's own limits decide what verifying it costs.** A tampered row could ask for hours of
   work or terabytes of memory, so hashes must come from trusted storage, and the documents say
   so (L-F10).
@@ -140,6 +146,40 @@ Accepted (the owner, 2026-11-24), proposed in [the M3 plan](../2026-11-24-m3-pla
   refusal, when they are made (M3C-F3).
 - **Decision 5's pre-check is `readable-hash-string?`:** every character is U+0021 to U+007E, so
   there is no U+0000, and there are at most `input-cap` characters. The empty string fails it.
+
+## Amendment, 2026-11-25: the rule as built (M4's plan)
+
+Accepted (the owner, 2026-11-25: "go with A"), proposed in [the M4 plan](../2026-11-25-m4-plan.md),
+§2.1, Q1, and §2.2.
+
+- **What it checks, as built.** It answers `#t` when the string fails the pre-check; when it does
+  not have item 4's shape; when libsodium cannot read it, which includes any string of
+  `strbytes` characters or more; or when its `m` or `t` differ from the limits given. Otherwise
+  `#f`.
+- **What it never checks:** the salt's or the tag's size, or whether the hash is whole. libsodium
+  decodes a tag at whatever length it finds, at 16 bytes or more. Measured at 1.0.18 and 1.0.22
+  ([research/m4-plan/b/](../research/m4-plan/b/README.md), D2 and D3, rerun by the caller):
+  - an argon2id hash with a 16-byte tag, which `password-hash` never makes, verifies `#t` and
+    answers `#f`;
+  - a hash with a character appended verifies `#f` and answers `#f`;
+  - a hash with its last character dropped verifies `#f`, and answers `#f` about 1 time in 16,
+    when the tag's spare bits happen to be zero, at either release.
+- **So decision 1's first wording overstated it.** "Not what `password-hash` would make now" read
+  wider than decision 2's rules, which are what the code holds. Decision 1 now says what decision 2
+  checks.
+- **Why not tighten it.** The owner chose to restate the rule:
+  - no string check can find a damaged hash, since one changed tag character keeps the shape and
+    the length. Only `password-verify`, with the password, can;
+  - the tag's size is libsodium's `STR_HASHBYTES`, 32, for which it has no function, so a check
+    would write a constant. A release that changed it would make every new hash read as stale;
+  - the only gain would be an imported hash in another shape moving to libsodium's at its next
+    login. Techo makes every hash it stores with `password-hash`.
+- **The login pattern is unchanged, and unaffected.** It asks only after `password-verify`
+  answers `#t`, and a damaged hash verifies `#f`.
+- **The documents say it:** needs-rehash tells whether a hash was made with today's algorithm and
+  limits; it is no check that the hash is intact.
+- **Decision 4's "about 55 ms a hash here"** was M3's measurement. M4's pre-work measured medians
+  of 49.0 to 50.5 ms on the same machine, and the documents say "about 50 ms here".
 
 [ADR-0001]: 0001-bind-libsodium-directly.md
 [ADR-0005]: 0005-the-subset-rule.md

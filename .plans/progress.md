@@ -61,8 +61,10 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
     - `test-no-memory` holds the no-memory codes, its children gated, under `ulimit -v`.
   - **Techo's question,** whether verify can tell short memory from a wrong password, is
     answered: no change in M3, and Techo's session was told.
-- **Next: M4,** `docs/`, `docs/reference.md` with `test-reference`, the site, `CHANGELOG.md` and
-  release 0.1.0 (brief §9). Its plan starts from "Owed to M4" below.
+- **M4 is under way:** `docs/`, `docs/reference.md` with `test-reference`, the site, `CHANGELOG.md`
+  and release 0.1.0 (brief §9; [the M4 plan](2026-11-25-m4-plan.md); ADR-0013). Slice 0, the plan
+  and the records, is on `m4-slice-0`. The owner allowed stacked PRs for M4 on 2026-11-25, as for
+  M3.
 
 ## Answered for M1
 
@@ -150,7 +152,30 @@ its questions on 2026-11-24, accepting every recommendation:
     two one, so the owner chose no change in M3: `#f` covers all three causes, and the documents
     give Techo's fallback (plan §4.2, item 4; ADR-0006, amended). Techo's session was told.
 
+## Answered for M4
+
+The M4 plan's pre-work, [research/m4-plan/](research/m4-plan/), set A for the site and the
+release and set B for the pages' facts, raised four questions. The owner answered them on
+2026-11-25:
+
+- **needs-rehash's rule: restated, not tightened** ("go with A", after discussing the trade-offs).
+  It never reads the salt's or the tag's size, so it is no check that a hash is whole (the M4
+  plan, §2.2; ADR-0009, amended).
+- **Five pages:** a quick start, passwords, tokens, finding libsodium, and the reference (ADR-0013,
+  decision 2).
+- **The docs' password examples run at the default,** a named exception to the limits rule
+  (ADR-0011, amended).
+- **The rest, accepted:** a GitHub Release for every tag; README.org's example a twin; the
+  signature comments' notes on lines of their own; Linux on x86_64 claimed, arm64 named not run;
+  the tag signed by the owner; `main` protected and a tag ruleset (ADR-0013; ADR-0010 and
+  ADR-0012, amended).
+
 ## Owed to M4
+
+Every note below was checked against the code and the real library by the M4 plan's set B. The
+plan's §3 states each as the pages will, and corrects six: the interrupts' times, the entropy
+abort, an unknown account's dummy, the stored hash, the over-cap password, and the fallback's
+reach.
 
 - **The documents' notes from M1:**
   - the first reference under an engine (ADR-0007, amended);

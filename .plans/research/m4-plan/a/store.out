@@ -1,0 +1,52 @@
+# The container, from <repo>: scripts/guix-env sh -c ...
+the profile lib/ holds no cmark
+cmark-gfm: absent
+tar: absent
+xz: absent
+curl: absent
+wget: absent
+python3: absent
+scheme: 10.4.0
+store items the container sees: 63
+
+# The host store, offline (ls and the manifest file of a profile; no guix command):
+$ ls -d /gnu/store/*-cmark-gfm-0.29.0.gfm.13 /gnu/store/*-tar-1.35 /gnu/store/*-xz-5.4.5 (directories only)
+/gnu/store/prn4x0x9i2m8mjxqyiyabay820j1snmd-cmark-gfm-0.29.0.gfm.13
+/gnu/store/ycl7zlh3b85nb5bv7wr59dcpxv0i6gv8-cmark-gfm-0.29.0.gfm.13
+/gnu/store/3wypk8y66m7jz7mxj4kf59ahbwy0p60x-tar-1.35
+/gnu/store/kwyllqh2iqdgvfdqd1lb28d20gkfdd31-tar-1.35
+/gnu/store/p2h7xqh23qsjlbapadpmfzxibxqfahpc-tar-1.35
+/gnu/store/qd17ddkv8dhl3c127l7hpw7k0nsdmwqa-tar-1.35
+/gnu/store/vlx3kkamd502jahyyn03qq9dxa63h3cz-tar-1.35
+/gnu/store/x5nk7jclncdrrsjhpmjjfl2z9p36bxyw-tar-1.35
+/gnu/store/0i4anagv296gx14v1rxkli1n2n17p5p9-xz-5.4.5
+/gnu/store/2air8vdcx9pnljsrc1szbzmd0csj9n5m-xz-5.4.5
+/gnu/store/70s4sq1hx1m5rmsg5bcnjxslwc8ppiag-xz-5.4.5
+/gnu/store/fbaw0sb21gv02qq7gs9wg5y5wlpdgzih-xz-5.4.5
+/gnu/store/gd41pn8r5723cyd6d79q9riqjbi070zz-xz-5.4.5
+/gnu/store/gziyc8kh2wd5gq3ah8vjvpr73my4cgam-xz-5.4.5
+/gnu/store/h878s2cm65k45jpgg3ns53al5c58ig2c-xz-5.4.5
+/gnu/store/h8nzyrnxm84h923xygy6iyyvwnxkwijg-xz-5.4.5
+/gnu/store/i1xn02f4wfhwh5qrvva0n7cc2wz03alj-xz-5.4.5
+/gnu/store/igsff1dix63snv2iqrkwsfxlijysfp5l-xz-5.4.5
+/gnu/store/p18c1zrjhq3y5gwmgw5g686x3pvgf7gq-xz-5.4.5
+/gnu/store/qkyw4pax652b3dcmi9c607ajls22b9vj-xz-5.4.5
+/gnu/store/y2j4x7x177cg0s1s6q7r7s7b2rsjh1gq-xz-5.4.5
+$ grep -o ... /gnu/store/3fv6gyyx6fd423iva81vcf2lqmack3nx-profile/manifest   # a chez-sqlite3 container profile at the same pin
+"/gnu/store/gsixr2n0a6aacsiy6lky6d1fjh7svqyd-valgrind-3.27.0"
+"/gnu/store/h878s2cm65k45jpgg3ns53al5c58ig2c-xz-5.4.5"
+"/gnu/store/nrlh72nrgyna5mm3p2n62mmld6al0lwv-chez-scheme-10.4.0"
+"/gnu/store/prn4x0x9i2m8mjxqyiyabay820j1snmd-cmark-gfm-0.29.0.gfm.13"
+"/gnu/store/qd17ddkv8dhl3c127l7hpw7k0nsdmwqa-tar-1.35"
+"/gnu/store/vi2anm0x47773lg48rh77dz9myhcbgmh-sqlite-3.53.1"
+"/gnu/store/zbkyjgf5b6ma77s864bank15grnvvflp-gcc-toolchain-16.2.0"
+$ grep -o ... <chez-sodium's container profile>/manifest
+"/gnu/store/flprgj390gldqvc3fzal0v3xk45s7xsf-libsodium-1.0.22"
+"/gnu/store/gsixr2n0a6aacsiy6lky6d1fjh7svqyd-valgrind-3.27.0"
+"/gnu/store/nrlh72nrgyna5mm3p2n62mmld6al0lwv-chez-scheme-10.4.0"
+"/gnu/store/zbkyjgf5b6ma77s864bank15grnvvflp-gcc-toolchain-16.2.0"
+$ diff <sibling>/channels.scm <repo>/channels.scm
+1c1
+< ;;; The Guix revision the development container is built from (ADR-0006).
+---
+> ;;; The Guix revision the development container is built from (ADR-0011).

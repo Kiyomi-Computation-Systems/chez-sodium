@@ -1,0 +1,31 @@
+## in process, plain
+first-reference 0 ms 6
+min-hash-verify 0 ms #t
+default-hash 53 ms 97
+default-verify 50 ms #t
+default-verify-wrong 49 ms #f
+needs-rehash 1 ms #f
+login-block 99 ms #t
+random-and-blake2b 1 ms 32
+Exception: attempt to reference unbound identifier bytevector
+## in process, under the gate's Valgrind
+first-reference 65 ms 6
+min-hash-verify 78 ms #t
+default-hash 686 ms 97
+default-verify 684 ms #t
+default-verify-wrong 678 ms #f
+needs-rehash 8 ms #f
+login-block 1347 ms #t
+random-and-blake2b 14 ms 32
+Exception: attempt to reference unbound identifier bytevector
+exit 255 wall 8210 ms
+ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+whole plain: exit 0 out #t wall 219 ms
+whole gate: exit 0 out #t wall 6270 ms
+ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+whole-min plain: exit 0 out #t wall 108 ms
+whole-min gate: exit 0 out #t wall 4966 ms
+ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+whole-none plain: exit 0 out 32 wall 114 ms
+whole-none gate: exit 0 out 32 wall 4891 ms
+ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)

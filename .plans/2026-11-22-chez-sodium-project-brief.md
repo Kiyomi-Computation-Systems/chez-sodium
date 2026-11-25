@@ -58,7 +58,7 @@ decision (§11.4).
 | `sodium_version_string`, `sodium_library_version_major`, `_minor` | `sodium-version` | the load's floor check, from the string (§7.2), and a report for bug reports |
 | `crypto_pwhash_str` | `password-hash` | hash a password at account creation and at a password change |
 | `crypto_pwhash_str_verify` | `password-verify` | check a login |
-| `crypto_pwhash_str_needs_rehash`, `crypto_pwhash_strprefix` | `password-needs-rehash?` | at login, re-hash a hash that is not what `password-hash` would make now (§4.2) |
+| `crypto_pwhash_str_needs_rehash`, `crypto_pwhash_strprefix` | `password-needs-rehash?` | at login, re-hash a hash not made with today's algorithm and limits (§4.2) |
 | `crypto_pwhash_strbytes`, `_opslimit_*`, `_memlimit_*`, `_passwd_min`, `_passwd_max` | the limits | ranges, and the three presets: interactive, moderate, sensitive |
 | `randombytes_buf` | `random-bytes` | make an API key |
 | `crypto_generichash`, with `_bytes`, `_bytes_min`, `_bytes_max`, `_keybytes_min` and `_keybytes_max` (ADR-0005, amended) | `blake2b` | store an API key as its BLAKE2b hash |
@@ -177,10 +177,10 @@ What this changes in the brief:
 ;; password-verify : String String -> Boolean            ; hash, password
 ;; password-needs-rehash? : String [Limits] -> Boolean    ; hash
 ;; Limits is (U 'interactive 'moderate 'sensitive Password-limits); the default is 'interactive
-;; make-password-limits : Nat Nat -> Password-limits      ; ops, memory in KiB
+;; make-password-limits : Natural Natural -> Password-limits ; ops, memory in KiB
 
-;; random-bytes : Nat -> Bytevector
-;; blake2b : Bytevector [Nat] [Bytevector] -> Bytevector   ; input, size, key
+;; random-bytes : Natural -> Bytevector
+;; blake2b : Bytevector [Natural] [Bytevector] -> Bytevector   ; input, size, key
 ;; constant-time-bytevector=? : Bytevector Bytevector -> Boolean
 ```
 
@@ -226,16 +226,19 @@ What this changes in the brief:
 
 ### 4.2 `password-needs-rehash?`
 
-**What `#t` means:** this hash is not what `password-hash` would make now, at these
-limits. The caller replaces it, using the password it has just verified.
+**What `#t` means:** this hash was not made with today's algorithm, parallelism and
+limits, or libsodium cannot read it. The caller replaces it, using the password it has
+just verified. It is no check that the hash is whole: it never reads the salt's or the
+tag's size, so a damaged hash that libsodium still parses can answer `#f`. Only
+`password-verify`, with the password, finds damage (ADR-0009, amended 2026-11-25).
 
 It answers `#t` when any of these holds:
 
 1. **The limits differ.** libsodium answers 1 because t or memory differs from the
    limits given, higher or lower.
-2. **libsodium cannot read the hash.** It answers -1: the string is corrupt, truncated,
-   or made elsewhere with a salt or tag it does not parse. Such a hash can still verify
-   (L-F7).
+2. **libsodium cannot read the hash.** It answers -1: a string it does not parse, or one
+   of `strbytes` characters or more. Such a hash can still verify (L-F7). A corrupt or
+   truncated string it still parses is not among them (ADR-0009, amended).
 3. **The string fails the pre-check** of §4.1.
 4. **The algorithm or parallelism differs.** The string does not begin with
    `crypto_pwhash_strprefix()`, or its parameters do not read `p=1`. libsodium ignores
@@ -269,7 +272,8 @@ pattern:
   verified against an imported hash (§11.1).
 - **A batch job** that checks stored hashes without passwords gets `#t` for stale and
   unreadable hashes alike. Both read as "replace at the next login". If a job ever
-  needs to tell them apart, that is a new verb with three answers, not a raise.
+  needs to tell them apart, that is a new verb with three answers, not a raise. It cannot
+  find a damaged hash that libsodium still parses.
 - **libsodium's default algorithm** is argon2id at 1.0.18 and 1.0.22.
   `password-hash` uses whatever the library's default is. `password-needs-rehash?`
   reads the expected prefix from that same library, so if a future release changes the
@@ -601,8 +605,8 @@ it catches.
 
 - **Password rows hash at libsodium's minimum**, read from `_opslimit_min` and
   `_memlimit_min`. The exceptions are row 5's cheap pair, row 7's one default hash, row 22's
-  code rows at the few cheap limits each code needs, and the no-memory rows (ADR-0011,
-  amended).
+  code rows at the few cheap limits each code needs, the no-memory rows, and the docs'
+  password examples, which `test-docs` runs at the default (ADR-0011, amended).
   Under Valgrind, a minimum hash takes about 0.4 ms, and an interactive one about 0.7 s
   (M3 plan §5.1; the review's 5 ms and 0.8 s were (P)'s).
 - **Only the no-memory rows use a high limit:** two hashes at `'sensitive`, in gated children

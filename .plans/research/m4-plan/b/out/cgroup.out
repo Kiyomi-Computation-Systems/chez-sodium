@@ -1,0 +1,19 @@
+-- 1.0.22: password-hash at 'interactive
+(made "$argon2id$v=19$m=65536,t=2,p=1$")
+   exit 0
+-- 1.0.22: password-hash at 'sensitive
+.plans/research/m4-plan/b/probes/cgroup.sh: line 14:     6 Killed                  scheme --libdirs src --program "$p" make sensitive "$s/cg.hash"
+   exit 137
+-- 1.0.22: password-verify of a 'sensitive hash, the right password
+.plans/research/m4-plan/b/probes/cgroup.sh: line 14:     7 Killed                  scheme --libdirs src --program "$p" fallback "$h" "correct horse" sensitive
+   exit 137
+-- 1.0.18: password-hash at 'interactive
+(made "$argon2id$v=19$m=65536,t=2,p=1$")
+   exit 0
+-- 1.0.18: password-hash at 'sensitive
+.plans/research/m4-plan/b/probes/cgroup.sh: line 14:    11 Killed                  scheme --libdirs src --program "$p" make sensitive "$s/cg.hash"
+   exit 137
+-- 1.0.18: password-verify of a 'sensitive hash, the right password
+.plans/research/m4-plan/b/probes/cgroup.sh: line 14:    12 Killed                  scheme --libdirs src --program "$p" fallback "$h" "correct horse" sensitive
+   exit 137
+scope exit 0

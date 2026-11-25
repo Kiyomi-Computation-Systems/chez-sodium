@@ -1,0 +1,40 @@
+blake2b
+chez-sodium-error?
+constant-time-bytevector=?
+make-password-limits
+password-hash
+password-needs-rehash?
+password-verify
+random-bytes
+sodium-failed-code
+sodium-failed-function
+sodium-failed?
+sodium-library-unavailable-candidates
+sodium-library-unavailable-detail
+sodium-library-unavailable-path
+sodium-library-unavailable-reason
+sodium-library-unavailable-source
+sodium-library-unavailable?
+sodium-version
+(count 18)
+16:   ;; sodium-version : -> String
+20:   ;; random-bytes : Natural -> Bytevector
+22:   ;; blake2b : Bytevector [Natural] [Bytevector] -> Bytevector   ; input, size, key
+24:   ;; constant-time-bytevector=? : Bytevector Bytevector -> Boolean
+28:   ;;   Limits = (U 'interactive 'moderate 'sensitive Password-limits), by default 'interactive
+29:   ;; password-hash : String [Limits] -> String
+31:   ;; password-verify : String String -> Boolean              ; hash, password
+33:   ;; password-needs-rehash? : String [Limits] -> Boolean      ; hash
+35:   ;; make-password-limits : Natural Natural -> Password-limits ; ops, memory in KiB
+39:   ;; chez-sodium-error? : Any -> Boolean
+41:   ;; sodium-library-unavailable? : Any -> Boolean
+43:   ;; sodium-library-unavailable-reason : SodiumLibraryUnavailable -> Reason
+44:   ;;   Reason = (U 'invalid-override 'not-found 'load-failed 'below-floor
+45:   ;;               'missing-api 'init-failed)
+47:   ;; sodium-library-unavailable-path : SodiumLibraryUnavailable -> (U String #f)
+49:   ;; sodium-library-unavailable-source : SodiumLibraryUnavailable -> (U Symbol #f)
+51:   ;; sodium-library-unavailable-detail : SodiumLibraryUnavailable -> Any
+53:   ;; sodium-library-unavailable-candidates : SodiumLibraryUnavailable -> (Listof String)
+55:   ;; sodium-failed? : Any -> Boolean
+57:   ;; sodium-failed-function : SodiumFailed -> String
+59:   ;; sodium-failed-code : SodiumFailed -> Integer

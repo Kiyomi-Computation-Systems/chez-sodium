@@ -1,0 +1,24 @@
+== login at /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26
+("$argon2id$v=19$m=19456,t=2,p=1$" logged-in "$argon2id$v=19$m=65536,t=2,p=1$" refused logged-in refused refused)
+exit 0
+== login at <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+("$argon2id$v=19$m=19456,t=2,p=1$" logged-in "$argon2id$v=19$m=65536,t=2,p=1$" refused logged-in refused refused)
+exit 0
+== token at /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26
+(32 32 #t #f #f)
+exit 0
+== token at <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+(32 32 #t #f #f)
+exit 0
+== version at /gnu/store/y2i9rq2kp4fmvp3359j6vr1h1iahfwmb-profile/lib/libsodium.so.26
+"1.0.22"
+exit 0
+== version at <repo>/build/slice5/prefix-1.0.18/lib/libsodium.so.23
+"1.0.18"
+exit 0
+== version with no such library
+(refused load-failed "/no/such/libsodium.so.23")
+exit 0
+== version with a bare name
+(refused invalid-override #f)
+exit 0
