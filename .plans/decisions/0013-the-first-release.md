@@ -4,6 +4,8 @@
   §2 and §4. The owner answered the plan's four questions that day, each with its recommendation.
   Decision 2 widened, and decision 14 added, in M4's slice 1, at the owner's requests that day:
   the pages say what chez-sodium is not, and the repository gains contributor files.
+  Amended 2026-11-25 at the release, at the owner's word
+  ([amendment](#amendment-2026-11-25-the-release-as-made)).
 - **Date:** 2026-11-25
 - **Scope:** `docs/`, README.org, `test-reference`, `test-docs`, the docs site and its CI, the
   comment pass, CHANGELOG.md, `Akku.manifest`'s version, and the release's steps
@@ -154,6 +156,20 @@
   its tag, and makes its Release by the same recipe.
 - **Publishing on Akku stays a later decision,** after Techo has battle-tested the library
   (brief §11.8).
+
+## Amendment, 2026-11-25: the release as made
+
+Accepted (the owner, 2026-11-25: "you do ritual and you do the tagging"), at the release
+([research/m4-release/](../research/m4-release/README.md)).
+
+- **Decision 1, as it ran:** the caller, not the owner, made the annotated tag `v0.1.0` on the
+  release PR's squash, `981ba2e`, signed it with the release key that signs chez-sqlite3's tags,
+  read `git tag -v`, and pushed it alone. The owner asked for it; the key and its passphrase are
+  the owner's, held by the workstation's gpg-agent. A later release asks again who tags.
+- **Decision 13's order, as it ran:** `main`'s push run was read after the tag, not before. Its
+  tree was the one the release PR's run had passed, and the owner was at hand for the key.
+- **Decision 12:** the Release was published by the caller at the owner's word, once the tag's CI
+  run was green, its body read back byte for byte as a draft and once published.
 
 [ADR-0009]: 0009-what-needs-rehash-means.md
 [ADR-0010]: 0010-linux-only.md

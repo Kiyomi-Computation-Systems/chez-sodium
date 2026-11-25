@@ -61,16 +61,18 @@ starting slice work. When a slice merges, update **Now**, and add a close-out un
     - `test-no-memory` holds the no-memory codes, its children gated, under `ulimit -v`.
   - **Techo's question,** whether verify can tell short memory from a wrong password, is
     answered: no change in M3, and Techo's session was told.
-- **M4 is under way:** `docs/`, `docs/reference.md` with `test-reference`, the site, `CHANGELOG.md`
-  and release 0.1.0 (brief §9; [the M4 plan](2026-11-25-m4-plan.md); ADR-0013). The owner allowed
-  stacked PRs for M4 on 2026-11-25, as for M3.
-  - **Merged:** slice 0, the plan and the records (#18, `6edcb7f`), and slice 1, the docs and the
-    site (#19, `6687b63`).
-  - **Merged:** M4's closing review and its fixes (#20, `aee5f90`).
-  - **The release:** the repository's settings are set and read back; the release branch,
-    `m4-release`, holds CHANGELOG.md's `[0.1.0]`, the manifest at 0.1.0 and the clone lines at
-    the tag ([research/m4-release/](research/m4-release/README.md)). Next: its merge, then the
-    owner's signed tag.
+- **M4 is done and released** (PRs #18 to #21, squashed onto `main` on 2026-11-25; [the M4
+  plan](2026-11-25-m4-plan.md); ADR-0013; the close-outs below): the plan and the records, #18;
+  the docs and the site, #19; the closing review's fixes, #20; and the release, #21.
+  - **v0.1.0,** an annotated tag signed with the release key, on `981ba2e`, and its GitHub Release
+    ([research/m4-release/](research/m4-release/README.md)).
+  - **Five pages,** a quick start, passwords, tokens, finding libsodium and the reference, held to
+    the code by `test-reference` and `test-docs`, and a site on GitHub Pages, deployed by the tag:
+    `https://kiyomi-computation-systems.github.io/chez-sodium/`.
+  - **CI's sixth job, `site`,** and `pages.yml`; `main` protected, every job required; a "release
+    tags" ruleset; private vulnerability reporting on.
+  - **The harness:** `make test` runs 44 suites, and `check-test-fails` plants 18 cases.
+- **Next: M5,** Tier 2, `sha256` and `hmac-sha256`, when Techo's attachments need them (brief §9).
 
 ## Answered for M1
 
@@ -176,9 +178,9 @@ release and set B for the pages' facts, raised four questions. The owner answere
   the tag signed by the owner; `main` protected and a tag ruleset (ADR-0013; ADR-0010 and
   ADR-0012, amended).
 
-## Owed to M4
+## Owed to M4, done
 
-Every note below was checked against the code and the real library by the M4 plan's set B, and is
+Each note below is stated on the pages M4 wrote. Every note below was checked against the code and the real library by the M4 plan's set B, and is
 stated here as the plan's §3 states it, which the pages follow. Six were corrected: the
 interrupts' times, the entropy abort, an unknown account's dummy, the stored hash, the over-cap
 password, and the fallback's reach.
@@ -220,7 +222,42 @@ password, and the fallback's reach.
 - **The clone-line check of `test-manifest`,** built in M4's slice 1 at 0.0.0, with no branch,
   and moved to the tag by the release (the M4 plan, §4.4).
 
+## Carried past 0.1.0
+
+None blocks a release; each is read again when its subject moves.
+- **`test-check-ci`'s time:** 193 s under the gate on CI at its worst, against the plan's 200 s
+  split line. It splits when a run passes 200 s.
+- **Linux on arm64** runs nowhere: discovery's `aarch64-linux-gnu` directory is written, and 0.1.0
+  names arm64 as not run (ADR-0010, amended).
+- **Tightening needs-rehash for imported hashes,** if Techo ever imports hashes made elsewhere
+  (the M4 plan, §2.2).
+- **`check-site`'s refusal of a release-like ref** is held only by `check-site` run with the tag,
+  as `pages.yml` runs it; no suite sets `SITE_REF`.
+- **Who makes a release's tag:** the caller made v0.1.0's at the owner's word; a later release
+  asks again (ADR-0013, amended).
+
 ## Close-outs
+
+### 2026-11-25 — the release of 0.1.0 (PR #21)
+
+- **The release branch:** CHANGELOG.md's `[0.1.0]`, `Akku.manifest` at 0.1.0, both clone lines at
+  `--branch v0.1.0`, README.org's site link, and the quick start's note on cloning a tag. Before
+  its merge: `make test` 44 of 44; `check-site` at `v0.1.0`, in the container and on Ubuntu's
+  Chez 9.5.8; and the live check on loopback, each clause watched failing. CI's run 45648811236
+  passed all six jobs.
+- **The settings,** set by the caller at the owner's word and read back: protection, Pages, the
+  environment's `v*` rule and the tag ruleset.
+- **Merged** as `981ba2e`, its tree equal to the tested head's.
+- **The tag,** made, signed and pushed by the caller at the owner's word (ADR-0013, amended):
+  `v0.1.0`, object `b8c5acb`, on `981ba2e`, a good signature from the release key.
+- **After:** Pages deployed; the live check passes against the site, and its pages equal a local
+  render byte for byte; the archives hold no `.plans/` and no `AGENTS.md`; README.org's clone line
+  runs verbatim; the Release's body is the CHANGELOG entry, byte for byte
+  ([research/m4-release/](research/m4-release/README.md)).
+- **Learned:** the owner's first run of the tag commands found `main` before the release's merge,
+  and made nothing, since the message file sat in the caller's scratch directory, which the
+  owner's shell cannot read. Give the owner commands whose every file is in the checkout, with
+  no comments, and the commit to check, after the merge, not before.
 
 ### 2026-11-25 — M4's closing review and its fixes (PR #20)
 

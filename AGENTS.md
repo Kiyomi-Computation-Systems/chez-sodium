@@ -2,7 +2,7 @@
 
 ## Where the project stands
 
-* **M4 is under way: the docs, the site and release 0.1.0.** M0 built the records,
+* **M4 is done: the docs, the site and release 0.1.0.** M0 built the records,
   the container, the test harness, the memory gate and CI. M1 built the load, the block helper and CI's `floor`
   and `current` lanes (its plan is `.plans/2026-11-22-m1-plan.md`). M2 built
   `random-bytes`, `blake2b` and `constant-time-bytevector=?` in
@@ -10,10 +10,11 @@
   built `password-hash`, `password-verify`, `password-needs-rehash?` and
   `make-password-limits` in `(chez-sodium private password-verbs)`, beside native, on a
   pure core, `(chez-sodium private password-text)` (its plan is
-  `.plans/2026-11-24-m3-plan.md`). M4 writes `docs/`, five pages held to the code by
-  `test-reference` and `test-docs`, the site and its CI, and release 0.1.0 (its plan is
-  `.plans/2026-11-25-m4-plan.md`; its record is ADR-0013). `.plans/progress.md` says
-  where the project stands and what comes next.
+  `.plans/2026-11-24-m3-plan.md`). M4 wrote `docs/`, five pages held to the code by
+  `test-reference` and `test-docs`, and the site and its CI, and released v0.1.0 (its plan
+  is `.plans/2026-11-25-m4-plan.md`; its record is ADR-0013). M5 comes
+  next: Tier 2, `sha256` and `hmac-sha256`. `.plans/progress.md` says where the project
+  stands and what comes next.
 * The plan is the brief, `.plans/2026-11-22-chez-sodium-project-brief.md`. Read it before
   any work.
   - Its §11 holds the owner's decisions; its §10 records that nothing is open.
